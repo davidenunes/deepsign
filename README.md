@@ -16,13 +16,15 @@ A complete installation would be something as follows:
  export WORKON_HOME=~/dev/envs
  mkdir -p $WORKON_HOME
  source /usr/local/bin/virtualenvwrapper.sh
+ # or
+ source /usr/bin/virtualenvwrapper.sh
  mkvirtualenv --python=/usr/bin/python3 deepsign
  ```
 
  **Note**: To access the environment anytime just run `workon deepsign`
 ### Install **TensorFlow**
 To install **TensorFlow** on the newly setup `virtualenv` just run the following:
- ```
+ ```bash
  workon deepsign
  pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0rc0-cp35-cp35m-linux_x86_64.whl
  ```
@@ -38,7 +40,7 @@ To install **TensorFlow** on the newly setup `virtualenv` just run the following
 
  Alternatively, install it in the current environment using:
 
- ```
+ ```bash
  workon deepsign
  pip3 install --upgrade git+https://github.com/davidelnunes/tensorx.git
  ```
@@ -48,7 +50,7 @@ To install **TensorFlow** on the newly setup `virtualenv` just run the following
 ### Installing the Remaining Dependencies
 Take the `requirements.txt` file provided and run the following
 
-```
+```bash
 workon deepsign
 pip3 install -r /path/to/requirements.txt
 ```
