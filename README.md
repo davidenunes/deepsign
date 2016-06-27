@@ -55,4 +55,8 @@ workon deepsign
 pip3 install -r /path/to/requirements.txt
 ```
 
-### Done
+### Download English Models for SpaCy
+```bash
+workon deepsign
+python -m spacy.en.download
+```
