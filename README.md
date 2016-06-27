@@ -11,15 +11,14 @@ A complete installation would be something as follows:
 * Make sure python 3.5 is installed.
 * Create a `virtualenv` using _virtualenv_ or _[virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)_
 
- ```bash
-
- export WORKON_HOME=~/dev/envs
- mkdir -p $WORKON_HOME
- source /usr/local/bin/virtualenvwrapper.sh
- # or
- source /usr/bin/virtualenvwrapper.sh
- mkvirtualenv --python=/usr/bin/python3 deepsign
- ```
+```bash
+export WORKON_HOME=~/dev/envs
+mkdir -p $WORKON_HOME
+source /usr/local/bin/virtualenvwrapper.sh
+# or
+source /usr/bin/virtualenvwrapper.sh
+mkvirtualenv --python=/usr/bin/python3 deepsign
+```
 
  **Note**: To access the environment anytime just run `workon deepsign`
 ### Install **TensorFlow**
@@ -40,10 +39,10 @@ To install **TensorFlow** on the newly setup `virtualenv` just run the following
 
  Alternatively, install it in the current environment using:
 
- ```bash
- workon deepsign
- pip3 install --upgrade git+https://github.com/davidelnunes/tensorx.git
- ```
+```bash
+workon deepsign
+pip3 install --upgrade git+https://github.com/davidelnunes/tensorx.git
+```
 
  **Note**: _TensorX_ also depends on _TensorFlow_, so this assumes tensorflow is already installed in the environment.
 
