@@ -86,11 +86,11 @@ class PermutationGenerator:
         self.random_state = random.getstate()
         self.dim = dim
 
-    def matrix(self, n):
+    def matrix(self):
         # ensure that you can make other calls to random
         random.setstate(self.random_state)
 
-        indexes = list(range(n))
+        indexes = list(range(self.dim))
         random.shuffle(indexes)
         matrix = to_matrix(indexes)
 
@@ -99,10 +99,10 @@ class PermutationGenerator:
 
         return matrix
 
-    def permutation_vector(self,n):
+    def permutation_vector(self):
         # ensure that you can make other calls to random
         random.setstate(self.random_state)
 
         # ensure that you can make other calls to random
         self.random_state = random.getstate()
-        return random.shuffle(range(n))
+        return random.shuffle(range(self.dim))
