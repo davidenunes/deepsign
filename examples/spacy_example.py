@@ -11,11 +11,14 @@ print(tokens)
 #for t in tokens:
  #   print("("+t.dep_ + " "+t.orth_+")")
 
-token = tokens[0]
+token = tokens[3]
 
-while token.head is not token:
-    print("("+token.orth_+"--->"+token.dep_+"--->"+token.head.orth_+")")
-    token = token.head
+print("tokens in subtree")
+for c in token.children:
+    print("(" + c.orth_ + "("+c.pos_+")--->" + c.dep_ + "--->" + c.head.orth_ + ")")
+
+print("token in head")
+print("("+token.orth_+"("+token.pos_+")--->"+token.dep_+"--->"+token.head.orth_+")")
 
 
 # for more examples https://spacy.io/docs#token
