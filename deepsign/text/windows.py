@@ -1,4 +1,4 @@
-import collections
+
 
 class WordWindow():
     """ A word window contains:
@@ -6,13 +6,13 @@ class WordWindow():
         a word which is in the center of the window
         a right [] of strings
     """
-    def __init__(self,left,word,right):
+    def __init__(self, left, target, right):
         self.left = left
-        self.word = word
+        self.target = target
         self.right = right
 
     def __str__(self):
-        return "("+str(self.left)+","+self.word+","+str(self.right)+")"
+        return "("+str(self.left)+","+self.target + "," + str(self.right) + ")"
 
 
 def sliding_windows(tokens, window_size=1):
@@ -39,10 +39,10 @@ def sliding_windows(tokens, window_size=1):
 
         # create window
         left = tokens[wl:wcl]
-        word = tokens[w]
+        target = tokens[w]
         right = tokens[wch:wh]
 
-        windows.append(WordWindow(left,word,right))
+        windows.append(WordWindow(left,target,right))
 
     return windows
 

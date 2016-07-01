@@ -1,7 +1,7 @@
 import unittest
 import numpy.testing as np_test
 import numpy as np
-from deepsign.ri.encode import BoW,BoWDir
+import deepsign.ri.encode as enc
 from deepsign.ri.sign_index import SignIndex
 from deepsign.ri.core import RandomIndexGenerator
 from deepsign.ri.permutations import PermutationGenerator
@@ -17,7 +17,7 @@ class TestEncode(unittest.TestCase):
         self.sign_index = SignIndex(self.generator)
         self.perm_generator = PermutationGenerator(dim=dim)
 
-    def test_BoW_create(self):
+    def test_bow_create(self):
         data = ["A", "B", "A", "C", "A", "B"]
 
         for s in data:
@@ -26,10 +26,11 @@ class TestEncode(unittest.TestCase):
         unique_str = set(data)
         self.assertEqual(self.sign_index.size(),len(unique_str))
 
-        encoder = BoW(self.sign_index, window_size=1)
-        vectors = encoder.encode(data)
+        windows = sliding_windows(data,window_size=1)
+        vectors = [enc.to_bow(w,self.sign_index) for w in windows]
+        self.assertEqual(len(vectors),len(windows))
 
-    def test_BoW_ignore_order(self):
+    def test_bow_ignore_order(self):
         data1 = ["A", "B"]
         data2 = ["B", "A"]
 
@@ -37,21 +38,22 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(s1)
             self.sign_index.add(s2)
 
-        encoder = BoW(self.sign_index, window_size=1)
-        v1 = encoder.encode(data1)
-        v2 = encoder.encode(data2)
+        windows1 = sliding_windows(data1,window_size=1)
+        windows2 = sliding_windows(data2, window_size=1)
 
-        np_test.assert_array_equal(v1[0],v2[0])
-        np_test.assert_array_equal(v1[1],v2[1])
+        v1 = enc.to_bow(windows1[0],self.sign_index)
+        v2 = enc.to_bow(windows2[0],self.sign_index)
+
+        np_test.assert_array_equal(v1,v2)
+        np_test.assert_array_equal(v1,v2)
 
         a_ri = self.sign_index.get_ri("A")
         b_ri = self.sign_index.get_ri("B")
 
-        np_test.assert_array_equal(v1[0]- a_ri.to_vector(),
+        np_test.assert_array_equal(v1- a_ri.to_vector(),
                                    b_ri.to_vector())
 
-    def test_BoWDir_create(self):
-        data0 = ["A"]
+    def test_bow_dir_create(self):
         data1 = ["A", "B","C"]
         data2 = ["A", "C","B"]
 
@@ -59,31 +61,16 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(data1[i])
             self.sign_index.add(data2[i])
 
-        encoder = BoWDir(self.sign_index, window_size=2)
-
-        v0 = encoder.encode(data0)
-        np_test.assert_array_equal(v0[0],self.sign_index.get_ri("A").to_vector())
-
-        v1 = encoder.encode(data1)
-        self.assertEqual(len(v1),len(data1))
-        self.assertEqual(len(v1),len(sliding_windows(data1)))
-
-        v2 = encoder.encode(data2)
-
-        # get encodings for first window of each string vector
-        u = v1[0]
-        v = v2[0]
-
         w1 = sliding_windows(data1,window_size=2)
         w2 = sliding_windows(data2,window_size=2)
+
+        perm = self.perm_generator.matrix()
+        v1 = enc.to_bow_dir(w1[0], sign_index=self.sign_index, perm_matrix=perm)
+        v2 = enc.to_bow_dir(w2[0], sign_index=self.sign_index, perm_matrix=perm)
+
         self.assertSetEqual(set(w1[0].right),set(w2[0].right))
+        np_test.assert_array_equal(v1, v2)
 
-
-
-        # first two windows should be the same
-        np_test.assert_array_equal(u,v)
-
-        #TODO refactor: encoders should work per window and not per sentence; different encoders can be applied to the whole sentence
 
 if __name__ == '__main__':
     unittest.main()

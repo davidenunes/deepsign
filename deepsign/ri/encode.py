@@ -1,83 +1,63 @@
-import deepsign.text.windows as txtw
-import deepsign.ri.permutations as perm
 import numpy as np
+from numpy import linalg as LA
 
 
-class Encoder:
-    def encode(self,seq=[]):
-        return seq
+def to_bow(window, sign_index):
+    # get vectors for each component of the window
+    left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
+    right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
+    target_v = [sign_index.get_ri(window.target).to_vector()]
+
+    ri_vs = left_vs + target_v + right_vs
+    bow_v = np.sum(ri_vs, axis=0)
+
+    return bow_v
 
 
-class WindowEncoder(Encoder):
-    def __init__(self, sign_index, window_size=1):
-        self.window_size = window_size
-        self.sign_index = sign_index
+def to_bow_dir(window, sign_index, perm_matrix):
+    target_v = sign_index.get_ri(window.target).to_vector()
+    bow_dir_v = target_v
+
+    # permutations for direction encoding
+    right_perm = perm_matrix
+    left_perm = LA.inv(perm_matrix)
+
+    left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
+    right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
+
+    if len(left_vs) > 0:
+        left_v = np.sum(left_vs, axis=0)
+        left_v = np.dot(left_v, left_perm)
+        bow_dir_v += left_v
+    if len(right_vs) > 0:
+        right_v = np.sum(right_vs, axis=0)
+        right_v = np.dot(right_v, right_perm)
+        bow_dir_v += right_v
+
+    return bow_dir_v
 
 
-class BoW(WindowEncoder):
-    def __init__(self, sign_index, window_size=1):
-        super(BoW, self).__init__(sign_index, window_size)
+def to_bow_order(window, sign_index, perm_matrix):
+    target_v = sign_index.get_ri(window.target).to_vector()
+    bow_order_v = target_v
 
-    def encode(self,seq=[]):
-        """encodes a sequence of tokens using a slidding window encoder
-        with or without including the target word of each window
+    left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
+    right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
 
-        :param seq: ['hello', 'this', 'is my sequence'] a sequence of tokens to be encoded using random indexing
-        :return:
-        """
-        index = self.sign_index
+    if len(left_vs) > 0:
+        # use negative power permutation to encode left of window
+        for i, lv in enumerate(reversed(left_vs)):
+            distance_i = -1 * (i + 1)
+            perm_i = LA.matrix_power(perm_matrix, distance_i)
+            lv_perm = np.dot(lv, perm_i)
+            bow_order_v += lv_perm
 
-        def get_vectors(window):
-            left_v = [index.get_ri(s).to_vector() for s in window.left]
-            right_v = [index.get_ri(s).to_vector() for s in window.right]
-            target_v = [index.get_ri(window.word).to_vector()]
+    if len(right_vs) > 0:
+        # positive power permutations to encode right of window
+        for i, rv in enumerate(right_vs):
+            distance_i = (i + 1)
+            perm_i = LA.matrix_power(perm_matrix, distance_i)
+            rv_perm = np.dot(rv, perm_i)
+            bow_order_v += rv_perm
 
-            return left_v + right_v + target_v
-
-        windows = txtw.sliding_windows(seq,self.window_size)
-        vectors = [np.sum(get_vectors(w),axis=0) for w in windows]
-
-        return vectors
-
-
-class BoWDir(WindowEncoder):
-    def __init__(self, sign_index, window_size=1):
-        super(BoWDir, self).__init__(sign_index, window_size)
-
-        # create and store new permutation to be used as order information
-        dim = self.sign_index.feature_dim()
-        gen = perm.PermutationGenerator(dim=dim)
-
-        self.left_permutation = gen.matrix()
-        self.right_permutation = np.linalg.inv(self.left_permutation)
-
-    def encode(self,seq=[]):
-        index = self.sign_index
-
-        windows = txtw.sliding_windows(seq, self.window_size)
-
-        # use +1 to represent right and -1 to represent left
-
-        vectors = []
-
-        for w in windows:
-
-            left_vs = [index.get_ri(s).to_vector() for s in w.left]
-            right_vs = [index.get_ri(s).to_vector() for s in w.right]
-
-            left_v = np.zeros(index.feature_dim())
-            right_v = np.zeros(index.feature_dim())
-
-            if len(left_vs) > 0:
-                left_v = np.sum(left_vs,axis=0)
-                left_v = np.dot(left_v,self.left_permutation)
-            if len(right_vs) > 0:
-                right_v = np.sum(right_vs, axis=0)
-                right_v = np.dot(right_v,self.right_permutation)
-
-            target_v = index.get_ri(w.word).to_vector()
-
-            result_v = left_v + target_v + right_v
-            vectors.append(result_v)
-
-        return vectors
+    return bow_order_v
