@@ -8,6 +8,7 @@ from deepsign.rp.permutations import PermutationGenerator
 from deepsign.rp.ri import RandomIndexGenerator
 from deepsign.utils.views import sliding_windows
 
+
 class TestEncode(unittest.TestCase):
 
     def setUp(self):
@@ -38,7 +39,7 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(s1)
             self.sign_index.add(s2)
 
-        windows1 = sliding_windows(data1,window_size=1)
+        windows1 = sliding_windows(data1, window_size=1)
         windows2 = sliding_windows(data2, window_size=1)
 
         v1 = enc.to_bow(windows1[0],self.sign_index)
@@ -54,8 +55,8 @@ class TestEncode(unittest.TestCase):
                                    b_ri.to_vector())
 
     def test_bow_dir_create(self):
-        data1 = ["A", "B","C"]
-        data2 = ["A", "C","B"]
+        data1 = ["A", "B", "C"]
+        data2 = ["A", "C", "B"]
 
         for i in range(len(data1)):
             self.sign_index.add(data1[i])

@@ -6,7 +6,7 @@
 from mpi4py import MPI
 
 import time
-import utils.vectors
+from deepsign.utils.views import divide_slice
 import numpy
 import h5py
 import sys
@@ -43,7 +43,7 @@ if comm.rank == 0:
 
     print("Master Node: preparing data, processing [ %d of %d ]"%(num_records,len(dataset)))
 
-    slices = utils.vectors.divide_slice(num_elems=num_records, num_slices=num_slaves)
+    slices = divide_slice(num_elems=num_records, num_slices=num_slaves)
 
     print("Sending Tasks to %d nodes"%(num_slaves))
     # send slices
