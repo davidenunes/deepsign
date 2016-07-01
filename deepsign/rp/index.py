@@ -2,10 +2,7 @@ from bidict import bidict
 
 
 class SignIndex():
-    """
-    TODO Note: Probably refactor this with a factory pattern to load an index from hdf5 if needed
-    I think the indexes are reasonably small to work in memory for now so, a Bidirectional Map will do
-    """
+
     def __init__(self, generator):
         """
         :param generator a random index generator

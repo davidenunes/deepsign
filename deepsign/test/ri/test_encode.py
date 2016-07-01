@@ -1,12 +1,12 @@
 import unittest
-import numpy.testing as np_test
-import numpy as np
-import deepsign.ri.encode as enc
-from deepsign.ri.sign_index import SignIndex
-from deepsign.ri.core import RandomIndexGenerator
-from deepsign.ri.permutations import PermutationGenerator
-from deepsign.text.windows import sliding_windows
 
+import numpy.testing as np_test
+
+import deepsign.rp.encode as enc
+from deepsign.rp.index import SignIndex
+from deepsign.rp.permutations import PermutationGenerator
+from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.utils.views import sliding_windows
 
 class TestEncode(unittest.TestCase):
 

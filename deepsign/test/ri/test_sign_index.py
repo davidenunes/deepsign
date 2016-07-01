@@ -1,6 +1,6 @@
 import unittest
-from deepsign.ri.core import RandomIndexGenerator, RandomIndex
-from deepsign.ri.sign_index import SignIndex
+from deepsign.rp.ri import RandomIndexGenerator, RandomIndex
+from deepsign.rp.index import SignIndex
 
 
 class TestSignIndex(unittest.TestCase):

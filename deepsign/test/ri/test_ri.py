@@ -1,5 +1,5 @@
 import unittest
-import deepsign.ri.core as ri
+from deepsign.rp import ri
 
 
 class TestRI(unittest.TestCase):
@@ -25,7 +25,6 @@ class TestRI(unittest.TestCase):
         vectors = [gen.generate().to_vector() for x in range(0, 18)]
 
         for v in vectors: print(v)
-
 
 if __name__ == '__main__':
     unittest.main()

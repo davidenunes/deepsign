@@ -1,5 +1,5 @@
 import unittest
-import deepsign.utils.vector as split
+import deepsign.utils.views as split
 
 
 class TestSplit(unittest.TestCase):

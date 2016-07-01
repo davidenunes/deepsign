@@ -3,7 +3,6 @@ from numpy import linalg as LA
 
 
 def to_bow(window, sign_index):
-    # get vectors for each component of the window
     left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
     right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
     target_v = [sign_index.get_ri(window.target).to_vector()]
