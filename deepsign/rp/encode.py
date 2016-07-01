@@ -12,7 +12,6 @@ def to_bow(window, sign_index):
 
     return bow_v
 
-
 def to_bow_dir(window, sign_index, perm_matrix):
     target_v = sign_index.get_ri(window.target).to_vector()
     bow_dir_v = target_v
@@ -60,3 +59,5 @@ def to_bow_order(window, sign_index, perm_matrix):
             bow_order_v += rv_perm
 
     return bow_order_v
+
+
