@@ -4,6 +4,7 @@ import h5py
 import os.path
 from deepsign.utils.views import sliding_windows
 from deepsign.rp import encode as enc
+import deepsign.text.tokenizer as tk
 from spacy.en import English
 
 data_path = "/Dropbox/research/Data/WaCKy/wacky.hdf5"
@@ -25,16 +26,35 @@ print("Loading English Model...")
 nlp =  English()
 print("Done!")
 
-num_sentences = 100
+
+#sentence = dataset[6][0]
+sentence = ":) Granada don't, the 'Alhambra' and the city 's plain , the Alhama mountain , the picturesque Axarquía region , Antequera and its stunning torcal mountain , the El Chorro gorge , Ronda mountain , Cortes Nature Reserve , Alcornocales mountain , magnificent view out to Africa from Tarifa , these are just some of the place , people and pleasure that you will discover as you ride the ancient trail of Andalusia ."
+
+print(sentence)
+
+tokens1 = tk.tokenize(sentence)
+print(tokens1)
+
+doc = nlp(sentence)
+tokens2 = [w.orth_ for w in doc]
+print(tokens2)
+
+"""
+num_sentences = 10
 for i in range(num_sentences):
     sentence = dataset[i][0]
+
+    tokens1 = tk.tokenize(sentence)
+    print(tokens1)
+
+
+    # spacy process
     doc = nlp(sentence)
-    print(doc)
+    tokens2 = [w.orth_ for w in doc]
+    print(tokens2)
 
     tokens = [t.orth_ for t in doc if not t.is_punct]
-    tokens_ents = [t.orth_ for t in doc if t.ent_type != 0]
-    print("entities:")
-    print(tokens_ents)
+
 
     #windows = sliding_windows(tokens,window_size=2)
     #for w in windows:
@@ -44,7 +64,7 @@ for i in range(num_sentences):
     for token in doc:
         # print head
         print(token.dep_ + "(" + token.head.orth_ + "("+token.head.pos_+")" + "," + token.orth_ + "("+token.pos_+")"+ ")")
-        for child in token.children:
-            print(child.dep_ + "(" + token.orth_ + "("+token.pos_+")" + "," + child.orth_ + "("+child.pos_+")" +  ")")
+
+"""
 
 f.close()
