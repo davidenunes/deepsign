@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
+import time
 import h5py
 import os.path
+from spacy.en import English
 from deepsign.utils.views import sliding_windows
 from deepsign.rp import encode as enc
-import deepsign.text.tokenizer as tk
-from spacy.en import English
 
-data_path = "/Dropbox/research/Data/WaCKy/wacky.hdf5"
+
+data_path = "/data/datasets/wacky.hdf5"
 home = os.getenv("HOME")
 dataset_path = home+data_path
 
@@ -22,22 +23,12 @@ dataset = f[dataset_name]
 # do something with the dataset
 
 
-print("Loading English Model...")
+print("Loading Spacy English Model")
+t0 = time.time()
 nlp =  English()
-print("Done!")
+t1 = time.time()
+print("Done: %d secs ",t1-t0 / 1000)
 
-
-#sentence = dataset[6][0]
-sentence = ":) Granada don't, the 'Alhambra' and the city 's plain , the Alhama mountain , the picturesque Axarquía region , Antequera and its stunning torcal mountain , the El Chorro gorge , Ronda mountain , Cortes Nature Reserve , Alcornocales mountain , magnificent view out to Africa from Tarifa , these are just some of the place , people and pleasure that you will discover as you ride the ancient trail of Andalusia ."
-
-print(sentence)
-
-tokens1 = tk.tokenize(sentence)
-print(tokens1)
-
-doc = nlp(sentence)
-tokens2 = [w.orth_ for w in doc]
-print(tokens2)
 
 """
 num_sentences = 10
