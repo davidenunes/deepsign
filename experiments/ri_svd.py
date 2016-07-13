@@ -20,8 +20,7 @@ window_size = 4
 ri_dim = 500
 ri_active = 5
 
-num_sentences = 4
-
+num_sentences = 10
 
 
 data_path = "/data/datasets/wacky.hdf5"
@@ -79,33 +78,29 @@ for i in range(num_sentences):
             occurrences[sign_id] = bow_vector + current_vector
 
     t1 = time.time()
-    print("Sentence %d processed in: {0:.10f} secs ".format(i+1,t1 - t0))
+    print("Sentence {0} processed in: {1:.10f} secs ".format(i+1,t1 - t0))
 
 
-# Create Random Indexing Occurrence Matrix
+# Create corpus matrix based on ri
 num_rows = len(occurrences)
 
 keys = occurrences.keys()
-occurr_matrix = np.matrix([occurrences[k] for k in keys])
-
-
-
-
+c_matrix = np.matrix([occurrences[key] for key in keys])
+print(c_matrix.shape)
 
 # Perform Singular Value Decomposition
-U, S, V = np.linalg.svd(occurr_matrix, full_matrices=True)
-print((U.shape, S.shape, V.shape))
+U, s, V_t = np.linalg.svd(c_matrix, full_matrices=False)
+print((U.shape, s.shape, V_t.shape))
 
-n_components = 100
-rU = U[:, :n_components]
-rS = S[:n_components]
-rV = V[:n_components, :]
+# number of components to consider
+k = 100
+rU = U[:, :k]
+rs = s[:k]
 
-print((rU.shape, rS.shape, rV.shape))
-# reconstruct matrix from the first rn components
-r_occurr_matrix  = np.dot(rU, np.dot(rS, rV.T))
-print(r_occurr_matrix.shape)
 
+print((rU.shape, rs.shape))
+ld_matrix = np.dot(rU, np.diag(rs))
+print(ld_matrix.shape)
 
 
 f.close()
