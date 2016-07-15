@@ -1,5 +1,6 @@
 import unittest
 from deepsign.rp import ri
+import numpy as np
 
 
 class TestRI(unittest.TestCase):
@@ -25,6 +26,24 @@ class TestRI(unittest.TestCase):
         vectors = [gen.generate().to_vector() for x in range(0, 18)]
 
         for v in vectors: print(v)
+
+    def test_rescale(self):
+        dim = 10
+        active = 4
+
+        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+
+        ri1 = gen.generate().to_vector()
+        ri2 = gen.generate().to_vector()
+
+        s = ri1 + ri1 + ri2
+
+        print(s)
+
+        print(s/np.max(s,axis=0))
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

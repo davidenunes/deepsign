@@ -60,3 +60,9 @@ pip3 install -r /path/to/requirements.txt
 workon deepsign
 python -m spacy.en.download
 ```
+
+### Plotting with Matplotlib
+To use a GUI backend for matplotlib
+```bash
+sudo apt-get install tcl-dev tk-dev
+```
