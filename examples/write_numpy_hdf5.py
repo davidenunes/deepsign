@@ -47,5 +47,4 @@ print("random index vectors written")
 sum_vectors = h5f.create_dataset(dataset_name+"_sum", data=c_matrix, compression="gzip")
 print("random index sum vectors written")
 
-
 h5f.close()
