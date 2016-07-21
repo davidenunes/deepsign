@@ -3,6 +3,7 @@ import numpy as np
 
 
 class RandomIndex:
+
     def __init__(self,dim,positive,negative):
         self.positive = positive
         self.negative = negative
@@ -13,6 +14,18 @@ class RandomIndex:
         v[self.positive] = 1
         v[self.negative] = -1
         return v
+
+    def to_sparse(self):
+        return np.array(self.positive+self.negative)
+
+
+def from_sparse(dim, active, active_list):
+    num_positive = active // 2
+
+    positive = active_list[0:num_positive]
+    negative = active_list[num_positive:len(active_list)]
+
+    return RandomIndex(dim=dim,positive=positive,negative=negative)
 
 
 class RandomIndexGenerator:

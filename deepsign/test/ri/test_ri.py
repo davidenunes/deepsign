@@ -1,6 +1,7 @@
 import unittest
 from deepsign.rp import ri
 import numpy as np
+import numpy.testing as npt
 
 
 class TestRI(unittest.TestCase):
@@ -42,6 +43,21 @@ class TestRI(unittest.TestCase):
 
         print(s/np.max(s,axis=0))
 
+    def test_to_sparse(self):
+        dim = 100
+        active = 4
+
+        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+
+        index1 = gen.generate()
+        ri_v1 = index1.to_vector()
+        sparse_array = index1.to_sparse()
+        self.assertEqual(len(sparse_array),active)
+
+        index2 = ri.from_sparse(dim,active,sparse_array)
+        ri_v2 = index2.to_vector()
+
+        npt.assert_array_equal(ri_v1,ri_v2)
 
 
 
