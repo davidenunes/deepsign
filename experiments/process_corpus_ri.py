@@ -74,6 +74,9 @@ for i in tqdm(range(num_sentences)):
     # remove punctuation and stop words
     # TODO additional pre-processing substitute time and URLs by T_TIME, and T_URL, etc?
     # TODO all caps to lower except entities
+    # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
+    # TODO some words are tokenised to 's n't, decide what to keep and remove
+    # TODO substitute numbers for T_NUMBER ?
     tokens = [t.orth_ for t in p_sentence if not t.is_punct and not t.is_stop]
     #print(p_sentence)
     #print(tokens)
