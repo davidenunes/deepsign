@@ -1,4 +1,5 @@
 import itertools
+import numpy as np
 
 
 def _pairwise(iterable):
@@ -74,3 +75,31 @@ def sliding_windows(seq, window_size=1):
         windows.append(Window(left, target, right))
 
     return windows
+
+
+class SparseArray(object):
+    def __init__(self, dim, active, values):
+        self.dim = dim
+        self.active = active
+        self.values = values
+
+    def to_vector(self):
+        v = np.zeros(self.dim)
+        v[self.active] = self.values
+        return v
+
+
+def np_to_sparse(sparse_array):
+    """ converts a 1D numpy array to a sparse version
+    :param sparse_array the array to be converted
+    """
+    if not isinstance(sparse_array,np.ndarray):
+        raise TypeError("Expected type: {0}, actual type: {1} ".format(np.ndarray,type(sparse_array)))
+    active = np.nonzero(sparse_array)
+    values = sparse_array[active]
+    dim = sparse_array.shape[0]
+    result = SparseArray(dim=dim,active=active,values=values)
+    return result
+
+
+

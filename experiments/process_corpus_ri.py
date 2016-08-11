@@ -16,9 +16,6 @@ from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-
-
-
 from sklearn.manifold import TSNE
 
 import gc
@@ -49,7 +46,7 @@ dataset = h5f[dataset_name]
 print("Loading Spacy English Model")
 t0 = time.time()
 # load tokenizer only
-nlp =  English(entity=False,load_vectors=False,parser=False,tagger=False)
+nlp =  English(entity=False,load_vectors=False,parser=True,tagger=True)
 t1 = time.time()
 print("Done: {0:.2f} secs ".format(t1-t0))
 
@@ -75,9 +72,26 @@ for i in tqdm(range(num_sentences)):
     # TODO additional pre-processing substitute time and URLs by T_TIME, and T_URL, etc?
     # TODO all caps to lower except entities
     # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
-    # TODO some words are tokenised to 's n't, decide what to keep and remove
+    # TODO
     # TODO substitute numbers for T_NUMBER ?
-    tokens = [t.orth_ for t in p_sentence if not t.is_punct and not t.is_stop]
+
+
+
+    def get_string(token):
+        w = token.orth_
+
+        # some words are tokenised with 's and n't, apply this before filtering stop words
+        if w == "'s":
+            w = "is"
+        elif w == "n't":
+            w = "not"
+        return w
+
+
+
+    tokens = [t.orth_ for t in p_sentence if not t.is_punct]
+
+
     #print(p_sentence)
     #print(tokens)
 
@@ -106,6 +120,8 @@ for i in tqdm(range(num_sentences)):
 h5f.close()
 
 # open hdf5 file to write
+
+# TODO do this online it is too memory intensive
 
 # prepare data
 word_ids = occurrences.keys()

@@ -1,10 +1,16 @@
 from spacy.en import English
 import spacy.parts_of_speech as POS
+from spacy.strings import StringStore
+from spacy.tokens import Doc
+
 
 
 print("Loading English Model...")
 nlp =  English()
 print("Done!")
+
+print("Vocab. Size: ",len(nlp.vocab.strings))
+print("hello" in nlp.vocab.strings)
 
 
 print("Available Parts-Of-Speech:")
@@ -16,6 +22,9 @@ print(VERB)
 #loads the entire nlp pipeline with parser, named-entity recognition, pos tagger
 tokens = nlp(u'Mr Anderson, welcome back, we missed you.')
 print(tokens)
+
+
+
 
 
 def print_subtree(token):
@@ -81,5 +90,6 @@ print(tokens)
 
 token = tokens[1]
 print_subtree(token)
+
 
 
