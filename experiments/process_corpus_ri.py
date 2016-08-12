@@ -72,13 +72,13 @@ for i in tqdm(range(num_sentences)):
     # TODO additional pre-processing substitute time and URLs by T_TIME, and T_URL, etc?
     # TODO all caps to lower except entities
 
-    # TODO remove E-MAILS substitute by T_EMAIL 
+    # TODO remove E-MAILS substitute by T_EMAIL
     # TODO substitute numbers for T_NUMBER ?
 
 
     # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
-    def is_stop_custom(token):
-        w = token.orth_
+    def is_stop_custom(t):
+        w = t.orth_
 
         # some words are tokenised with 's and n't, apply this before filtering stop words
         custom_stop = ["'s",
@@ -92,7 +92,18 @@ for i in tqdm(range(num_sentences)):
 
         return False
 
-    tokens = [t.orth_ for t in p_sentence if not (t.is_punct or is_stop_custom(t))]
+
+    def replace_special(t):
+        result = t.orth_
+
+        if t.like_url:
+            result = "T_URL"
+        elif t.like_email:
+            result = "T_EMAIL"
+
+        return result
+
+    tokens = [replace_special(t) for t in p_sentence if not (t.is_punct or t.is_stop or is_stop_custom(t))]
 
 
     #print(p_sentence)
