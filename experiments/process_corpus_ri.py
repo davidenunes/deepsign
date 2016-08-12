@@ -71,29 +71,32 @@ for i in tqdm(range(num_sentences)):
     # remove punctuation and stop words
     # TODO additional pre-processing substitute time and URLs by T_TIME, and T_URL, etc?
     # TODO all caps to lower except entities
-    # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
-    # TODO
+
+    # TODO remove E-MAILS substitute by T_EMAIL 
     # TODO substitute numbers for T_NUMBER ?
 
 
-
-    def get_string(token):
+    # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
+    def is_stop_custom(token):
         w = token.orth_
 
         # some words are tokenised with 's and n't, apply this before filtering stop words
-        if w == "'s":
-            w = "is"
-        elif w == "n't":
-            w = "not"
-        return w
+        custom_stop = ["'s",
+                       "@card@",
+                       "@ord@",
+                       ]
 
+        for stop in custom_stop:
+            if w == stop:
+                return True
 
+        return False
 
-    tokens = [t.orth_ for t in p_sentence if not t.is_punct]
+    tokens = [t.orth_ for t in p_sentence if not (t.is_punct or is_stop_custom(t))]
 
 
     #print(p_sentence)
-    #print(tokens)
+    print(tokens)
 
     # Add Tokens to ri Index
     for token in tokens:

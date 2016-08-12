@@ -24,3 +24,4 @@ class TestSparseNPView(unittest.TestCase):
 
         rebuilt = compact1.to_vector()
         npt.assert_array_equal(rebuilt, ri_vector)
+
