@@ -1,10 +1,11 @@
 import random
 import numpy as np
+from deepsign.utils.views import SparseArray
 
 
 class RandomIndex:
 
-    def __init__(self,dim,positive,negative):
+    def __init__(self, dim, positive, negative):
         self.positive = positive
         self.negative = negative
         self.dim = dim
@@ -14,9 +15,6 @@ class RandomIndex:
         v[self.positive] = 1
         v[self.negative] = -1
         return v
-
-    def to_sparse(self):
-        return np.array(self.positive+self.negative)
 
 
 def from_sparse(dim, active, active_list):
