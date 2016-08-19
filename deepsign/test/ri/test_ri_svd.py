@@ -14,18 +14,18 @@ class TestRISVD(unittest.TestCase):
 
         c_matrix = np.matrix([gen.generate().to_vector() for i in range(num_samples)])
 
-        c_matrix = np.matrix([ri / np.max(ri, axis=0) for ri in c_matrix])
+        # c_matrix = np.matrix([ri_v / np.max(ri_v, axis=0) for ri_v in c_matrix])
 
-        print("Original: ",c_matrix.shape)
+        print("Original: ", c_matrix.shape)
 
         # perform svd
-        u, s, vt = np.linalg.svd(c_matrix,full_matrices=False)
-        print("Decomposition: ",(u.shape,np.diag(s).shape,vt.shape))
+        u, s, vt = np.linalg.svd(c_matrix, full_matrices=False)
+        print("Decomposition: ", (u.shape, np.diag(s).shape, vt.shape))
 
         # reconstruct
-        r_matrix = np.dot(u, np.dot(np.diag(s),vt))
-        print("Re-Construction: ",r_matrix.shape)
-        self.assertTrue(np.allclose(c_matrix,r_matrix))
+        r_matrix = np.dot(u, np.dot(np.diag(s), vt))
+        print("Re-Construction: ", r_matrix.shape)
+        self.assertTrue(np.allclose(c_matrix, r_matrix))
 
         # low-rank approximation
         k = 2

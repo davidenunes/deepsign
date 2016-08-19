@@ -27,9 +27,9 @@ keys = occurrences.keys()
 c_matrix = [occurrences[key] for key in keys]
 
 # squash each ri vector to [-1,1]
-c_matrix = [v/np.max(v,axis=0) for v in c_matrix]
+c_matrix = [v/np.max(v, axis=0) for v in c_matrix]
 
-# apply tanh transformation to smooth out the different patterns
+# apply hyperbolic tangent transformation to smooth out the different patterns
 c_matrix = np.matrix([np.tanh(v) for v in c_matrix])
 
 c_matrix = np.matrix(c_matrix)
