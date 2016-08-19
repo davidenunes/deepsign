@@ -1,6 +1,5 @@
 import unittest
-from deepsign.rp import ri
-import numpy as np
+
 
 
 class TestRISVD(unittest.TestCase):

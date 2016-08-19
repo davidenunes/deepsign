@@ -9,28 +9,28 @@ def _pairwise(iterable):
     return zip(a, b)
 
 
-def divide_slice(num_elems,num_slices=1):
-    """ Splits an vector with num_elems into num_slices returning a list of
-    slices for that vector
+def divide_slice(n, n_slices=1):
+    """ Splits a vector with n elements equally into n_slices
+    returning a list of slices for that vector.
 
-    :param num_elems: number of elemebts in the vector
-    :param num_slices: number of slices the vector is to be splitted into
+    :param n: number of elements in the vector
+    :param n_slices: number of slices the vector is to be split into
     :return: a list of slices for the vector
     """
-    len_split = int(num_elems / num_slices)
-    num_indexes = num_slices - 1
+    len_split = int(n / n_slices)
+    num_indexes = n_slices - 1
 
     ss = [0]
-    for s in range(len_split, len_split * num_slices, len_split):
+    for s in range(len_split, len_split * n_slices, len_split):
         ss.append(s)
 
-    ss.append(num_elems)
+    ss.append(n)
     slices = [slice(s[0],s[1],1) for s in _pairwise(ss)]
 
     return slices
 
 
-class Window():
+class Window:
     """ A window contains:
         a left []
         a target which is in the center of the window
@@ -53,19 +53,19 @@ def sliding_windows(seq, window_size=1):
     :return: an array of Window instances
     """
     elem_indexes = range(0, len(seq))
-    num_elems = len(seq)
+    n_elems = len(seq)
 
     windows = []
     # create a sliding window for each elem
     for w in elem_indexes:
 
         # lower limits
-        wl = max(0,w - window_size)
+        wl = max(0, w - window_size)
         wcl = w
 
         # upper limits
-        wch = num_elems if w == num_elems-1 else min(w+1, num_elems-1)
-        wh = w + min(window_size + 1, num_elems)
+        wch = n_elems if w == n_elems-1 else min(w+1, n_elems-1)
+        wh = w + min(window_size + 1, n_elems)
 
         # create window
         left = seq[wl:wcl]
@@ -88,18 +88,34 @@ class SparseArray(object):
         v[self.active] = self.values
         return v
 
+    def __add__(self, other):
+        s_v = self.to_vector()
+        o_v = other.to_vector()
+
+        r = s_v + o_v
+        active = np.nonzero(r)
+
+        return SparseArray(self.dim, active, r[active])
+
 
 def np_to_sparse(sparse_array):
-    """ converts a 1D numpy array to a sparse version
-    :param sparse_array the array to be converted
+    """ Converts a 1D numpy array to a sparse version
+    :param sparse_array: the array to be converted
+    :type sparse_array np.ndarray
     """
-    if not isinstance(sparse_array,np.ndarray):
-        raise TypeError("Expected type: {0}, actual type: {1} ".format(np.ndarray,type(sparse_array)))
     active = np.nonzero(sparse_array)
     values = sparse_array[active]
     dim = sparse_array.shape[0]
-    result = SparseArray(dim=dim,active=active,values=values)
+    result = SparseArray(dim=dim, active=active, values=values)
     return result
+
+
+def ri_to_sparse(random_index):
+    """Converts a random index to a SparseArray object"""
+    active = random_index.positive + random_index.negative
+    values = [1]*len(random_index.positive) + [-1]*len(random_index.negative)
+
+    return SparseArray(dim=random_index.dim, active=active, values=values)
 
 
 

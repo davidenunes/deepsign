@@ -43,7 +43,7 @@ if comm.rank == 0:
 
     print("Master Node: preparing data, processing [ %d of %d ]"%(num_records,len(dataset)))
 
-    slices = divide_slice(num_elems=num_records, num_slices=num_slaves)
+    slices = divide_slice(n=num_records, n_slices=num_slaves)
 
     print("Sending Tasks to %d nodes"%(num_slaves))
     # send slices

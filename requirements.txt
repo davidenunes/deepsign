@@ -6,3 +6,4 @@ spacy==0.101.0
 scipy==0.17.1
 scikit-learn==0.17.1
 tqdm==4.7.6
+
