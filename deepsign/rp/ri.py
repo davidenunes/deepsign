@@ -1,10 +1,9 @@
 import random
+
 import numpy as np
-from deepsign.utils.views import SparseArray
 
 
 class RandomIndex:
-
     def __init__(self, dim, positive, negative):
         self.positive = positive
         self.negative = negative
@@ -23,7 +22,7 @@ def from_sparse(dim, active, active_list):
     positive = active_list[0:num_positive]
     negative = active_list[num_positive:len(active_list)]
 
-    return RandomIndex(dim=dim,positive=positive,negative=negative)
+    return RandomIndex(dim=dim, positive=positive, negative=negative)
 
 
 class RandomIndexGenerator:
@@ -33,6 +32,7 @@ class RandomIndexGenerator:
     The instances only save information about the dimension of the indexes (vectors), and
     their positive and negative indexes.
     """
+
     def __init__(self, dim, active, seed=None):
         # system time is used if seed not supplied
         if seed:
@@ -46,7 +46,7 @@ class RandomIndexGenerator:
         # ensure that you can make other calls to random
         random.setstate(self.random_state)
 
-        active_indexes = random.sample(range(0,self.dim), self.num_active)
+        active_indexes = random.sample(range(0, self.dim), self.num_active)
 
         num_positive = self.num_active // 2
         positive = active_indexes[0:num_positive]
@@ -55,5 +55,4 @@ class RandomIndexGenerator:
         # ensure that you can make other calls to random
         self.random_state = random.getstate()
 
-        return RandomIndex(self.dim,positive,negative)
-
+        return RandomIndex(self.dim, positive, negative)
