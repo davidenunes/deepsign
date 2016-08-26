@@ -26,7 +26,7 @@ To install **TensorFlow** on the newly setup `virtualenv` just run the following
 
 ```bash
 workon deepsign
-pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0rc0-cp35-cp35m-linux_x86_64.whl
+pip3 install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.10.0rc0-cp35-cp35m-linux_x86_64.whl
 ```
 
  This is the _CPU only_ version, if you need other versions see [TensorFlow installation](https://www.tensorflow.org/versions/r0.9/get_started/os_setup.html#virtualenv-installation). This should take care of the tensorflow dependency.
