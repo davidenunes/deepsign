@@ -11,6 +11,10 @@ class TestSplit(unittest.TestCase):
         self.assertEqual(len(slices), num_splits)
 
         print(slices)
+        for r in slices:
+            for elem in r:
+                print(elem)
+            print("-------")
 
 
 if __name__ == '__main__':

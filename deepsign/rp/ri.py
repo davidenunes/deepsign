@@ -16,11 +16,11 @@ class RandomIndex:
         return v
 
 
-def from_sparse(dim, active, active_list):
-    num_positive = active // 2
+def from_sparse(dim, n_active, active_indexes):
+    num_positive = n_active // 2
 
-    positive = active_list[0:num_positive]
-    negative = active_list[num_positive:len(active_list)]
+    positive = active_indexes[0:num_positive]
+    negative = active_indexes[num_positive:len(active_indexes)]
 
     return RandomIndex(dim=dim, positive=positive, negative=negative)
 

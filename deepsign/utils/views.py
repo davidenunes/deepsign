@@ -11,7 +11,8 @@ def _pairwise(iterable):
 
 def divide_slice(n, n_slices=1):
     """ Splits a vector with n elements equally into n_slices
-    returning a list of slices for that vector.
+    returning a list of index ranges for that vector, each range corresponds
+    to a slice.
 
     :param n: number of elements in the vector
     :param n_slices: number of slices the vector is to be split into
@@ -25,9 +26,9 @@ def divide_slice(n, n_slices=1):
         ss.append(s)
 
     ss.append(n)
-    slices = [slice(s[0],s[1],1) for s in _pairwise(ss)]
+    ranges = [range(s[0],s[1]) for s in _pairwise(ss)]
 
-    return slices
+    return ranges
 
 
 class Window:

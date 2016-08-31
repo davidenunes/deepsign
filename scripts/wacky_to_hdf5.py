@@ -32,7 +32,7 @@ dataset_name = "sentences"
 h5f = h5py.File(h5f_name, "a")
 # store strings as variable-length UTF-8
 dt = h5py.special_dtype(vlen=str)
-dataset = h5f.create_dataset(dataset_name, (1, 1), maxshape=(None, 1), dtype=dt, compression="gzip")
+dataset = h5f.create_dataset(dataset_name, (1,), maxshape=(None,), dtype=dt, compression="lzf")
 num_rows = 0
 EXPAND_HDF5_BY = 1000
 

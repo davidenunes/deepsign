@@ -1,4 +1,5 @@
 from bidict import bidict
+import os
 
 
 class SignIndex():
@@ -25,10 +26,17 @@ class SignIndex():
         return sign in self.signs
 
     def add(self,sign):
+        #print("index PID ",os.getpid())
         if not sign in self.signs:
+            # 1 - get next id
             self.signs[sign] = self.nextID
+            # 2 . generate random index
             self.random_indexes[self.nextID] = self.generator.generate()
             self.nextID += 1
+
+    def add_all(self,signs):
+        for sign in signs:
+            self.add(sign)
 
     def remove(self,sign):
         if sign in self.signs:

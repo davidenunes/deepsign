@@ -4,45 +4,70 @@ import time
 import h5py
 import os.path
 from spacy.en import English
-
 from deepsign.utils.views import sliding_windows as sliding
 from deepsign.rp.index import SignIndex
 from deepsign.rp.ri import RandomIndexGenerator
 from deepsign.rp.encode import to_bow
 import deepsign.utils.views as views
-import sys
-import deepsign.utils.profiling as prof
-
 import numpy as np
 from tqdm import tqdm
+from deepsign.io.h5store import batch_write
 
-# *************************
-# model parameters
-# *************************
-window_size = 3
-ri_dim = 600
-ri_num_active = 4
+def load_dataset(hdf5_file):
+    print("Reading hdf5 dataset from: ", corpus_file)
+    dataset_name = "ukwac_sentences"
+    dataset = hdf5_file[dataset_name]
+    return dataset
 
-home = os.getenv("HOME")
-corpus_file = "/data/datasets/wacky.hdf5"
-result_path = home + "/data/results/"
-corpus_file = home + corpus_file
-print(os.path.isfile(corpus_file))
 
-print("Reading hdf5 dataset from: ", corpus_file)
-dataset_name = "ukwac_sentences"
+def write_results(result_file, sign_index, frequencies, occurrences):
+    h5f = h5py.File(result_file, 'w')
 
-# open hdf5 file and get the dataset
-h5f = h5py.File(corpus_file, 'r')
-dataset = h5f[dataset_name]
-# do something with the dataset
+    word_ids = occurrences.keys()
+    print("processing {0} word vectors".format(len(word_ids)))
 
-# Create Sign RI Index
-ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_num_active)
-sign_index = SignIndex(ri_gen)
+    print("writing to ", result_file)
+    dim = sign_index.feature_dim()
+    act = sign_index.feature_act()
 
-max_sentences = 10000
-sentence_it = (dataset[i][0] for i in range(max_sentences))
+    dataset_name = "{0}_{1}".format(dim, act)
+    print("dataset: " + dataset_name)
+
+    vocabulary = np.array([sign_index.get_sign(w_id).encode("UTF-8") for w_id in word_ids])
+
+    # the hdf5 needs to store variable-length strings with a specific encoding (UTF-8 in this case)
+    dt = h5py.special_dtype(vlen=str)
+    vocabulary_data = h5f.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="lzf")
+    print("vocabulary data written")
+
+    frequencies = np.array([frequencies[w_id] for w_id in word_ids])
+    frequency_data = h5f.create_dataset("frequencies", data=frequencies, compression="lzf")
+    print("count data written")
+
+    # random indexing vectors are stored in sparse mode (active indexes only),
+    # reconstruct using ri.from_sparse(dim,active,active_list) to get a RandomIndex object
+    ri_vectors = [sign_index.get_ri(w.decode("UTF-8")) for w in vocabulary]
+    # store random indexes as a list of positive indexes followed by negative indexes
+    ri_sparse = np.array([ri.positive + ri.negative for ri in ri_vectors])
+    index_data = h5f.create_dataset(dataset_name, data=ri_sparse, compression="lzf")
+    print("random index vectors written")
+
+    index_data.attrs["dimension"] = dim
+    index_data.attrs["active"] = act
+
+
+    # avg are stored as is since there is no guarantee that these will be sparse (depends on the params)
+    sum_vectors = h5f.create_dataset(dataset_name + "_sum", shape=(len(word_ids),dim), compression="lzf")
+
+    # num batches to store
+    num_words = len(word_ids)
+    occurrence_gen = (occurrences[w_id].to_vector() for w_id in range(num_words))
+
+    batch_write(sum_vectors,occurrence_gen,num_words,1000,progress=True)
+    time.sleep(0.5)
+    print("random index sum vectors written")
+
+    h5f.close()
 
 
 def load_spacy():
@@ -53,27 +78,22 @@ def load_spacy():
     print("Done: {0:.2f} secs ".format(t1 - t0))
     return nlp
 
-
-def is_invalid_token(token):
-
+# TODO check what other useless tokens are put in wacky
+def is_valid_token(token):
     if token.is_punct or token.is_stop:
-        return True
+        return False
 
     w = token.orth_
-
-    # some words are tokenised with 's and n't, apply this before filtering stop words
-    custom_stop = ["'s",
-                   "@card@",
-                   "@ord@",
-                   ]
-
+    custom_stop = ["'s", "@card@", "@ord@"]
     for stop in custom_stop:
         if w == stop:
-            return True
+            return False
 
-    return False
+    return True
 
 
+# TODO replace numbers with T_NUMBER ?
+# TODO replace time with T_TIME?
 def replace_w_token(t):
     result = t.orth_
 
@@ -83,60 +103,35 @@ def replace_w_token(t):
         result = "T_EMAIL"
 
     return result
+    # work on a dataset row slice
 
 
-def parallel_process_corpus(profiling=False):
-    nlp = load_spacy()
+def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_dim=1000, ri_active=10):
 
-    progress_it = (i for i in tqdm(range(max_sentences)))
+    h5f = h5py.File(corpus_file, 'r')
+    dataset = load_dataset(h5f)
 
-    for sentence in nlp.pipe(sentence_it, n_threads=8, batch_size=500):
-        tokens = [replace_w_token(token) for token in sentence if not is_invalid_token(token)]
-        next(progress_it)
+    if max_sentences > 0:
+        num_sentences = min(max_sentences,len(dataset))
+    else:
+        num_sentences = len(dataset)
 
-
-
-
-def process_corpus(profiling=False):
-    print("Loading Spacy English Model")
-
-    # process 1 million sentences
-    num_sentences = 1000  # len(dataset)
-    # Co-occurrences
-    num_sentences = min(num_sentences, len(dataset))
+    # ****************************************** PROCESS CORPUS ********************************************************
+    # TODO turn this into a general purpose module
+    ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
+    sign_index = SignIndex(ri_gen)
     occurrences = dict()
     frequencies = dict()
+    data_gen = (dataset[i][0] for i in range(num_sentences))
 
-    for i in tqdm(range(num_sentences)):
-        sentence = dataset[i][0]
-
-        t0 = time.time()
-        p_sentence = nlp(sentence)
-
-        # print(p_sentence)
-
-        # remove punctuation and stop words
-        # TODO additional pre-processing substitute time and URLs by T_TIME, and T_URL, etc?
+    nlp = load_spacy()
+    for sentence in tqdm(nlp.pipe(data_gen, n_threads=8, batch_size=2000), total=num_sentences):
         # TODO all caps to lower except entities
+        tokens = [replace_w_token(token) for token in sentence if is_valid_token(token)]
 
-        # TODO remove E-MAILS substitute by T_EMAIL
-        # TODO substitute numbers for T_NUMBER ?
+        sign_index.add_all(tokens)
 
-        # TODO remove useless tokens from the previously process @card@, @ord@, (check what tokens are considered in wacky)
-
-
-
-
-
-        tokens = [replace_special(t) for t in p_sentence if not (t.is_punct or t.is_stop or is_stop_custom(t))]
-
-        # print(tokens)
-
-        # Add Tokens to ri Index
-        for token in tokens:
-            sign_index.add(token)
-
-        # Compute Sliding Windows
+        # get sliding windows of given size
         s_windows = sliding(tokens, window_size=window_size)
 
         # Encode each window as a bag-of-words and add to occurrences
@@ -153,65 +148,22 @@ def process_corpus(profiling=False):
                 occurrences[sign_id] = bow_vector + current_vector
                 frequencies[sign_id] += 1
 
-        t1 = time.time()
-
+    # ************************************** END PROCESS CORPUS ********************************************************
     h5f.close()
 
-    if profiling:
-        print("Occurrences size: {0} MB".format(prof.total_size(occurrences) / pow(2, 20)))
-        print("Sign Index size: {0} MB".format(prof.total_size(sign_index) / pow(2, 20)))
-
-
-"""
-# open hdf5 file to write
-
-# TODO do this online it is too memory intensive
-
-# prepare data
-word_ids = occurrences.keys()
-print("processing {0} word vectors".format(len(word_ids)))
-
-vocabulary = np.array([sign_index.get_sign(w_id).encode("UTF-8") for w_id in word_ids])
-frequencies = np.array([frequencies[w_id] for w_id in word_ids])
-ri_vectors = [sign_index.get_ri(w.decode("UTF-8")) for w in vocabulary]
-
-ri_active = np.array([i.positive + i.negative for i in ri_vectors])
-
-ri_avg_vectors = [occurrences[w_id] for w_id in word_ids]
-
-filename = "random_indexing.hdf5"
-corpus_file = result_path + filename
-print("writing to ", corpus_file)
-
-dataset_name = "ri_d{0}_a{1}".format(ri_dim,ri_active)
-print("dataset: "+dataset_name)
-
-h5f = h5py.File(corpus_file, 'w')
-dt = h5py.special_dtype(vlen=str)
-
-# the hdf5 needs to store variable-length strings with a specific encoding (UTF-8 in this case)
-vocabulary_data = h5f.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="gzip")
-print("vocabulary data written")
-
-count_data = h5f.create_dataset("frequencies", data=frequencies, compression="gzip")
-print("count data written")
-
-# random indexing vectors are stored in sparse mode (active indexes only),
-# reconstruct using ri.from_sparse(dim,active,active_list) to get a RandomIndex object
-ri_data = h5f.create_dataset(dataset_name, data=ri_active, compression="gzip")
-print("random index vectors written")
-ri_data.attrs["dimension"] = ri_dim
-ri_data.attrs["active"] = ri_num_active
-
-# avg are stored as is since there is no guarantee that these will be sparse (depends on the params)
-sum_vectors = h5f.create_dataset(dataset_name+"_sum", data=ri_avg_vectors, compression="gzip")
-print("random index sum vectors written")
-
-
-h5f.close()
-
-"""
+    write_results(result_file,sign_index,frequencies,occurrences)
 
 if __name__ == '__main__':
-    # process_corpus(profiling=True)
-    parallel_process_corpus(profiling=True)
+    # model parameters
+    window_size = 3
+    max_sentences = 2030
+    ri_dim = 600
+    ri_active = 4
+
+    # corpus and output files
+    home = os.getenv("HOME")
+    corpus_file = "/data/datasets/wacky.hdf5"
+    corpus_file = home + corpus_file
+    result_file = home + "/data/results/random_indexing_test.hdf5"
+
+    process_corpus(corpus_file, result_file, max_sentences, window_size, ri_dim, ri_active)
