@@ -9,12 +9,7 @@ def expand(dataset, n_rows):
     :param dataset a h5py dataset to be resized
     :param n_rows number of rows to be added to the dataset
     """
-    d_shape = dataset.shape
-
-    if d_shape > 1:
-        dataset.resize(d_shape[0] + n_rows, d_shape[1])
-    else:
-        dataset.rezise(d_shape[0] + n_rows, )
+    dataset.resize(dataset.shape[0] + n_rows, 0)
 
 
 def batch_write(dataset, data_gen, n_rows, batch_size, progress=False):
@@ -36,23 +31,12 @@ def batch_write(dataset, data_gen, n_rows, batch_size, progress=False):
         dataset[current_slice] = current_batch
 
 
+def str_dataset(hdf5_file, name, shape=(1,), maxshape=(None,)):
+    str_type = h5py.special_dtype(vlen=str)
+    dataset = hdf5_file.create_dataset(name, shape=shape, maxshape=maxshape, dtype=str_type, compression='gzip')
 
+    return dataset
 
-class HDF5Store:
-    def __init__(self, path, mode=None):
-        self.path = path
-        self.mode = mode
-        self.file = h5py.File(path,mode=mode)
-
-    def str_dataset(self, name, shape=(1,), maxshape=(None,)):
-        str_type = h5py.special_dtype(vlen=str)
-        dataset = self.file.create_dataset(name, shape=shape, maxshape=maxshape,
-                                           dtype=str_type,
-                                           compression='lzf')
-        return dataset
-
-    def close(self):
-        self.file.close()
 
 
 

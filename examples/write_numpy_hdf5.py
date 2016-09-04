@@ -3,6 +3,8 @@ import numpy as np
 import h5py
 import os.path
 
+from deepsign.io import h5utils
+
 
 home = os.getenv("HOME")
 result_path = home+"/data/results/"
@@ -25,7 +27,7 @@ counts = [1] * num_samples
 counts = np.array(counts)
 
 
-filename = "random_indexes.hdf5"
+filename = "random_indexing_test.hdf5"
 dataset_path = result_path+filename
 print("writing to ",dataset_path)
 
@@ -46,5 +48,16 @@ print("random index vectors written")
 
 sum_vectors = h5f.create_dataset(dataset_name+"_sum", data=c_matrix, compression="gzip")
 print("random index sum vectors written")
+
+dset0 = h5f.create_dataset("test init",shape=(0,gen.dim),maxshape=(None,gen.dim))
+print("0 shape dataset length:", len(dset0))
+
+h5utils.expand(dset0,1)
+print("0 shape dataset length:", len(dset0))
+print("len after expand:", len(dset0))
+#print("contains",dset0[0])
+dset0[0] += gen.generate().to_vector()
+print(dset0[0])
+
 
 h5f.close()
