@@ -11,14 +11,20 @@ from deepsign.rp.encode import to_bow
 import deepsign.utils.views as views
 import numpy as np
 from tqdm import tqdm
-from deepsign.io.h5utils import batch_write
-import sys
+
+from deepsign.utils.profiling import total_size
+
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+plt.ion()
 
 def load_dataset(hdf5_file):
     print("Reading hdf5 dataset from: ", corpus_file)
-    dataset_name = "ukwac_sentences"
+    dataset_name = "sentences_lemmatised"
     dataset = hdf5_file[dataset_name]
     return dataset
+
 
 def load_spacy():
     t0 = time.time()
@@ -27,6 +33,7 @@ def load_spacy():
     t1 = time.time()
     print("Done: {0:.2f} secs ".format(t1 - t0))
     return nlp
+
 
 # TODO check what other useless tokens are put in wacky
 def is_valid_token(token):
@@ -70,6 +77,8 @@ def synch_occurr(occurr_dict, occurr_dataset):
 
 def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_dim=1000, ri_active=10):
 
+
+
     input_hdf5 = h5py.File(corpus_file, 'r')
     dataset = load_dataset(input_hdf5)
 
@@ -96,6 +105,8 @@ def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_
 
     nlp = load_spacy()
 
+    plt.ion()
+
     num_updates = 0
     for sentence in tqdm(nlp.pipe(data_gen, n_threads=8, batch_size=2000), total=num_sentences):
         # TODO all caps to lower except entities
@@ -121,6 +132,16 @@ def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_
                 occurr[sign_id] = bow_vector + current_vector
                 frequencies[sign_id] += 1
             num_updates += 1
+
+        # plot memory sizes
+
+        index_size = total_size((sign_index.signs)/pow(2, 20))
+        ri_size = total_size((sign_index.random_indexes)/pow(2, 20))
+
+        plt.scatter(num_updates, index_size, label="word index")
+        plt.scatter(num_updates, ri_size, label="random indexes")
+        plt.pause(0.01)
+
 
         if num_updates >= occurr_synch_t:
             tqdm.write("Synching occurrences...")
@@ -170,7 +191,7 @@ def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_
 if __name__ == '__main__':
     # model parameters
     window_size = 3
-    max_sentences = 1000000
+    max_sentences = 100000
     ri_dim = 1000
     ri_active = 10
 
