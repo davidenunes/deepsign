@@ -2,15 +2,14 @@ from bidict import bidict
 import os
 
 
-class SignIndex():
-
+class SignIndex:
     def __init__(self, generator):
         """
         :param generator a random index generator
         """
         self.generator = generator
-        self.signs = bidict() # str <-> id
-        self.random_indexes = dict() # id -> RandomIndex
+        self.signs = bidict()  # str <-> id
+        self.random_indexes = dict()  # id -> RandomIndex
         self.nextID = 0
 
     def size(self):
@@ -22,11 +21,10 @@ class SignIndex():
     def feature_act(self):
         return self.generator.num_active
 
-    def contains(self,sign):
+    def contains(self, sign):
         return sign in self.signs
 
-    def add(self,sign):
-        #print("index PID ",os.getpid())
+    def add(self, sign):
         if not sign in self.signs:
             # 1 - get next id
             self.signs[sign] = self.nextID
@@ -34,15 +32,15 @@ class SignIndex():
             self.random_indexes[self.nextID] = self.generator.generate()
             self.nextID += 1
 
-    def add_all(self,signs):
+    def add_all(self, signs):
         for sign in signs:
             self.add(sign)
 
-    def remove(self,sign):
+    def remove(self, sign):
         if sign in self.signs:
             del self.signs[sign]
 
-    def get_ri(self,sign):
+    def get_ri(self, sign):
         id = self.signs[sign]
 
         v = None
@@ -51,13 +49,13 @@ class SignIndex():
 
         return v
 
-    def get_id(self,sign):
+    def get_id(self, sign):
         id = None
         if sign in self.signs:
             id = self.signs[sign]
         return id
 
-    def get_sign(self,id):
+    def get_sign(self, id):
         sign = None
         if id in self.signs.inv:
             sign = self.signs.inv[id]
