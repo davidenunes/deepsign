@@ -12,7 +12,7 @@ class SignIndex:
         self.random_indexes = dict()  # id -> RandomIndex
         self.nextID = 0
 
-    def size(self):
+    def __len__(self):
         return len(self.signs)
 
     def feature_dim(self):
@@ -25,11 +25,12 @@ class SignIndex:
         return sign in self.signs
 
     def add(self, sign):
-        if not sign in self.signs:
+        if sign not in self.signs:
             # 1 - get next id
-            self.signs[sign] = self.nextID
+            sign_id = self.nextID
+            self.signs[sign] = sign_id
             # 2 . generate random index
-            self.random_indexes[self.nextID] = self.generator.generate()
+            self.random_indexes[sign_id] = self.generator.generate()
             self.nextID += 1
 
     def add_all(self, signs):
@@ -50,13 +51,13 @@ class SignIndex:
         return v
 
     def get_id(self, sign):
-        id = None
+        sign_id = None
         if sign in self.signs:
-            id = self.signs[sign]
-        return id
+            sign_id = self.signs[sign]
+        return sign_id
 
-    def get_sign(self, id):
+    def get_sign(self, sign_id):
         sign = None
-        if id in self.signs.inv:
-            sign = self.signs.inv[id]
+        if sign_id in self.signs.inv:
+            sign = self.signs.inv[sign_id]
         return sign

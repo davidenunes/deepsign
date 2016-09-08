@@ -15,9 +15,7 @@ from tqdm import tqdm
 from deepsign.utils.profiling import total_size
 
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
-rcParams.update({'figure.autolayout': True})
-plt.ion()
+
 
 def load_dataset(hdf5_file):
     print("Reading hdf5 dataset from: ", corpus_file)
@@ -189,6 +187,8 @@ def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_
     output_hdf5.close()
 
 if __name__ == '__main__':
+    plt.ion()
+
     # model parameters
     window_size = 3
     max_sentences = 100000
@@ -199,6 +199,6 @@ if __name__ == '__main__':
     home = os.getenv("HOME")
     corpus_file = "/data/datasets/wacky.hdf5"
     corpus_file = home + corpus_file
-    result_file = home + "/data/results/random_indexing_1M.hdf5"
+    result_file = home + "/data/results/random_indexing_test.hdf5"
 
     process_corpus(corpus_file, result_file, max_sentences, window_size, ri_dim, ri_active)

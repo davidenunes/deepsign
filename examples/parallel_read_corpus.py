@@ -35,7 +35,7 @@ def load_dataset():
     corpus_file = home + corpus_file
 
     print("Reading hdf5 dataset from: ", corpus_file)
-    dataset_name = "ukwac_sentences"
+    dataset_name = "sentences_lemmatised"
 
     # open hdf5 file and get the dataset
     h5f = h5py.File(corpus_file, 'r')
