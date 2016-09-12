@@ -11,7 +11,19 @@ from spacy.en import English
 import numpy as np
 from tqdm import tqdm
 from collections import Counter
-from spacy.vocab import Vocab
+
+from nltk.tokenize import StanfordTokenizer
+from nltk.tokenize import TweetTokenizer
+from deepsign.nlp import stoplist
+from deepsign.nlp import token as tku
+from deepsign.utils.views import divide_slice
+from itertools import chain
+
+
+def load_tokenizer():
+    tokenizer = StanfordTokenizer(path_to_jar="/home/davex32/dev/lib/stanford-postagger/stanford-postagger.jar")
+    #tokenizer = TweetTokenizer(reduce_len=True)
+    return tokenizer
 
 
 def load_dataset(hdf5_file):
@@ -21,26 +33,14 @@ def load_dataset(hdf5_file):
     return dataset
 
 
-def load_spacy():
-    t0 = time.time()
-    # load tokenizer only
-    nlp = English(entity=False, load_vectors=False, parser=False, tagger=False, matcher=False)
-    nlp.vocab.strings._map =
-    t1 = time.time()
-    # print("Done: {0:.2f} secs ".format(t1 - t0))
-    return nlp
-
-
 # TODO check what other useless tokens are put in wacky
-def is_valid_token(token):
-    if token.is_punct or token.is_stop:
+def valid_token(token):
+    if tku.is_punct(token) or token in stoplist.ENGLISH or tku.is_bracket(token):
         return False
 
-    w = token.orth_
-    custom_stop = ["'s", "@card@", "@ord@"]
-    for stop in custom_stop:
-        if w == stop:
-            return False
+    custom_stop = ("'s", "@card", "@ord")
+    if token in custom_stop:
+        return False
 
     return True
 
@@ -50,17 +50,14 @@ def is_valid_token(token):
 special_tokens = {"URL": "T_URL", "EMAIL": "T_EMAIL"}
 
 
-def replace_w_token(t, nlp):
-    result = t.orth_
-
-    if t.like_url:
+def replace_token(token):
+    result = token
+    if tku.is_url(token):
         result = special_tokens["URL"]
-    elif t.like_email:
+    elif tku.is_email(token):
         result = special_tokens["EMAIL"]
 
-    lex = nlp.vocab[result]
-    return lex
-    # work on a dataset row slice
+    return result
 
 
 def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
@@ -72,35 +69,49 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     else:
         num_sentences = len(dataset)
 
-    nlp = load_spacy()
-    tokenizer = nlp.tokenizer
+    tokenizer = load_tokenizer()
 
     freq = Counter()
 
     # ************************************ PROCESS VOCABULARY **************************************************
     # load one sentence in memory at a time
-    #perhaps this is too slow, should I load chunks at a time and then create a generator for each slice inthe chunk?
-    sentence_gen = (dataset[i] for i in range(num_sentences))
-    for sentence in tqdm(tokenizer.pipe(sentence_gen, n_threads=4, batch_size=4000), total=num_sentences):
-        tokens = [replace_w_token(token, nlp) for token in sentence if is_valid_token(token)]
+    # perhaps this is too slow, should I load chunks at a time and then create a generator for each slice inthe chunk?
+    chunk_size = 2
+    n_chunks = num_sentences // chunk_size
+    chunk_slices = divide_slice(num_sentences, n_chunks)
+    chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
-        for token in tokens:
-            freq[token.orth] += 1
+    def chunk_it(c):
+        for i in range(len(c)):
+            yield c[i]
+
+    sentence_gen = chain.from_iterable(chunk_it(c) for c in chunk_gen)
+
+    for sentence in tqdm(sentence_gen, total=num_sentences):
+        t0 = time.time()
+        tokens = tokenizer.tokenize(sentence)
+        t1 = time.time()
+        tqdm.write(str(tokens))
+        tqdm.write("Done: {0:.3f} secs ".format(t1 - t0))
+        #tokens = [replace_token(token) for token in tokens if valid_token(token)]
+
+        #for token in tokens:
+        #    freq[token] += 1
 
     input_hdf5.close()
     tqdm.write("{0} unique words".format(len(freq)))
     # order by frequency
-    freq = freq.most_common()
+    #freq = freq.most_common()
 
-    for i in range(10):
-        print("{0}:{1}".format(nlp.vocab.strings[freq[i][0]], freq[i][1]))
+    #for i in range(10):
+    #    print("{0}:{1}".format(freq[i][0], freq[i][1]))
 
     # ************************************ WRITE VOCABULARY TO HDF5 **********************************************
     if output_file is not None:
         output_hdf5 = h5py.File(output_file, 'w')
         word_ids = range(len(freq))
         # convoluted scheme of spaCy
-        vocabulary = np.array([nlp.vocab.strings[lex_id] for (lex_id, _) in freq])
+        vocabulary = np.array([w for (w, _) in freq])
 
         # the hdf5 needs to store variable-length strings with a specific encoding (UTF-8 in this case)
         dt = h5py.special_dtype(vlen=str)
@@ -116,7 +127,7 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 0
+    max_sentences = 100
 
     # corpus and output files
     home = os.getenv("HOME")
@@ -124,4 +135,4 @@ if __name__ == '__main__':
     corpus_file = home + corpus_file
     output_file = home + "/data/results/wacky_index.hdf5"
 
-    build_vocabulary(corpus_file, output_file, max_sentences)
+    build_vocabulary(corpus_file, None, max_sentences)
