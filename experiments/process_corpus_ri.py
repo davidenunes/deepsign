@@ -95,7 +95,7 @@ def process_corpus(corpus_file, result_file, max_sentences=0, window_size=3, ri_
     # avg are stored as is since there is no guarantee that these will be sparse (depends on the params)
     occurr_dataset = output_hdf5.create_dataset("ri_sum", shape=(0, ri_dim), maxshape=(None, ri_dim), compression="gzip")
     occurr = dict()
-    occurr_synch_t = 500000
+    occurr_synch_t = 1000
 
 
     frequencies = dict()
