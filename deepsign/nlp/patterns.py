@@ -33,7 +33,7 @@ URL = re.compile(
           (?::\d+)?                                       # optional port
           (?:\/[^?\#\s'">)\]}]+)?                         # optional path
           (?:\?[^\#\s'">)\]}]+)?                          # optional query
-          #(?:\#[^\s'">)\]}]+)?                           # optional fragment
+          (?:\#[^\s'">)\]}]+)?                           # optional fragment
     )
     (?=[\s)\]\}>"'»’”›❯',]|$)?                            # url boundary
     """,
