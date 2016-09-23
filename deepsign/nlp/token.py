@@ -3,6 +3,7 @@ import re
 from deepsign.nlp import patterns
 
 
+
 def is_punct(token):
     for c in token:
         if not unicodedata.category(c).startswith('P'):
@@ -33,14 +34,14 @@ def is_right_punct(token):
     right_punct = (')', ']', '}', '>', '"', "'", '»', '’', '”', '›', '❯', "''")
     return token in right_punct
 
-_url_re = patterns.URL
+_url_re = patterns.RE_URL
 
 
 def is_url(token):
     return _url_re.match(token) is not None
 
 
-_email_re = re.compile(patterns.EMAIL)
+_email_re = re.compile(patterns.RE_EMAIL)
 
 def is_email(token):
     return _email_re.match(token) is not None

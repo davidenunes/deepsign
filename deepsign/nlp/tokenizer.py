@@ -3,31 +3,43 @@
 RexEx Tokenizer
 """
 
-from deepsign.nlp import token
+from collections import deque
+from deepsign.nlp import patterns as pm
 
-def split_contractions(tokens):
-    """
-    A function to split apostrophe contractions at the end of alphanumeric (and hyphenated) tokens.
-    Takes the output of any of the tokenizer functions and produces and updated list.
-    :param tokens: a list of tokens
-    :returns: an updated list if a split was made or the original list otherwise
-    """
-    idx = -1
 
-    for token in list(tokens):
-        idx += 1
+class Tokenizer:
+    def __init__(self, text):
+        self.text = text
 
-        if IS_CONTRACTION.match(token) is not None:
-            length = len(token)
+    def __iter__(self):
+        return self
 
-            if length > 1:
-                for pos in range(length - 1, -1, -1):
-                    if token[pos] in APOSTROPHES:
-                        if 2 < length and pos + 2 == length and token[-1] == 't' and token[pos - 1] == 'n':
-                            pos -= 1
+    def __next__(self):
+        if len(self.text) == 0:
+            raise StopIteration
+        else:
+            return self._next_token()
 
-                        tokens.insert(idx, token[:pos])
-                        idx += 1
-                        tokens[idx] = token[pos:]
+    def _next_token(self):
+        rem = pm.REMatcher()
+        s = self.text
 
-    return tokens
+        # skip space characters
+        if rem.match(pm.RE_SPACES, s):
+            self.text = rem.skip()
+            return self.__next__()
+
+        if rem.match(pm.RE_WORD, s):
+            self.text = rem.skip()
+            return rem.matched.group()
+
+        else:#TODO remove this, finish the tokenizer
+            token = self.text[0]
+            self.text = self.text[1:]
+            return token
+
+
+
+def tokenize(text):
+    tk = Tokenizer(text)
+    return [token for token in tk]
