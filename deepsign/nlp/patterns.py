@@ -80,11 +80,11 @@ HYPHEN = r'[\-_\u058A\u2010\u2011]'
 
 # didn't include all the symbols just the ones I thought it could appear
 # starting parenthesis and brackets
-PARENS_BRACKETS_S = r'[\(\[\{\u2329\u2768\u2E28\u3008\u300A\uFE59\uFE5B\uFF08\uFF3B\uFF5B]'
+PARENS_BRACKET_S = r'[\(\[\{\u2329\u2768\u2E28\u3008\u300A\uFE59\uFE5B\uFF08\uFF3B\uFF5B]'
 # ending parenthesis and brackets
-PARENS_BRACKETS_E = r'[\)\]\}\u232A\u2769\u2E29\u3009\u300B\uFE5A\uFE5C\uFF09\uFF3D\uFF5D]'
+PARENS_BRACKET_E = r'[\)\]\}\u232A\u2769\u2E29\u3009\u300B\uFE5A\uFE5C\uFF09\uFF3D\uFF5D]'
 # any parenthesis or brackets
-PARENS_BRACKETS = re_or([PARENS_BRACKETS_S,PARENS_BRACKETS_E])
+PARENS_BRACKET = re_or([PARENS_BRACKET_S, PARENS_BRACKET_E])
 
 # TODO PUNCTUATION
 # like dots comas, semicolon, bang, question mark
