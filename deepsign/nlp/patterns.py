@@ -30,7 +30,6 @@ def re_or(patterns):
 def re_group(pattern):
     return "("+pattern+")"
 
-
 def re_boundary_s(pattern):
     return r'(?:(?<=(?:'+pattern+')) | (?<=(?:^)))'
 
@@ -78,6 +77,9 @@ NOT_SPACE = r'[^\s]+'
 APOSTROPHE = r'[\'\u201B\u02BC\u2018\u2019\u2032\u0091\u0092\u0060]'
 HYPHEN = r'[\-_\u058A\u2010\u2011]'
 
+
+
+
 # didn't include all the symbols just the ones I thought it could appear
 # starting parenthesis and brackets
 PARENS_BRACKET_S = r'[\(\[\{\u2329\u2768\u2E28\u3008\u300A\uFE59\uFE5B\uFF08\uFF3B\uFF5B]'
@@ -85,9 +87,6 @@ PARENS_BRACKET_S = r'[\(\[\{\u2329\u2768\u2E28\u3008\u300A\uFE59\uFE5B\uFF08\uFF
 PARENS_BRACKET_E = r'[\)\]\}\u232A\u2769\u2E29\u3009\u300B\uFE5A\uFE5C\uFF09\uFF3D\uFF5D]'
 # any parenthesis or brackets
 PARENS_BRACKET = re_or([PARENS_BRACKET_S, PARENS_BRACKET_E])
-
-# TODO PUNCTUATION
-# like dots comas, semicolon, bang, question mark
 
 
 # ubiquitous quote that might appear anywhere
@@ -104,6 +103,23 @@ QUOTES = re_or([
     QUOTE_E
 ])
 
+# Stanford PTBLexer includes caracters for armenian arabic, etc
+# I'm trying to tokenize regular english perhaps I can include such
+# chars in the future but not now. I removed ideographic, arabic, armenian
+# etc, commas, question marks and so on
+#
+# I did include small and fullwidth punctuation (dunno where to expect that though)
+DOTS = r'\.\.\.+|[\u0085\u2025\u2026]|\.[ \u00A0](?:\.[ \u00A0])+\.'
+
+# punctuation except hyphens, paranthesis and quotes
+PUNCT_INSIDE = r'[,;:\u204F\uFE50\uFE54\uFE55\uFF1B\uFF0C\uFF1A\uFF1B]'
+PUNCT_END = r'[\.?!¡¿\u2047\u2048\2049\uFE52\uFE56\uFE57\uFF01\uFF0E\uFF1F]'
+
+
+PUNCT = re_or([PUNCT_INSIDE,PUNCT_END,HYPHEN,DOTS])
+PUNCT_SEQ = PUNCT+'+'
+
+
 # Alpha num. patterns
 
 DIGIT = r'\d'
@@ -116,6 +132,8 @@ LIKELY_FRACTIONS = r'(?:\d{1,4}[\- \u00A0])?\d{1,4}(?:\\?\/|\u2044)\d{1,4}'
 VULGAR_FRACTIONS = r'[\u00BC\u00BD\u00BE\u2153-\u215E]'
 
 CURRENCY = r'[\u0024\u058f\u060b\u09f2\u09f3\u09fb\u0af1\u0bf9\u0e3f\u17db\ua838\ufdfc\ufe69\uff04\uffe0\uffe1\uffe5\uffe6\u00a2-\u00a5\u20a0]'
+
+PERCENT = S_NUMBER+'%'
 
 DATE = r'\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4}'
 
@@ -144,7 +162,7 @@ LETTER_ACCENT = r'(?i)(?:(?![×Þß÷þø])[a-zÀ-ÿ])'
 
 # Extra unicode letters (from Stanford CoreNLP Lexer), I labeled the ranges so that people know what they are doing
 _UNICODE_EXTRA_WORD_CHARS = [
-    '\u00AD',                                                                               # soft hyphen (breaks words across lines)
+    '\u00AD',                                                                               # soft hyphen
     '\u0237-\u024F',                                                                        # latin small (ȷùęō)
     '\u02C2-\u02C5\u02D2-\u02DF\u02E5-\u02FF',                                              # modifier letters (ʷʰˁ˟)
     '\u0300-\u036F',                                                                        # combining accents
@@ -172,30 +190,14 @@ LETTER = re_or([LETTER_ACCENT,LETTER_EXTRA])
 
 WORD = "{letter}(?:{letter}|{digit})*(?:[.!?]{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT)
 
+# Originally Stanford PTB Lexer has a list of abbreviation regexes to match the ones found in WSJ corpus
+# I made one a little bit more general to match things I don't want to get separated Ph.D, a.k.a., p.m., etc
+ABBREV = LETTER + '{1,4}(?:\.'+LETTER+'{1,4})+'
+
+# v1.0, 0.5.2 there are other valid tags, but this is the most common
+VERSION = LETTER+'?\d(?:\.\d)*'
+
 # Contractions
-# 'tis
-# 'twas
-# 'em   :them
-# 'n'   :and
-# combinations
-# n't've
-# 'dn't've
-# 'sn't
-# 'd've
-# y’all’on’t        : you all will not  --- exception ’on’t
-# y’all’ll’ven’t    : you all have not 've n't
-
-#extra
-#cap'n  :captain
-#e'er   :ever
-#ma'am  : madam
-#ne'er  : never
-#o'clock: of the clock is the exception xD
-#ol'    : old
-#s'pose
-# 'em 'im 'er 'k 'cuz 'cause 'd 'o
-
-
 CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
 CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)               # 'm 've 'd 'll 're
 CONTRACTION_3 = "(?:{apo}t)".format(apo=APOSTROPHE)                                # it -> 'tis 'twas
@@ -216,34 +218,29 @@ CONTRACTION_WORD = re_or([
 # we parse the sentence and skip tokens like words at the begining of words
 # and sentences surrounded by things that can be used as apostrophes as quotes
 
-# TODO other than Contractions to be split we can have assimilations
+# TODO other than Contractions we can have assimilations that could be split
 # e.g. cannot, gimme, gonna, shoulda
 
-# TODO: I can make a regex better than this
-# all words are things like word{apo}word or {apo}word
-# so instead of making valid english words only I can
-# make anything that would accept valid english words
-# and gibberish alike since the gibberish will be in the
-# middle of the text anyway if it has no meaning that's
-# not my problem, the ones above I want to split
-# the rest are words and I can live with them
-
-# Extra words not to be separated From Stanford Tokenizer
+# Extra words not to be separated ---some from Stanford PTBLexer
 CONTRACTION_WORD_EXTRA = r"""(?i)
     {apo}n{apo}?|
     {apo}?k|
-    [ldj]{apo}|
-    dunkin{apo}|
-    somethin{apo}|
-    {apo}cause|
-    ol{apo}|
-    o{apo}clock|
     {apo}em|
     {apo}im|
     {apo}er|
-    cont{apo}d\.?|
-    {apo}[2-9]0s|{apo}till?|
+    {apo}till?|
+    {apo}sup|
+    {apo}cause|
+    {apo}cuz|
+    {apo}[2-9]0s|
+    [A-HJ-XZn]{apo}{letter}{letter}{letter}*|
     {letter}{letter}*[aeiouy]{apo}[aeiouA-Z]{letter}*|
+    [ldj]{apo}|
+    dunkin{apo}|
+    somethin{apo}|
+    ol{apo}|
+    o{apo}clock|
+    cont{apo}d\.?|
     nor{apo}easter|
     c{apo}mon|
     e{apo}er|
@@ -350,55 +347,13 @@ EMOTICON_REVERSED = re_boundary_s(SPACE) + \
                            _emote_mouth_sad,
                            _emote_mouth_other])
 
-
-_emote_face_left = r'(\u2665|0|[oO]|\u00b0|[vV]|\\$|[tT]|[xX]|;|\u0ca0|@|\u0298|\u2022|\u30FB|\u25D5|\\^|\u00AC|\\*)'
-_emote_face_center = r'(?:[\.]|[_-]+)'
-_emote_face_right = r'\1'
-# extra
-_emote_face_e1 = r'(?:--[\'\"])'
-_emote_face_e2 = r'(?:[<>])[\._-]+(?:[<>])'
-_emote_face_e3 = r'(?:[.][_]+[.])'
-_emote_face_e4 = r'(?:[oO]' + _emote_face_center + r'[oO])'
-
-EMOTICON_FACE = re_or([
-    "(?:" + _emote_face_left +_emote_face_center+_emote_face_right+ ")",
-    _emote_face_e1,
-    _emote_face_e2,
-    _emote_face_e3,
-    _emote_face_e4
-])
-
-# east emotes
-_emote_e_left = r'[\uFF3C\\\u01AA\u0504\(\uFF08<>;\u30FD=~\*\-]+'
-_emote_e_right = r'[\-\=\\);\'\u0022<>\u0283\uFF09/\uFF0F\u30CE\uFF89\u4E3F\u256F\u03C3\u3063\u00B5~\\*]+'
-_emote_e_symbol = r'[^A-Za-z0-9\s\(\)\*:=\-]'
-
-EMOTICON_EAST_FACE = _emote_e_left + \
-                re_or([EMOTICON_FACE, _emote_e_symbol]) + \
-                     _emote_e_right
-
-
+# TODO east emote styles like (T_T)
 
 EMOTICON = re_or([
     EMOTICON_STANDARD,
-    EMOTICON_REVERSED,
-    EMOTICON_EAST_FACE,
-    EMOTICON_FACE,
+    EMOTICON_REVERSED
 ])
 
 HEARTS = "(?:<+/?3+)+"
-
-ARROWS = re_or([r'(?:<*[-―—=]*>+|<+[-―—=]*>*)', '[\u2190-\u21ff]+'])
-
-"""punctuation
-PUNCTUATION = [
-        (re.compile(r'([:,])([^\d])'), r' \1 \2'),
-        (re.compile(r'([:,])$'), r' \1 '),
-        (re.compile(r'\.\.\.'), r' ... '),
-        (re.compile(r'[;@#$%&]'), r' \g<0> '),
-        (re.compile(r'([^\.])(\.)([\]\)}>"\']*)\s*$'), r'\1 \2\3 '),
-        (re.compile(r'[?!]'), r' \g<0> '),
-
-        (re.compile(r"([^'])' "), r"\1 ' "),
-]"""
+ARROWS = re_or([r'(?:<*[{hyphen}=]*>+|<+[{hyphen}=]*>*)', '[\u2190-\u21ff]+']).format(hyphen=HYPHEN)
 
