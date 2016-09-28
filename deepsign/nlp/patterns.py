@@ -12,9 +12,9 @@ These regular expressions were inspired in (and improved from) expressions used 
 
 # Patterns:
 # TODO punctuation
-# TODO twitter (or other social media) handles (e.g. @dude)
-# TODO hashtags (e.g. something)
 # TODO emoji
+# TODO arrows and decors
+# TODO abreviations
 import re
 
 
@@ -254,7 +254,7 @@ CONTRACTION_WORD_EXTRA = r"""(?i)
 
 # original regex from @gruber https://gist.github.com/winzig/8894715
 # just added the optional port number
-RE_URL = re.compile(r"""
+URL = r"""
 (?i)
 \b
 (							            # Capture 1: entire matched URL
@@ -297,10 +297,9 @@ RE_URL = re.compile(r"""
     (?!@)			                    # not succeeded by a @, avoid matching "foo.na" in "foo.na@example.com"
   )
 )
-""", re.UNICODE | re.VERBOSE)
+"""
 
-
-RE_EMAIL = re.compile(r"""
+EMAIL = r"""
     (?:(?<=(?:\W))|(?<=(?:^)))                          # e-mail boundary
     (
         [a-zA-Z0-9.\-_']+                                # user
@@ -310,7 +309,96 @@ RE_EMAIL = re.compile(r"""
         (?:\w{2,})                                      # TLD
     )
     (?=\W|$)                                            # e-mail boundary
-    """, re.VERBOSE | re.UNICODE)
+"""
+
+TWITTER_HANDLE = r'[@\uFF20][a-zA-Z_][a-zA-Z_0-9]*'
+HASHTAG = r'[#\uFF03][\w_]+[\w\'_\-]*[\w_]+'
+
+"""
+EMOTICONS =
+    (?:
+      [<>]?
+      [:;=8]                     # eyes
+      [\-o\*\']?                 # optional nose
+      [\)\]\(\[dDpP/\:\}\{@\|\\] # mouth
+      |
+      [\)\]\(\[dDpP/\:\}\{@\|\\] # mouth
+      [\-o\*\']?                 # optional nose
+      [:;=8]                     # eyes
+      [<>]?
+      |
+      <3                         # heart
+    )
+"""
 
 
+_emote_eyes = r'[:=;]'                      # eyes ---8 and x cause problems
+_emote_nose = r'(?:|-|[^a-zA-Z0-9 ]|[Oo])'  # nose ---doesn't get :'-(
+_emote_mouth_happy = r'[D\)\]\}]+'
+_emote_mouth_sad = r'[\(\[\{]+'
+_emote_mouth_tongue = r'[pPd3]+(?=\W|$|RT|rt|Rt)'
+_emote_mouth_other = r'(?:[oO]+|[/\\]+|[vV]+|[Ss]+|[|]+)'
+
+EMOTICON_STANDARD = _emote_eyes + _emote_nose + \
+                    re_or([_emote_mouth_happy,
+                           _emote_mouth_sad,
+                           _emote_mouth_tongue,
+                           _emote_mouth_other])
+
+EMOTICON_REVERSED = re_boundary_s(SPACE) + \
+                    re_or([_emote_mouth_happy,
+                           _emote_mouth_sad,
+                           _emote_mouth_other])
+
+
+_emote_face_left = r'(\u2665|0|[oO]|\u00b0|[vV]|\\$|[tT]|[xX]|;|\u0ca0|@|\u0298|\u2022|\u30FB|\u25D5|\\^|\u00AC|\\*)'
+_emote_face_center = r'(?:[\.]|[_-]+)'
+_emote_face_right = r'\1'
+# extra
+_emote_face_e1 = r'(?:--[\'\"])'
+_emote_face_e2 = r'(?:[<>])[\._-]+(?:[<>])'
+_emote_face_e3 = r'(?:[.][_]+[.])'
+_emote_face_e4 = r'(?:[oO]' + _emote_face_center + r'[oO])'
+
+EMOTICON_FACE = re_or([
+    "(?:" + _emote_face_left +_emote_face_center+_emote_face_right+ ")",
+    _emote_face_e1,
+    _emote_face_e2,
+    _emote_face_e3,
+    _emote_face_e4
+])
+
+# east emotes
+_emote_e_left = r'[\uFF3C\\\u01AA\u0504\(\uFF08<>;\u30FD=~\*\-]+'
+_emote_e_right = r'[\-\=\\);\'\u0022<>\u0283\uFF09/\uFF0F\u30CE\uFF89\u4E3F\u256F\u03C3\u3063\u00B5~\\*]+'
+_emote_e_symbol = r'[^A-Za-z0-9\s\(\)\*:=\-]'
+
+EMOTICON_EAST_FACE = _emote_e_left + \
+                re_or([EMOTICON_FACE, _emote_e_symbol]) + \
+                     _emote_e_right
+
+
+
+EMOTICON = re_or([
+    EMOTICON_STANDARD,
+    EMOTICON_REVERSED,
+    EMOTICON_EAST_FACE,
+    EMOTICON_FACE,
+])
+
+HEARTS = "(?:<+/?3+)+"
+
+ARROWS = re_or([r'(?:<*[-―—=]*>+|<+[-―—=]*>*)', '[\u2190-\u21ff]+'])
+
+"""punctuation
+PUNCTUATION = [
+        (re.compile(r'([:,])([^\d])'), r' \1 \2'),
+        (re.compile(r'([:,])$'), r' \1 '),
+        (re.compile(r'\.\.\.'), r' ... '),
+        (re.compile(r'[;@#$%&]'), r' \g<0> '),
+        (re.compile(r'([^\.])(\.)([\]\)}>"\']*)\s*$'), r'\1 \2\3 '),
+        (re.compile(r'[?!]'), r' \g<0> '),
+
+        (re.compile(r"([^'])' "), r"\1 ' "),
+]"""
 
