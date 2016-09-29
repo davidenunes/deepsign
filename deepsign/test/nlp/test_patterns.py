@@ -181,7 +181,6 @@ class TestPatterns(unittest.TestCase):
         print(r2)
 
     def test_contraction_word(self):
-        #s0 = "'ven't"
         s1 = "Don't do that"
         s2 = "Shouldn't've done that"
         s3 = "He'dn't've that"

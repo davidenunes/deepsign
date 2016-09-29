@@ -66,7 +66,7 @@ class Tokenizer:
             return rem.matched.group()
 
         # NUMBERS ******************************************************************************************************
-        # TODO: requisites not met
+        # TODO: requirements not met
         """
         Check for entities that might start with numbers before splitting based on numbers
         e.g. times, dates, etc
@@ -76,7 +76,7 @@ class Tokenizer:
             return rem.matched.group()
 
         # PUNCTUATION **************************************************************************************************
-        # TODO: requisites not met
+        # TODO: requirements not met
         """
         We should check for all entities that might start with punctuation before checking this
         e.g.
