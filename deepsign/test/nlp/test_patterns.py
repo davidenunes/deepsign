@@ -9,6 +9,7 @@ def _matches(pattern, target_str):
     found = pattern.findall(target_str)
     return len(found) == 1 and found[0] == target_str
 
+
 class TestPatterns(unittest.TestCase):
 
     def test_url(self):
@@ -178,5 +179,29 @@ class TestPatterns(unittest.TestCase):
         s2 = "I'dn't've what you want though and He wouldn't've that either"
         r2 = c_split.findall(s2)
         print(r2)
+
+    def test_contraction_word(self):
+        #s0 = "'ven't"
+        s1 = "Don't do that"
+        s2 = "Shouldn't've done that"
+        s3 = "He'dn't've that"
+        s4 = "y'all need this"
+        s5 = "'twas not that bad"
+        s6 = "'twasn't that bad"
+        s7 = "Give'em hell"
+
+        #r0 = re.match(pm.CONTRACTION, s0)
+        #print(r0.group())
+
+        r1 = re.match(pm.CONTRACTION_WORD_1,s1)
+        print(r1.groups())
+        print(r1.span(2))
+
+        r2 = re.match(pm.CONTRACTION_WORD_1, s2)
+        print(r2.groups())
+
+        r3 = re.match(pm.CONTRACTION_WORD_1, s3)
+        print(r3.groups())
+
 
 

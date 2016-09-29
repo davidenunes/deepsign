@@ -49,23 +49,23 @@ class REMatcher:
     in the tokenizer
     """
 
-    def match(self, re_pattern, text):
+    def match(self, pattern, text):
         """
         Returns True if the pattern matches input at the begining of the string
         False otherwise
 
-        :param re_pattern: the compiled re pattern to be matched in the input
+        :param pattern: the compiled re pattern to be matched in the input
         :param input: the input where we look for a pattern
         """
-        m = re_pattern.match(text)
+        m = re.match(pattern, text)
         if m is not None:
             self.input = text
             self.matched = m
             return True
         return False
 
-    def skip(self):
-        (_, i) = self.matched.span()
+    def skip(self,group=0):
+        (_, i) = self.matched.span(group)
         return self.input[i:]
 
 # punctuation patterns
@@ -97,7 +97,7 @@ QUOTE_S = r'[\u2018\u201C\u0091\u0093\u2039\u00AB\u201A\u201E]{1,2}'
 QUOTE_E = r'[\u2019\u201D\u0092\u0094\u203A\u00BB\u201B\u201F]{1,2}'
 
 # any quote
-QUOTES = re_or([
+QUOTE = re_or([
     QUOTE_U,
     QUOTE_S,
     QUOTE_E
@@ -109,6 +109,9 @@ QUOTES = re_or([
 # etc, commas, question marks and so on
 #
 # I did include small and fullwidth punctuation (dunno where to expect that though)
+
+PUNCT_FN = r'[\\\/@#_\*&\=\+%<>~\*]'
+
 DOTS = r'\.\.\.+|[\u0085\u2025\u2026]|\.[ \u00A0](?:\.[ \u00A0])+\.'
 
 # punctuation except hyphens, paranthesis and quotes
@@ -116,16 +119,18 @@ PUNCT_INSIDE = r'[,;:\u204F\uFE50\uFE54\uFE55\uFF1B\uFF0C\uFF1A\uFF1B]'
 PUNCT_END = r'[\.?!¡¿\u2047\u2048\2049\uFE52\uFE56\uFE57\uFF01\uFF0E\uFF1F]'
 
 
-PUNCT = re_or([PUNCT_INSIDE,PUNCT_END,HYPHEN,DOTS])
+PUNCT = re_or([PUNCT_INSIDE, QUOTE, PARENS_BRACKET, PUNCT_END, HYPHEN, DOTS, PUNCT_FN])
 PUNCT_SEQ = PUNCT+'+'
 
 
-# Alpha num. patterns
+# AlphaNum Patterns
 
 DIGIT = r'\d'
 
-U_NUMBER = r'\d+|\d*(?:[.:,\u00AD\u066B\u066C]\d+)+'
-S_NUMBER = r'[\-+]?' + U_NUMBER
+# don't care about comma or dot separator consistency
+U_NUMBER = r'\.?\d+(?:[.,\u00AD]\d+)*(?:[.,\u00AD]\d+)?'
+S_NUMBER = r'[\-+]' + U_NUMBER
+NUMBER = r'[\-+]?' + U_NUMBER
 SUBSUP_NUMBER = r'[\u207A\u207B\u208A\u208B]?(?:[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]+|[\u2080-\u2089]+)'
 
 LIKELY_FRACTIONS = r'(?:\d{1,4}[\- \u00A0])?\d{1,4}(?:\\?\/|\u2044)\d{1,4}'
@@ -188,7 +193,10 @@ _UNICODE_EXTRA_WORD_CHARS = [
 LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
 LETTER = re_or([LETTER_ACCENT,LETTER_EXTRA])
 
-WORD = "{letter}(?:{letter}|{digit})*(?:[.!?]{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT)
+WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
+
+# f**k s#$t
+WORD_SENSORED = LETTER+'{1,2}'+PUNCT_SEQ+LETTER+'{1,3}'
 
 # Originally Stanford PTB Lexer has a list of abbreviation regexes to match the ones found in WSJ corpus
 # I made one a little bit more general to match things I don't want to get separated Ph.D, a.k.a., p.m., etc
@@ -199,19 +207,13 @@ VERSION = LETTER+'?\d(?:\.\d)*'
 
 # Contractions
 CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
-CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)               # 'm 've 'd 'll 're
-CONTRACTION_3 = "(?:{apo}t)".format(apo=APOSTROPHE)                                # it -> 'tis 'twas
-CONTRACTION_4 = "(?:y{apo})".format(apo=APOSTROPHE)                                # you -> y'all
-CONTRACTION = re_or([CONTRACTION_1, CONTRACTION_2, CONTRACTION_3, CONTRACTION_4])
+CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)               # 'm 've 'd 'll 're                              # you -> y'all
+CONTRACTION = re_or([CONTRACTION_1, CONTRACTION_2])
 
-CONTRACTION_WORD_1 = '(?i)([a-z]+)' + "({c})".format(c=CONTRACTION)          # Don't I'm You're He'll He's
-CONTRACTION_WORD_2 = "(?i)({c3})(is)|({c3})(was)".format(c3=CONTRACTION_3)   #'tis 'twas
-CONTRACTION_WORD_3 = "(?i)({c4})(all)".format(c4=CONTRACTION_4)              # y'all
-CONTRACTION_WORD = re_or([
-    CONTRACTION_WORD_1,
-    CONTRACTION_WORD_2,
-    CONTRACTION_WORD_3
-])
+CONTRACTION_WORD_1 = '(?i)([a-z]+)' + "({c}+)".format(c=CONTRACTION)                # Don't I'm You're He'll He's
+CONTRACTION_WORD_2 = "(?i)({apo}t)(is|was)".format(apo=APOSTROPHE)                 #'tis 'twas
+CONTRACTION_WORD_3 = "(?i)(y{apo})(all)".format(apo=APOSTROPHE)                    # y'all
+
 
 # TODO also we have to deal with words that start with apostrophe
 # there are two kinds: the ones that come from contractions after
@@ -311,30 +313,13 @@ EMAIL = r"""
 TWITTER_HANDLE = r'[@\uFF20][a-zA-Z_][a-zA-Z_0-9]*'
 HASHTAG = r'[#\uFF03][\w_]+[\w\'_\-]*[\w_]+'
 
-"""
-EMOTICONS =
-    (?:
-      [<>]?
-      [:;=8]                     # eyes
-      [\-o\*\']?                 # optional nose
-      [\)\]\(\[dDpP/\:\}\{@\|\\] # mouth
-      |
-      [\)\]\(\[dDpP/\:\}\{@\|\\] # mouth
-      [\-o\*\']?                 # optional nose
-      [:;=8]                     # eyes
-      [<>]?
-      |
-      <3                         # heart
-    )
-"""
 
-
-_emote_eyes = r'[:=;]'                      # eyes ---8 and x cause problems
-_emote_nose = r'(?:|-|[^a-zA-Z0-9 ]|[Oo])'  # nose ---doesn't get :'-(
+_emote_eyes = r'[:=;]'                              # eyes ---8 and x cause problems
+_emote_nose = r'(?:|-o?|[^a-zA-Z0-9 ]|[Oo]|\*|\')'  # nose ---doesn't get :'-(
 _emote_mouth_happy = r'[D\)\]\}]+'
 _emote_mouth_sad = r'[\(\[\{]+'
-_emote_mouth_tongue = r'[pPd3]+(?=\W|$|RT|rt|Rt)'
-_emote_mouth_other = r'(?:[oO]+|[/\\]+|[vV]+|[Ss]+|[|]+)'
+_emote_mouth_tongue = r'[pPd3]+(?=\W|$)'
+_emote_mouth_other = r'(?:[oO]+|[/\\]+|[vV]+|[Ss]+|[|]+|@)'
 
 EMOTICON_STANDARD = _emote_eyes + _emote_nose + \
                     re_or([_emote_mouth_happy,
@@ -346,6 +331,7 @@ EMOTICON_REVERSED = re_boundary_s(SPACE) + \
                     re_or([_emote_mouth_happy,
                            _emote_mouth_sad,
                            _emote_mouth_other])
+
 
 # TODO east emote styles like (T_T)
 

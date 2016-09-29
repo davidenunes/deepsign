@@ -16,7 +16,7 @@ def is_parens_bracket(text):
 
 
 def is_quote(text):
-    return re.fullmatch(patterns.QUOTES, text) is not None
+    return re.fullmatch(patterns.QUOTE, text) is not None
 
 
 def is_url(text):
