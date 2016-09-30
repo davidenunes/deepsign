@@ -36,91 +36,69 @@ class Tokenizer:
     def _next_token(self):
         matcher = pm.REMatcher()
         text = self.text
+        match_group = -1
 
-        # return space characters or sequences of whitespace as a single token
+        # 0 is the whole match
+        # 1 the first group (if it exists)
         if matcher.match(RE['SPACES'], text):
-            self.text = matcher.skip()
-            return matcher.matched.group()
-
-        # CONTRACTIONS *************************************************************************************************
-        # contractions resulted from previous separation of contraction words
-        # (do)(n't) -> return (do) ->  skip to (n't)
-        if matcher.match(RE['CONTRACTION'], text):
-            self.text = matcher.skip()
-            return matcher.matched.group()
-
-
-        if matcher.match(RE['CONTRACTION_W1'], text):
+            # spaces are tokens too
+            match_group = 0
+        elif matcher.match(RE['CONTRACTION'], text):
+            # (do)(n't) -> return (do) ->  skip to (n't)
+            match_group = 0
+        elif matcher.match(RE['CONTRACTION_W1'], text):
             # he's don't I'ven't -> (w)(c+)
-            self.text = matcher.skip(1)
-            return matcher.matched.group(1)
+            match_group = 1
+        elif matcher.match(RE['CONTRACTION_W2'], text):
+            # 'twas 'tis -> (c)(w)
+            match_group = 1
+        elif matcher.match(RE['CONTRACTION_W3'], text):
+            # y'all -> (c)(w)
+            match_group = 1
+        elif matcher.match(RE['CONTRACTION_WE'], text):
+            # words with apostrophe (w) -> (w)
+            match_group = 0
+        elif matcher.match(RE['WORD'], text):
+            # TODO: Match tokens that might start with words
+            """e.g.
+                - URLs: something.com
+                - e-mail: abc@xyz.com
+                - Sensored words: f**k
+                - Abbreviations: Ph.D a.k.a. p.m.
+                - Versions: v1.2
+            """
+            # TODO test abbreviations
+            # TODO test conflict between versions and numbers with dot and coma
+            match_group = 0
+        elif matcher.match(RE['NUMBER'], text):
+            # TODO match entities starting with numbers
+            """e.g.
+                - times
+                - dates
+                - version numbers
+            """
+            match_group = 0
+        elif matcher.match(RE['PUNCT_SEQ'], text):
+            # TODO match entities that start with punctuation before this
+            """e.g.
+                - numbers with sign (-2.5)
+                - hashtags
+                - twitter handles
+                - arrows
+                - hearts
+                - emoticons
+            """
+            match_group = 0
 
-        # 'twas 'tis -> (c)(w)
-        if matcher.match(RE['CONTRACTION_W2'], text):
-            self.text = matcher.skip(1)
-            return matcher.matched.group(1)
-
-        # y'all -> (c)(w)
-        if matcher.match(RE['CONTRACTION_W3'], text):
-            self.text = matcher.skip(1)
-            return matcher.matched.group(1)
-
-        # words that we don't want to split but have an apostrophe (w) -> (w)
-        if matcher.match(RE['CONTRACTION_WE'], text):
-            self.text = matcher.skip()
-            return matcher.matched.group()
-
-        # TODO test abbreviations
-        # TODO test conflict between versions and numbers with dot and coma
-        # WORDS ********************************************************************************************************
-        """
-        Check for entities that might start with words before splitting based on words
-        e.g.
-        - URLs: something.com
-        - e-mail: abc@xyz.com
-        - Sensored words: f**k
-        - Abbreviations: Ph.D a.k.a. p.m.
-        - Versions: v1.2
-        """
-        if matcher.match(RE['WORD'], text):
-            self.text = matcher.skip(0)
-            return matcher.matched.group()
-
-        # NUMBERS ******************************************************************************************************
-        # TODO: requirements not met
-        """
-        Check for entities that might start with numbers before splitting based on numbers
-        e.g.
-        - times
-        - dates
-        - version numbers
-        """
-        if matcher.match(RE['NUMBER'], text):
-            self.text = matcher.skip(0)
-            return matcher.matched.group()
-
-        # PUNCTUATION **************************************************************************************************
-        # TODO: requirements not met
-        """
-        We should check for all entities that might start with punctuation before checking this
-        e.g.
-        - numbers with sign (-2.5)
-        - hashtags
-        - twitter handles
-        - arrows
-        - hearts
-        - emoticons
-        """
-        if matcher.match(RE['PUNCT_SEQ'], text):
-            self.text = matcher.skip(0)
-            return matcher.matched.group()
-
-
-        # skip everything else character by character
+        if match_group >= 0:
+            self.text = matcher.skip(match_group)
+            token = matcher.matched.group(match_group)
         else:
+            # nothing matched return character token
             token = self.text[0]
             self.text = self.text[1:]
-            return token
+
+        return token
 
 
 def tokenize(text):
