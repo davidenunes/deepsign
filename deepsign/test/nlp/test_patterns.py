@@ -209,3 +209,27 @@ class TestPatterns(unittest.TestCase):
         r7 = re.match(pm.WORD, s7)
         self.assertEqual(len(r7.groups()), 0)
         self.assertEqual(r7.group(), "Give")
+
+    def test_number_patterns(self):
+        time = "03:40"
+
+        date_1 = "27-02-2000"
+        date_2 = "02/02/90"
+
+        version_1 = "1.0"
+        version_2 = "1.2.1"
+        version_3 = "v1.0.3"
+
+        number_1 = "1.2"
+        number_2 = "1,2000.39"
+        number_3 = "1.2000,39"
+
+        # separators for numbers
+        # \u0020 space
+        # \u0027 apostrophe
+        # \u002c coma
+        # \u002e fullstop
+        # \u2009 thin space
+        # \u202f narrow no-break space
+        # I just consider dots and commas
+
