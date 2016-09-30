@@ -3,11 +3,24 @@
 RexEx Tokenizer
 """
 
-from collections import deque
 from deepsign.nlp import patterns as pm
+import re
 
+
+RE = {
+    'SPACES': re.compile(pm.SPACES),
+    'CONTRACTION': re.compile(pm.CONTRACTION),
+    'CONTRACTION_W1': re.compile(pm.CONTRACTION_WORD_1),
+    'CONTRACTION_W2': re.compile(pm.CONTRACTION_WORD_2),
+    'CONTRACTION_W3': re.compile(pm.CONTRACTION_WORD_3),
+    'CONTRACTION_WE': re.compile(pm.CONTRACTION_WORD_EXTRA),
+    'WORD': re.compile(pm.WORD),
+    'NUMBER': re.compile(pm.NUMBER),
+    'PUNCT_SEQ': re.compile(pm.PUNCT_SEQ)
+}
 
 class Tokenizer:
+
     def __init__(self, text):
         self.text = text
 
@@ -21,59 +34,70 @@ class Tokenizer:
             return self._next_token()
 
     def _next_token(self):
-        rem = pm.REMatcher()
+        matcher = pm.REMatcher()
         text = self.text
 
-        # skip space characters
-        if rem.match(pm.RE_SPACES, text):
-            self.text = rem.skip()
-            return self.__next__()
+        # return space characters or sequences of whitespace as a single token
+        if matcher.match(RE['SPACES'], text):
+            self.text = matcher.skip()
+            return matcher.matched.group()
 
         # CONTRACTIONS *************************************************************************************************
         # contractions resulted from previous separation of contraction words
         # (do)(n't) -> return (do) ->  skip to (n't)
-        if rem.match(pm.CONTRACTION, text):
-            self.text = rem.skip()
-            return rem.matched.group()
+        if matcher.match(RE['CONTRACTION'], text):
+            self.text = matcher.skip()
+            return matcher.matched.group()
 
-        # he's don't I'ven't -> (w)(c+)
-        if rem.match(pm.CONTRACTION_WORD_1, text):
-            self.text = rem.skip(1)
-            return rem.matched.group(1)
+
+        if matcher.match(RE['CONTRACTION_W1'], text):
+            # he's don't I'ven't -> (w)(c+)
+            self.text = matcher.skip(1)
+            return matcher.matched.group(1)
 
         # 'twas 'tis -> (c)(w)
-        if rem.match(pm.CONTRACTION_WORD_2, text):
-            self.text = rem.skip(1)
-            return rem.matched.group(1)
+        if matcher.match(RE['CONTRACTION_W2'], text):
+            self.text = matcher.skip(1)
+            return matcher.matched.group(1)
 
         # y'all -> (c)(w)
-        if rem.match(pm.CONTRACTION_WORD_3, text):
-            self.text = rem.skip(1)
-            return rem.matched.group(1)
+        if matcher.match(RE['CONTRACTION_W3'], text):
+            self.text = matcher.skip(1)
+            return matcher.matched.group(1)
 
-        # (w) -> (w)
-        if rem.match(pm.CONTRACTION_WORD_EXTRA, text):
-            self.text = rem.skip()
-            return rem.matched.group()
+        # words that we don't want to split but have an apostrophe (w) -> (w)
+        if matcher.match(RE['CONTRACTION_WE'], text):
+            self.text = matcher.skip()
+            return matcher.matched.group()
 
+        # TODO test abbreviations
+        # TODO test conflict between versions and numbers with dot and coma
         # WORDS ********************************************************************************************************
         """
         Check for entities that might start with words before splitting based on words
         e.g.
+        - URLs: something.com
+        - e-mail: abc@xyz.com
+        - Sensored words: f**k
+        - Abbreviations: Ph.D a.k.a. p.m.
+        - Versions: v1.2
         """
-        if rem.match(pm.WORD, text):
-            self.text = rem.skip(0)
-            return rem.matched.group()
+        if matcher.match(RE['WORD'], text):
+            self.text = matcher.skip(0)
+            return matcher.matched.group()
 
         # NUMBERS ******************************************************************************************************
         # TODO: requirements not met
         """
         Check for entities that might start with numbers before splitting based on numbers
-        e.g. times, dates, etc
+        e.g.
+        - times
+        - dates
+        - version numbers
         """
-        if rem.match(pm.NUMBER, text):
-            self.text = rem.skip(0)
-            return rem.matched.group()
+        if matcher.match(RE['NUMBER'], text):
+            self.text = matcher.skip(0)
+            return matcher.matched.group()
 
         # PUNCTUATION **************************************************************************************************
         # TODO: requirements not met
@@ -84,11 +108,12 @@ class Tokenizer:
         - hashtags
         - twitter handles
         - arrows
+        - hearts
         - emoticons
         """
-        if rem.match(pm.PUNCT_SEQ, text):
-            self.text = rem.skip(0)
-            return rem.matched.group()
+        if matcher.match(RE['PUNCT_SEQ'], text):
+            self.text = matcher.skip(0)
+            return matcher.matched.group()
 
 
         # skip everything else character by character

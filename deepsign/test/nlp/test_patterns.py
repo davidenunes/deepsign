@@ -168,7 +168,6 @@ class TestPatterns(unittest.TestCase):
         c_found = cw.match(s)
         print(s + " ", c_found.groups())
 
-
     def test_contractions_split(self):
         s1 = "Don't do that again I'm serious, I'll be right there."
         c_split = re.compile(pm.CONTRACTION_WORDS, re.UNICODE)
@@ -181,26 +180,42 @@ class TestPatterns(unittest.TestCase):
         print(r2)
 
     def test_contraction_word(self):
-        s1 = "Don't do that"
-        s2 = "Shouldn't've done that"
-        s3 = "He'dn't've that"
-        s4 = "y'all need this"
-        s5 = "'twas not that bad"
-        s6 = "'twasn't that bad"
-        s7 = "Give'em hell"
-
-        #r0 = re.match(pm.CONTRACTION, s0)
-        #print(r0.group())
+        s1 = "Don't"
+        s2 = "Shouldn't've"
+        s3 = "He'dn't've"
+        s4 = "'twas"
+        s5 = "'twasn't"
+        s6 = "y'all"
+        s7 = "Give'em"
 
         r1 = re.match(pm.CONTRACTION_WORD_1,s1)
-        print(r1.groups())
-        print(r1.span(2))
+        self.assertEqual(len(r1.groups()),2)
+        self.assertTupleEqual(r1.groups(),("Do","n't"))
 
         r2 = re.match(pm.CONTRACTION_WORD_1, s2)
-        print(r2.groups())
+        self.assertEqual(len(r2.groups()), 2)
+        self.assertTupleEqual(r2.groups(), ("Should", "n't've"))
 
         r3 = re.match(pm.CONTRACTION_WORD_1, s3)
-        print(r3.groups())
+        self.assertEqual(len(r3.groups()), 2)
+        self.assertTupleEqual(r3.groups(), ("He", "'dn't've"))
+
+        r4 = re.match(pm.CONTRACTION_WORD_2, s4)
+        self.assertEqual(len(r4.groups()), 2)
+        self.assertTupleEqual(r4.groups(), ("'t", "was"))
+
+        r5 = re.match(pm.CONTRACTION_WORD_2, s5)
+        self.assertEqual(len(r5.groups()), 2)
+        self.assertTupleEqual(r5.groups(), ("'t", "was"))
+
+        r6 = re.match(pm.CONTRACTION_WORD_3, s6)
+        self.assertEqual(len(r6.groups()), 2)
+        self.assertTupleEqual(r6.groups(), ("y'", "all"))
+
+        r7 = re.match(pm.WORD, s7)
+        self.assertEqual(len(r7.groups()), 0)
+        self.assertEqual(r7.group(), "Give")
+
 
 
 

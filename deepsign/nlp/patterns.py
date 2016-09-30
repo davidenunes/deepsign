@@ -57,7 +57,7 @@ class REMatcher:
         :param pattern: the compiled re pattern to be matched in the input
         :param input: the input where we look for a pattern
         """
-        m = re.match(pattern, text)
+        m = pattern.match(text)
         if m is not None:
             self.input = text
             self.matched = m
