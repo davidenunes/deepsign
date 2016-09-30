@@ -215,13 +215,13 @@ CONTRACTION_WORD_2 = "(?i)({apo}t)(is|was)".format(apo=APOSTROPHE)              
 CONTRACTION_WORD_3 = "(?i)(y{apo})(all)".format(apo=APOSTROPHE)                    # y'all
 
 
-# TODO also we have to deal with words that start with apostrophe
+# NOTE: we have to deal with words that start with apostrophe
 # there are two kinds: the ones that come from contractions after
 # we parse the sentence and skip tokens like words at the begining of words
 # and sentences surrounded by things that can be used as apostrophes as quotes
 
-# TODO other than Contractions we can have assimilations that could be split
-# e.g. cannot, gimme, gonna, shoulda
+# TODO other than Contractions we can have Assimilations that could be split
+# e.g. cannot, gimme, gonna, shouldda, wanna, coulda
 
 # Extra words not to be separated ---some from Stanford PTBLexer
 CONTRACTION_WORD_EXTRA = r"""(?i)
