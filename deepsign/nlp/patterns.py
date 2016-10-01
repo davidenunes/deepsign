@@ -141,13 +141,13 @@ CURRENCY = r'[\u0024\u058f\u060b\u09f2\u09f3\u09fb\u0af1\u0bf9\u0e3f\u17db\ua838
 PERCENT = NUMBER+'%'
 RATIO = r'(?:(?:[1-9]\d+)|\d)(?::\d+)'
 
-DATE_1 = r'(?:[0-9]{1,2}[\-\/][0-9]{1,2}[\-\/][0-9]{2,4})'
-DATE_2 = r'(?:[0-9]{2,4}[\-\/][0-9]{1,2}[\-\/][0-9]{1,2})'
+DATE_1 = r'[0-9]{1,2}[\-\/][0-9]{1,2}[\-\/][0-9]{2,4}'
+DATE_2 = r'[0-9]{2,4}[\-\/][0-9]{1,2}[\-\/][0-9]{1,2}'
 DATE = re_or([DATE_1,DATE_2])
 
 TIME = r'\d+(?::\d+){1,2}'
 
-ISO8601DATETIME = r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[x0-9]{2}:[0-9]{2}Z?'
+ISO8601DATETIME = DATE_2+'T'+TIME+'Z'
 
 DEGREES = r'\u00B0[CF]'
 
@@ -168,8 +168,8 @@ NUMERIC_ENTITY = re_or([
     LIKELY_FRACTIONS,
     TIME,
     RATIO,
-    VERSION,
     NUMBER,
+    VERSION,
     SUBSUP_NUMBER,
     VULGAR_FRACTIONS
 ])

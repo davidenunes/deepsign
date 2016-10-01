@@ -245,6 +245,7 @@ class TestPatterns(unittest.TestCase):
         not_ratio = "01:4"
         date_1 = "27-02-2000"
         date_2 = "02/02/90"
+        date_iso = "2016-10-01T16:15:35Z"
         version_1 = "1.2.1"
         version_2 = "v1.0.3"
         number_1 = "-1.2"
@@ -253,21 +254,21 @@ class TestPatterns(unittest.TestCase):
         phone_1 = "776-2323"
         phone_2 = "+21 21 928 239"
 
-
-
-        # debugging purposes (some patterns overlap)
-        print_matches(num_pattenrs, time)
-        print_matches(num_pattenrs, ratio)
-        print_matches(num_pattenrs, not_ratio)
-        print_matches(num_pattenrs, date_1)
-        print_matches(num_pattenrs, date_2)
-        print_matches(num_pattenrs, version_1)
-        print_matches(num_pattenrs, version_2)
-        print_matches(num_pattenrs, number_1)
-        print_matches(num_pattenrs, number_2)
-        print_matches(num_pattenrs, number_3)
-        print_matches(num_pattenrs, phone_1)
-        print_matches(num_pattenrs, phone_2)
+        # Debugging purposes (some patterns overlap)
+        debug = False
+        if debug:
+            print_matches(num_pattenrs, time)
+            print_matches(num_pattenrs, ratio)
+            print_matches(num_pattenrs, not_ratio)
+            print_matches(num_pattenrs, date_1)
+            print_matches(num_pattenrs, date_2)
+            print_matches(num_pattenrs, version_1)
+            print_matches(num_pattenrs, version_2)
+            print_matches(num_pattenrs, number_1)
+            print_matches(num_pattenrs, number_2)
+            print_matches(num_pattenrs, number_3)
+            print_matches(num_pattenrs, phone_1)
+            print_matches(num_pattenrs, phone_2)
 
 
         date_1_match = re.fullmatch(pm.DATE,date_1)
@@ -276,10 +277,48 @@ class TestPatterns(unittest.TestCase):
         date_2_match = re.fullmatch(pm.DATE,date_2)
         self.assertTrue(date_2_match is not None)
 
+        # numeric entity matching order matters
+        # we want to match each example exactly
+        # a submatch means there is some conflict
+        m = re.match(pm.NUMERIC_ENTITY,time)
+        self.assertEqual(time, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY,ratio)
+        self.assertEqual(ratio, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY,not_ratio)
+        self.assertEqual(not_ratio, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, date_1)
+        self.assertEqual(date_1, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, date_2)
+        self.assertEqual(date_2, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, date_iso)
+        self.assertEqual(date_iso,m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, version_1)
+        self.assertEqual(version_1, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, version_2)
+        self.assertEqual(version_2, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, number_1)
+        self.assertEqual(number_1, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, number_2)
+        self.assertEqual(number_2, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, number_3)
+        self.assertEqual(number_3, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, phone_1)
+        self.assertEqual(phone_1, m.group(0))
+
+        m = re.match(pm.NUMERIC_ENTITY, phone_2)
+        self.assertEqual(phone_2, m.group(0))
 
 
-
-
-        # numeric entity matching order
 
 
