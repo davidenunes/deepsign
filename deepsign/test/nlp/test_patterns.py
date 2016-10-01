@@ -10,6 +10,18 @@ def _matches(pattern, target_str):
     return len(found) == 1 and found[0] == target_str
 
 
+def print_matches(pattern_dict, txt):
+    print("-------------------")
+    print("matching: "+txt)
+    for k in pattern_dict:
+        p = pattern_dict[k]
+        m = re.match(p, txt)
+        if m is not None:
+            print(k + ": " + p)
+            print(m.group(0))
+    print("-------------------")
+
+
 class TestPatterns(unittest.TestCase):
     def test_url(self):
         # Examples to be Accepted
@@ -210,26 +222,64 @@ class TestPatterns(unittest.TestCase):
         self.assertEqual(len(r7.groups()), 0)
         self.assertEqual(r7.group(), "Give")
 
-    def test_number_patterns(self):
-        time = "03:40"
 
+
+
+
+    def test_number_patterns(self):
+        num_pattenrs = {
+            'ISODATE': pm.ISO8601DATETIME,
+            'DATE': pm.DATE,
+            'PHONE': pm.PHONE_LIKE,
+            'FRACTION': pm.LIKELY_FRACTIONS,
+            'TIME': pm.TIME,
+            'RATIO': pm.RATIO,
+            'NUMBER': pm.NUMBER,
+            'VERSION': pm.VERSION,
+            'SUBSUP_NUMBER': pm.SUBSUP_NUMBER,
+            'FRACTION_2': pm.VULGAR_FRACTIONS
+        }
+
+        time = "03:40:30"
+        ratio = "1:4"
+        not_ratio = "01:4"
         date_1 = "27-02-2000"
         date_2 = "02/02/90"
+        version_1 = "1.2.1"
+        version_2 = "v1.0.3"
+        number_1 = "-1.2"
+        number_2 = "1.2000,39"
+        number_3 = "1,2000.39"
+        phone_1 = "776-2323"
+        phone_2 = "+21 21 928 239"
 
-        version_1 = "1.0"
-        version_2 = "1.2.1"
-        version_3 = "v1.0.3"
 
-        number_1 = "1.2"
-        number_2 = "1,2000.39"
-        number_3 = "1.2000,39"
 
-        # separators for numbers
-        # \u0020 space
-        # \u0027 apostrophe
-        # \u002c coma
-        # \u002e fullstop
-        # \u2009 thin space
-        # \u202f narrow no-break space
-        # I just consider dots and commas
+        # debugging purposes (some patterns overlap)
+        print_matches(num_pattenrs, time)
+        print_matches(num_pattenrs, ratio)
+        print_matches(num_pattenrs, not_ratio)
+        print_matches(num_pattenrs, date_1)
+        print_matches(num_pattenrs, date_2)
+        print_matches(num_pattenrs, version_1)
+        print_matches(num_pattenrs, version_2)
+        print_matches(num_pattenrs, number_1)
+        print_matches(num_pattenrs, number_2)
+        print_matches(num_pattenrs, number_3)
+        print_matches(num_pattenrs, phone_1)
+        print_matches(num_pattenrs, phone_2)
+
+
+        date_1_match = re.fullmatch(pm.DATE,date_1)
+        self.assertTrue(date_1_match is not None)
+
+        date_2_match = re.fullmatch(pm.DATE,date_2)
+        self.assertTrue(date_2_match is not None)
+
+
+
+
+
+        # numeric entity matching order
+
 

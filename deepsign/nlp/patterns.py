@@ -138,29 +138,43 @@ VULGAR_FRACTIONS = r'[\u00BC\u00BD\u00BE\u2153-\u215E]'
 
 CURRENCY = r'[\u0024\u058f\u060b\u09f2\u09f3\u09fb\u0af1\u0bf9\u0e3f\u17db\ua838\ufdfc\ufe69\uff04\uffe0\uffe1\uffe5\uffe6\u00a2-\u00a5\u20a0]'
 
-PERCENT = S_NUMBER+'%'
+PERCENT = NUMBER+'%'
+RATIO = r'(?:(?:[1-9]\d+)|\d)(?::\d+)'
 
-DATE = r'\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4}'
+DATE_1 = r'(?:[0-9]{1,2}[\-\/][0-9]{1,2}[\-\/][0-9]{2,4})'
+DATE_2 = r'(?:[0-9]{2,4}[\-\/][0-9]{1,2}[\-\/][0-9]{1,2})'
+DATE = re_or([DATE_1,DATE_2])
 
-TIME_LIKE = r'\d+(?::\d+){1,2}'
+TIME = r'\d+(?::\d+){1,2}'
 
 ISO8601DATETIME = r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[x0-9]{2}:[0-9]{2}Z?'
 
 DEGREES = r'\u00B0[CF]'
 
-PHONE = r"""
-    (
-        \([0-9]{2,3}\)[ \u00A0]?
-        |
-        (\+\+?)?
-        ([0-9]{2,4}[\- \u00A0])?
-        [0-9]{2,4}[\- \u00A0]
-    )
-    [0-9]{3,4}[\- \u00A0]?[0-9]{3,5}
-    |
-    ((\+\+?)?[0-9]{2,4}\.)?
-    [0-9]{2,4}\.[0-9]{3,4}\.[0-9]{3,5}
-"""
+# added [^\d] because versions don't appear integrated in other patterns except for numbers
+VERSION = r'[vV]?\d(?:\.\d)+'
+
+PHONE_LIKE = r'[\+]?(?:\(\d{2,3}\)[\s\-])?\d{2,3}(?:[\s\-]\d{2,4})+'
+
+
+# order sensitive expression to match expressions
+# with numbers without conflict
+# e.g. date can be part of ISO8601DATE so we check for that first
+# useful for numeric entity tokenization
+NUMERIC_ENTITY = re_or([
+    ISO8601DATETIME,
+    DATE,
+    PHONE_LIKE,
+    LIKELY_FRACTIONS,
+    TIME,
+    RATIO,
+    VERSION,
+    NUMBER,
+    SUBSUP_NUMBER,
+    VULGAR_FRACTIONS
+])
+
+
 
 # latin and accented characters
 LETTER_ACCENT = r'(?i)(?:(?![×Þß÷þø])[a-zÀ-ÿ])'
@@ -193,6 +207,7 @@ _UNICODE_EXTRA_WORD_CHARS = [
 LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
 LETTER = re_or([LETTER_ACCENT,LETTER_EXTRA])
 
+
 WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
 
 # f**k s#$t
@@ -202,8 +217,7 @@ WORD_SENSORED = LETTER+'{1,2}'+PUNCT_SEQ+LETTER+'{1,3}'
 # I made one a little bit more general to match things I don't want to get separated Ph.D, a.k.a., p.m., etc
 ABBREV = LETTER + '{1,4}(?:\.'+LETTER+'{1,4})+'
 
-# v1.0, 0.5.2 there are other valid tags, but this is the most common
-VERSION = LETTER+'?\d(?:\.\d)*'
+
 
 # Contractions
 CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
