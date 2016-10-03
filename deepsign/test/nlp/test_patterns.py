@@ -7,8 +7,14 @@ from segtok.tokenizer import web_tokenizer
 import re
 
 
-def _matches(pattern, text):
-    return pattern.fullmatch(text) is not None
+def _matches(pattern,text):
+    match = pattern.match(text)
+
+    if match is not None:
+        matched = match.group(0)
+        return matched == text
+    else:
+        return False
 
 
 def print_matches(pattern_dict, txt):
@@ -41,8 +47,8 @@ class TestPatterns(unittest.TestCase):
         url_simple_protocol_path3 = "http://domain.com/path+path2+path3"
 
         url_pattern = re.compile(pm.URL, re.VERBOSE | re.UNICODE)
-        self.assertTrue(_matches(url_pattern, url_simple))
-        self.assertTrue(_matches(url_pattern, url_simple_sub))
+
+
         self.assertFalse(_matches(url_pattern, reject_url_simple_sub))
         self.assertTrue(_matches(url_pattern, url_simple_port))
         self.assertTrue(_matches(url_pattern, url_protocol_port))
@@ -65,6 +71,7 @@ class TestPatterns(unittest.TestCase):
         self.assertTrue(_matches(url_pattern, url_scheme_sub))
         self.assertTrue(_matches(url_pattern, url_path_asterisk))
         self.assertTrue(_matches(url_pattern, url_path_bang))
+
         self.assertFalse(_matches(url_pattern, url_parenthesis_invalid_1))
         self.assertTrue(_matches(url_pattern, url_parenthesis_2))
         self.assertTrue(_matches(url_pattern, url_parenthesis_3))
@@ -113,6 +120,7 @@ class TestPatterns(unittest.TestCase):
         self.assertTrue(_matches(url_pattern, url_ssh_2))
         self.assertTrue(_matches(url_pattern, url_ssh_3))
 
+
     def test_email(self):
         # E-MAIL
         email_simple = "user101-a_b@mail.com"
@@ -120,11 +128,12 @@ class TestPatterns(unittest.TestCase):
         email_dotuser = "user.101@mail.tld"
 
         email_pattern = re.compile(pm.EMAIL, re.UNICODE | re.VERBOSE)
+        url_pattern = re.compile(pm.URL, re.VERBOSE|re.UNICODE)
+
         self.assertTrue(_matches(email_pattern, email_simple))
+        self.assertFalse(_matches(url_pattern,email_simple))
         self.assertTrue(_matches(email_pattern, email_sub))
         self.assertTrue(_matches(email_pattern, email_dotuser))
-        
-        
 
     def test_REMatcher(self):
         s = "Hello World"
@@ -227,9 +236,15 @@ class TestPatterns(unittest.TestCase):
         self.assertEqual(len(r7.groups()), 0)
         self.assertEqual(r7.group(), "Give")
 
+    def test_word_version_conflict(self):
+        word_pattern = re.compile(pm.WORD, re.UNICODE)
+        version_pattern = re.compile(pm.VERSION, re.UNICODE)
 
+        version = "v1.2"
 
-
+        # this is a problem, version has to be catched first
+        self.assertTrue(word_pattern.match(version) is not None)
+        self.assertTrue(_matches(version_pattern,version))
 
     def test_number_patterns(self):
         num_pattenrs = {
@@ -324,6 +339,31 @@ class TestPatterns(unittest.TestCase):
         m = re.match(pm.NUMERIC, phone_2)
         self.assertEqual(phone_2, m.group(0))
 
+    def test_abbreviations(self):
+        abbrev_pattern = re.compile(pm.ABBREV, re.UNICODE)
 
+        # simple abbrev
+        simple_abbrev = [
+            "a.k.a.",
+            "a.m.",
+            "e.g.",
+            "U.S.A.",
+            "etc.",
+            "Mr.",
+            "MR.",
+            "MRS.",
+            "mrs.",
+            "Ph.D",
+            "a.m",
+            "A.M",
+            "Brit."
+        ]
+
+        for abbrev in simple_abbrev:
+            m = abbrev_pattern.match(abbrev)
+            self.assertEqual(m.group(0),abbrev)
+
+
+        self.assertTrue(abbrev_pattern.match("it. ") is None)
 
 

@@ -24,8 +24,6 @@ APOSTROPHE = r'[\'\u201B\u02BC\u2018\u2019\u2032\u0091\u0092\u0060]'
 HYPHEN = r'[\-_\u058A\u2010\u2011]'
 
 
-
-
 # didn't include all the symbols just the ones I thought it could appear
 # starting parenthesis and brackets
 PARENS_BRACKET_S = r'[\(\[\{\u2329\u2768\u2E28\u3008\u300A\uFE59\uFE5B\uFF08\uFF3B\uFF5B]'
@@ -157,13 +155,39 @@ LETTER = re_or([LETTER_ACCENT, LETTER_EXTRA])
 WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
 
 # f**k s#$t
-WORD_SENSORED = LETTER+'{1,2}'+PUNCT_SEQ+LETTER+'{1,3}'
+WORD_CENSORED = LETTER + '{1,2}' + PUNCT_SEQ + LETTER + '{1,3}'
 
 # Originally Stanford PTB Lexer has a list of abbreviation regexes to match the ones found in WSJ corpus
-# I made one a little bit more general to match things I don't want to get separated Ph.D, a.k.a., p.m., etc
-ABBREV = LETTER + '{1,4}(?:\.'+LETTER+'{1,4})+'
+# simple acronym
+ACRON = r'(?:[A-Za-z]\.){2,}|[A-Za-z]{2,3}\.(?:[A-Za-z]\.?)|[a-z]\.[a-z]|[A-Z]\.[A-Z]'
+
+# included some common abbrev.
+# having a lexicon is the only way, either that or learn it from corpora
+# (anything stop that doesn't separate a sentence can be part of an abbrev)
+_ABBREV_EXTRA = [
+    r'(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)',                                                 # months
+    r'(?:Mon|Tue|Tues|Wed|Thu|Thurs|Fri|Sat|Sun)',                                                           # days
+    r'(?:Inc|Cos?|Corp|Pp?t[ye]s?|Ltd|Plc|Rt|Bancorp|Bhd|Assn|Univ|Coll|Intl|Sys|Invt|Elec|Natl|M[ft]g|Dept)',    # co
+    r'(?:tel|est|ext|sq|fl|oz)',                                                                             # num
+    r'(?:Jr|Sr|Bros|Esq)',
+    r'(?:Mr|Mrs|Ms|Miss|Drs?|Profs?|Reps?|Attys?|Lt|Col|Gen|Messrs|Govs?|Adm|Rev|Maj|Sgt|Cpl|Pvt|Capt|Ste?|Col)',
+    r'(?:Pres|Lieut|Hon|Brig|Co?mdr|Pfc|Spc|Supts?|Det|Mt|Ft|Adj|Adv|Asst|Assoc|Ens|Insp|Mlle|Mme|Msgr|Sfc)',
+    r'(?:etc|al|seq|acc|cf)',
+    r'(?:adj|adv|Anniv|Attrib|Cal|Calc|Civ|Cl|dict)',
+    r'(?:ca|Figs?|prop|nos?|art|bldg|prop|pp|op|Conf|def|doc|ed|abbr|abbrv|abbrev)',
+    r'(?:So|No|Blvd|Rd|Ave|Apt|Ctr|Cts?|Hls?|Lk|Ln|Prt|Trl|Addr|Brit)'
+]
+
+ABBREV_EXTRA = r'(?i)'+re_or(_ABBREV_EXTRA)+r'\.'
+ABBREV = re_or([ACRON, ABBREV_EXTRA])
 
 
+
+
+
+
+#abbreviations like Ph.D might not have dot
+# U.S.A.
 
 # Contractions
 CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
@@ -213,43 +237,45 @@ CONTRACTION_WORD_EXTRA = r"""(?i)
 
 # original regex from @gruber https://gist.github.com/winzig/8894715
 # just added the optional port number
+# the following regex has backtracking problems when it has to match and fails
+# but calling re.match should lead to no problems since it
 URL = r"""
-    (?i)\b(
-        (?:
-        (?:https?:|[A-z]{2,}:)     # URL protocol and colon
-        (?:/{1,3}|[a-z0-9%])
-        )
-        |
-        [a-z0-9.\-]+[.](?:[a-z]{2,13})
-        /
-    )
-    (?:						    # One or more:
+(?i)
+  (?:
+    (?:https?:|[A-z]{2,}:)              # URL protocol and colon
+    (?:
+      /{1,3}						    # 1-3 slashes
+      |								    #   or
+      [a-z0-9%]						    # Single letter or digit or '%'
+    )                                   # (Trying not to match e.g. "URI::Escape")
+    |							        #   or
+    [a-z0-9.\-]+[\.]
+    (?:[a-z]{2,13})
+    /
+  )
+  (?:							        # One or more:
     [^\s()<>{}\[\]]+					# Run of non-space, non-()<>{}[]
     |								    #   or
-    \([^\s()]*?\([^\s()]+\)[^\s()]*?\)  # balanced parens, one level deep: (…(…)…)
-    |
     \([^\s]+?\)							# balanced parens, non-recursive: (…)
   )+
   (?:							        # End with:
-    \([^\s()]*?\([^\s()]+\)[^\s()]*?\)  # balanced parens, one level deep: (…(…)…)
-    |
     \([^\s]+?\)							# balanced parens, non-recursive: (…)
     |									#   or
-    [^\s`!()\[\]{};:'".,<>?«»“”‘’]		# not a space or one of these punct chars
+    [^\s`!()\[\]{};:'"\.,<>?«»“”‘’]		# not a space or one of these punct chars
   )
   |					                    # OR, the following to match naked domains:
   (?:
-    (?<!@)			                    # not preceded by a @, avoid matching foo@_gmail.com_
+    (?<!@)			                    # not preceded by a @, avoid matching foo@_mail.com_
     [a-z0-9]+
-    (?:[.\-][a-z0-9]+)*
-    [.]
+    (?:[\.\-][a-z0-9]+)?
+    [\.]
     (?:[a-z]{2,13})
     (?::\d{2,5})?                       # optional port
     \b
     /?
     (?!@)			                    # not succeeded by a @, avoid matching "foo.na" in "foo.na@example.com"
   )
-)
+
 """
 
 # I use a list to comment the regex so that the verbose flag is not necessary
@@ -291,11 +317,13 @@ EMOTICON_REVERSED = re_boundary_s(SPACE) + \
 
 # TODO east emote styles like (T_T)
 
+HEARTS = "(?:<+/?3+)+"
+
 EMOTICON = re_or([
     EMOTICON_STANDARD,
-    EMOTICON_REVERSED
+    EMOTICON_REVERSED,
+    HEARTS
 ])
 
-HEARTS = "(?:<+/?3+)+"
 ARROWS = re_or([r'(?:<*[{hyphen}=]*>+|<+[{hyphen}=]*>*)', '[\u2190-\u21ff]+']).format(hyphen=HYPHEN)
 
