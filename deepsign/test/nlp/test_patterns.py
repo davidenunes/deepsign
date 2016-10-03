@@ -344,6 +344,7 @@ class TestPatterns(unittest.TestCase):
 
         # simple abbrev
         simple_abbrev = [
+            "U.S.",
             "a.k.a.",
             "a.m.",
             "e.g.",
@@ -366,4 +367,7 @@ class TestPatterns(unittest.TestCase):
 
         self.assertTrue(abbrev_pattern.match("it. ") is None)
 
+        abbrev_end = "U.S.."
+        m = abbrev_pattern.match(abbrev_end)
+        print(m)
 

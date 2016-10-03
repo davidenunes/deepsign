@@ -12,8 +12,8 @@ class TestTokenizer(unittest.TestCase):
             "This is a sentence.",
             "This is, without a doubt, a sentence.",
             "Based in Eugene,Ore., PakTech needs a new distributor after Sydney-based Creative Pack Pty. Ltd. went into voluntary administration.",
-            "The Iron Age (ca. 1300 – ca. 300 BC).",
-            "Indo\u00ADnesian ship\u00ADping \u00AD",
+            "The Iron Age (ca. 1300 -- ca. 300 BC).",
+            u"Indo\u00ADnesian ship\u00ADping \u00AD",
             "Gimme a phone, I'm gonna call.",
             "\"John & Mary's dog,\" Jane thought (to herself).\n\"What a #$%!\na- ``I like AT&T''.\"",
             "I said at 4:45pm.",
@@ -48,14 +48,14 @@ class TestTokenizer(unittest.TestCase):
         self.gold = [
             ["This", "is", "a", "sentence", "."],
             ["This", "is", ",", "without", "a", "doubt", ",", "a", "sentence","."],
-            ["Based", "in", "Eugene", ",", "Ore.", ",", "PakTech", "needs", "a", "new", "distributor", "after", "Sydney-based", "Creative", "Pack", "Pty.", "Ltd.","went", "into", "voluntary", "administration", "."],
+            ["Based", "in", "Eugene", ",", "Ore", ".", ",", "PakTech", "needs", "a", "new", "distributor", "after", "Sydney", "-", "based", "Creative", "Pack", "Pty.", "Ltd.","went", "into", "voluntary", "administration", "."],
             ["The", "Iron", "Age", "(", "ca.", "1300", "--", "ca.", "300", "BC", ")", "."],
             ["Indonesian", "shipping", "-"],
-            ["Gim", "me", "a", "phone", ",", "I", "'m", "gon", "na", "call", "."],
-            ["``", "John", "&", "Mary", "'s", "dog", ",", "''", "Jane", "thought", "(", "to", "herself", ")", ".", "``","What", "a", "#", "$", "%", "!", "a", "-", "``", "I", "like", "AT&T", "''", ".", "''"],
+            ["Gimme", "a", "phone", ",", "I", "'m", "gonna", "call", "."],
+            ["\"", "John", "&", "Mary", "'s", "dog", ",", "\"", "Jane", "thought", "(", "to", "herself", ")", ".", "\"","What", "a", "#", "$", "%", "!", "a", "-", "``", "I", "like", "AT&T", "''", ".", "\""],
             ["I", "said", "at", "4:45", "pm", "."],
-            ["I", "ca", "n't", "believe", "they", "wan", "na", "keep", "40", "%", "of", "that", ".", "''", "``", "Whatcha", "think", "?", "''", "``", "I", "do", "n't", "--", "think", "so", "...", ",","''"],
-            ["You", "`", "paid", "'", "US$", "170,000", "?!", "You", "should", "'ve", "paid", "only", "$", "16.75","."],
+            ["I", "ca", "n't", "believe", "they", "wanna", "keep", "40", "%", "of", "that", ".", "\"", "``", "Whatcha", "think", "?", "''", "\"", "I", "do", "n't", "---", "think", "so", "...", ",","\""],
+            ["You", "`", "paid", "'", "US", "$", "170,000", "?!", "You", "should", "'ve", "paid", "only", "$", "16.75","."],
             ["1", ".", "Buy", "a", "new", "Chevrolet", "(", "37", "%", "-", "owned", "in", "the", "U.S.", ".", ")", ".","15", "%"],
             ["I", "like", "you", ";-)", "but", "do", "you", "care", ":(", ".","I", "'m", "happy", "^_^", "but", "shy", "(x.x)", "!"],
             ["Diamond", "(", "``", "Not", "even", "the", "chair", "''", ")", "lives", "near", "Udaipur", "(","84km", ")", ".","{", "1", ".", "A", "potential", "Palmer", "trade", ":", "}"],
@@ -89,16 +89,16 @@ class TestTokenizer(unittest.TestCase):
         Just use one of the sentences above along with its gold standard
         or enter a new one bellow
         """
-        s_index = 1
+        s_index = 10
 
         sentence = self.sentences[s_index]
         gold = self.gold[s_index]
 
         print(sentence)
-        print(gold)
+        print("expected: ", gold)
 
-        tokens = tokenize(sentence)
-        print(tokens)
+        tokens = [t for t in tokenize(sentence) if not token.is_space(t)]
+        print("result:   ",tokens)
 
         self.assertSequenceEqual(tokens,gold)
 

@@ -12,7 +12,7 @@ These regular expressions were inspired in (and improved from) expressions used 
 
 
 # utility fn and classes
-from deepsign.utils.regex import re_or, re_boundary_s
+from deepsign.utils.regex import re_or, re_boundary_s, re_boundary_e
 
 # punctuation patterns
 
@@ -60,10 +60,10 @@ DOTS = r'\.\.\.+|[\u0085\u2025\u2026]|\.[ \u00A0](?:\.[ \u00A0])+\.'
 
 # punctuation except hyphens, paranthesis and quotes
 PUNCT_INSIDE = r'[,;:\u204F\uFE50\uFE54\uFE55\uFF1B\uFF0C\uFF1A\uFF1B]'
-PUNCT_END = r'[\.?!¡¿\u2047\u2048\2049\uFE52\uFE56\uFE57\uFF01\uFF0E\uFF1F]'
+PUNCT_END = r'\?!|[\.\?!¡¿\u2047\u2048\2049\uFE52\uFE56\uFE57\uFF01\uFF0E\uFF1F]'
 
 
-PUNCT = re_or([PUNCT_INSIDE, QUOTE, PARENS_BRACKET, PUNCT_END, HYPHEN, DOTS, PUNCT_FN])
+PUNCT = re_or([PUNCT_INSIDE, QUOTE+'+', PARENS_BRACKET, DOTS, PUNCT_END, HYPHEN+'+', PUNCT_FN])
 PUNCT_SEQ = PUNCT+'+'
 
 
@@ -151,7 +151,7 @@ _UNICODE_EXTRA_WORD_CHARS = [
 LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
 LETTER = re_or([LETTER_ACCENT, LETTER_EXTRA])
 
-
+SOFT_HYPHEN = r'\u00AD'
 WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
 
 # f**k s#$t
@@ -159,7 +159,7 @@ WORD_CENSORED = LETTER + '{1,2}' + PUNCT_SEQ + LETTER + '{1,3}'
 
 # Originally Stanford PTB Lexer has a list of abbreviation regexes to match the ones found in WSJ corpus
 # simple acronym
-ACRON = r'(?:[A-Za-z]\.){2,}|[A-Za-z]{2,3}\.(?:[A-Za-z]\.?)|[a-z]\.[a-z]|[A-Z]\.[A-Z]'
+ACRON = r'(?:(?:[A-Za-z]\.){2,}|[A-Za-z]{2,3}\.(?:[A-Za-z]\.?)|[a-z]\.[a-z]|[A-Z]\.[A-Z])'
 
 # included some common abbrev.
 # having a lexicon is the only way, either that or learn it from corpora
@@ -178,7 +178,7 @@ _ABBREV_EXTRA = [
     r'(?:So|No|Blvd|Rd|Ave|Apt|Ctr|Cts?|Hls?|Lk|Ln|Prt|Trl|Addr|Brit)'
 ]
 
-ABBREV_EXTRA = r'(?i)'+re_or(_ABBREV_EXTRA)+r'\.'
+ABBREV_EXTRA = r'(?i)'+re_or(_ABBREV_EXTRA)+r'\.'+re_boundary_e("[^\.]")
 ABBREV = re_or([ACRON, ABBREV_EXTRA])
 
 
