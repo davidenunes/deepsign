@@ -1,13 +1,14 @@
 import unittest
+
+import deepsign.utils.regex
 from deepsign.nlp import patterns as pm
 from deepsign.nlp import token
 from segtok.tokenizer import web_tokenizer
 import re
 
 
-def _matches(pattern, target_str):
-    found = pattern.findall(target_str)
-    return len(found) == 1 and found[0] == target_str
+def _matches(pattern, text):
+    return pattern.fullmatch(text) is not None
 
 
 def print_matches(pattern_dict, txt):
@@ -39,17 +40,18 @@ class TestPatterns(unittest.TestCase):
         url_simple_path3 = "domain.com/path+path2+path3"
         url_simple_protocol_path3 = "http://domain.com/path+path2+path3"
 
-        self.assertTrue(_matches(pm.RE_URL, url_simple))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_sub))
-        self.assertFalse(_matches(pm.RE_URL, reject_url_simple_sub))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_port))
-        self.assertTrue(_matches(pm.RE_URL, url_protocol_port))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_path1))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_protocol_path1))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_path2))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_protocol_path2))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_path3))
-        self.assertTrue(_matches(pm.RE_URL, url_simple_protocol_path3))
+        url_pattern = re.compile(pm.URL, re.VERBOSE | re.UNICODE)
+        self.assertTrue(_matches(url_pattern, url_simple))
+        self.assertTrue(_matches(url_pattern, url_simple_sub))
+        self.assertFalse(_matches(url_pattern, reject_url_simple_sub))
+        self.assertTrue(_matches(url_pattern, url_simple_port))
+        self.assertTrue(_matches(url_pattern, url_protocol_port))
+        self.assertTrue(_matches(url_pattern, url_simple_path1))
+        self.assertTrue(_matches(url_pattern, url_simple_protocol_path1))
+        self.assertTrue(_matches(url_pattern, url_simple_path2))
+        self.assertTrue(_matches(url_pattern, url_simple_protocol_path2))
+        self.assertTrue(_matches(url_pattern, url_simple_path3))
+        self.assertTrue(_matches(url_pattern, url_simple_protocol_path3))
 
         url_scheme_simple = "https://domain.tld"
         url_scheme_sub = "https://sub.domain.tld"
@@ -59,21 +61,21 @@ class TestPatterns(unittest.TestCase):
         url_parenthesis_2 = "http://example.com/@user/file(1).html"
         url_parenthesis_3 = "http://sub.domain.domain/p1/r2.4.1/file.html#segment(string)"
 
-        self.assertTrue(_matches(pm.RE_URL, url_scheme_simple))
-        self.assertTrue(_matches(pm.RE_URL, url_scheme_sub))
-        self.assertTrue(_matches(pm.RE_URL, url_path_asterisk))
-        self.assertTrue(_matches(pm.RE_URL, url_path_bang))
-        self.assertFalse(_matches(pm.RE_URL, url_parenthesis_invalid_1))
-        self.assertTrue(_matches(pm.RE_URL, url_parenthesis_2))
-        self.assertTrue(_matches(pm.RE_URL, url_parenthesis_3))
+        self.assertTrue(_matches(url_pattern, url_scheme_simple))
+        self.assertTrue(_matches(url_pattern, url_scheme_sub))
+        self.assertTrue(_matches(url_pattern, url_path_asterisk))
+        self.assertTrue(_matches(url_pattern, url_path_bang))
+        self.assertFalse(_matches(url_pattern, url_parenthesis_invalid_1))
+        self.assertTrue(_matches(url_pattern, url_parenthesis_2))
+        self.assertTrue(_matches(url_pattern, url_parenthesis_3))
 
         url_fragment = "http://domain.tld/path/#hello"
         url_handle = "https://domain.tld/@username"
         url_tilde = "http://domain.tld/~username"
 
-        self.assertTrue(_matches(pm.RE_URL, url_fragment))
-        self.assertTrue(_matches(pm.RE_URL, url_handle))
-        self.assertTrue(_matches(pm.RE_URL, url_tilde))
+        self.assertTrue(_matches(url_pattern, url_fragment))
+        self.assertTrue(_matches(url_pattern, url_handle))
+        self.assertTrue(_matches(url_pattern, url_tilde))
 
         url_path_query_1 = "domain.com/path?key=value&key2=value2"
         url_path_query_2 = "domain.com/path?key=value&key2=value_2"
@@ -83,13 +85,13 @@ class TestPatterns(unittest.TestCase):
         url_path_query_6 = "domain.com/path?key=value1;value_2"
         url_path_query_7 = "domain.com/path?key=value1%20value_2"
 
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_1))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_2))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_3))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_4))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_5))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_6))
-        self.assertTrue(_matches(pm.RE_URL, url_path_query_7))
+        self.assertTrue(_matches(url_pattern, url_path_query_1))
+        self.assertTrue(_matches(url_pattern, url_path_query_2))
+        self.assertTrue(_matches(url_pattern, url_path_query_3))
+        self.assertTrue(_matches(url_pattern, url_path_query_4))
+        self.assertTrue(_matches(url_pattern, url_path_query_5))
+        self.assertTrue(_matches(url_pattern, url_path_query_6))
+        self.assertTrue(_matches(url_pattern, url_path_query_7))
 
         uri_user = "http://user:info@host.name.tld"
         uri_user_2 = "user:info@host.name.tld"
@@ -97,19 +99,19 @@ class TestPatterns(unittest.TestCase):
         uri_full = "http://username@example.com:123/path/data?key=value&key2=value2#fragid1"
         uri_full_invalid = "username@example.com:123/path/data?key=value&key2=value2#fragid1"
 
-        self.assertTrue(_matches(pm.RE_URL, uri_user))
-        self.assertTrue(_matches(pm.RE_URL, uri_user_2))
-        self.assertTrue(_matches(pm.RE_URL, uri_mail))
-        self.assertTrue(_matches(pm.RE_URL, uri_full))
-        self.assertFalse(_matches(pm.RE_URL, uri_full_invalid))
+        self.assertTrue(_matches(url_pattern, uri_user))
+        self.assertTrue(_matches(url_pattern, uri_user_2))
+        self.assertTrue(_matches(url_pattern, uri_mail))
+        self.assertTrue(_matches(url_pattern, uri_full))
+        self.assertFalse(_matches(url_pattern, uri_full_invalid))
 
         url_ssh_1 = "https://user1@domain.com:user2/file.ext"
         url_ssh_2 = "https://username@hostname/path"
         url_ssh_3 = "ssh://username@hostname:1010/path"
 
-        self.assertTrue(_matches(pm.RE_URL, url_ssh_1))
-        self.assertTrue(_matches(pm.RE_URL, url_ssh_2))
-        self.assertTrue(_matches(pm.RE_URL, url_ssh_3))
+        self.assertTrue(_matches(url_pattern, url_ssh_1))
+        self.assertTrue(_matches(url_pattern, url_ssh_2))
+        self.assertTrue(_matches(url_pattern, url_ssh_3))
 
     def test_email(self):
         # E-MAIL
@@ -117,16 +119,19 @@ class TestPatterns(unittest.TestCase):
         email_sub = "yser@one.two.tld"
         email_dotuser = "user.101@mail.tld"
 
-        self.assertTrue(_matches(pm.RE_EMAIL, email_simple))
-        self.assertTrue(_matches(pm.RE_EMAIL, email_sub))
-        self.assertTrue(_matches(pm.RE_EMAIL, email_dotuser))
+        email_pattern = re.compile(pm.EMAIL, re.UNICODE | re.VERBOSE)
+        self.assertTrue(_matches(email_pattern, email_simple))
+        self.assertTrue(_matches(email_pattern, email_sub))
+        self.assertTrue(_matches(email_pattern, email_dotuser))
+        
+        
 
     def test_REMatcher(self):
         s = "Hello World"
-        space = pm.RE_SPACE
-        nSpace = pm.RE_NOT_SPACE
+        space = re.compile(pm.SPACES)
+        nSpace = re.compile(pm.NOT_SPACE)
 
-        rem = pm.REMatcher()
+        rem = deepsign.utils.regex.REMatcher()
 
         self.assertTrue(rem.match(nSpace, s))
         s = rem.skip()
@@ -141,24 +146,24 @@ class TestPatterns(unittest.TestCase):
         re1 = 'A'
         re2 = 'B'
 
-        re_1or2 = pm.re_or([re1, re2])
+        re_1or2 = deepsign.utils.regex.re_or([re1, re2])
         self.assertEqual(re_1or2, r'(?:A|B)')
 
-        re_1 = pm.re_or([re1])
+        re_1 = deepsign.utils.regex.re_or([re1])
         self.assertEqual(re_1, r'(?:A)')
 
     def test_apostrophes(self):
         s = "don't do that, I havn`t seen it before"
-        apos = re.compile(pm.APOSTROPHES, re.UNICODE)
+        apos = re.compile(pm.APOSTROPHE, re.UNICODE)
         all_apos = apos.findall(s)
         self.assertEqual(len(all_apos), 2)
 
     def test_contractions_common(self):
         s = "Don't"
 
-        c = re.compile(pm.re_group(pm.CONTRACTION), re.UNICODE)
+        c = re.compile(deepsign.utils.regex.re_group(pm.CONTRACTION), re.UNICODE)
 
-        cw = re.compile(pm.CONTRACTION_WORD_SPLIT, re.UNICODE)
+        cw = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
         c_found = cw.match(s)
         print(s + " ", c_found.groups())
 
@@ -176,7 +181,7 @@ class TestPatterns(unittest.TestCase):
 
     def test_contractions_split(self):
         s1 = "Don't do that again I'm serious, I'll be right there."
-        c_split = re.compile(pm.CONTRACTION_WORDS, re.UNICODE)
+        c_split = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
 
         r1 = c_split.findall(s1)
         print(r1)
@@ -280,43 +285,43 @@ class TestPatterns(unittest.TestCase):
         # numeric entity matching order matters
         # we want to match each example exactly
         # a submatch means there is some conflict
-        m = re.match(pm.NUMERIC_ENTITY,time)
+        m = re.match(pm.NUMERIC, time)
         self.assertEqual(time, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY,ratio)
+        m = re.match(pm.NUMERIC, ratio)
         self.assertEqual(ratio, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY,not_ratio)
+        m = re.match(pm.NUMERIC, not_ratio)
         self.assertEqual(not_ratio, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, date_1)
+        m = re.match(pm.NUMERIC, date_1)
         self.assertEqual(date_1, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, date_2)
+        m = re.match(pm.NUMERIC, date_2)
         self.assertEqual(date_2, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, date_iso)
+        m = re.match(pm.NUMERIC, date_iso)
         self.assertEqual(date_iso,m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, version_1)
+        m = re.match(pm.NUMERIC, version_1)
         self.assertEqual(version_1, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, version_2)
+        m = re.match(pm.NUMERIC, version_2)
         self.assertEqual(version_2, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, number_1)
+        m = re.match(pm.NUMERIC, number_1)
         self.assertEqual(number_1, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, number_2)
+        m = re.match(pm.NUMERIC, number_2)
         self.assertEqual(number_2, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, number_3)
+        m = re.match(pm.NUMERIC, number_3)
         self.assertEqual(number_3, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, phone_1)
+        m = re.match(pm.NUMERIC, phone_1)
         self.assertEqual(phone_1, m.group(0))
 
-        m = re.match(pm.NUMERIC_ENTITY, phone_2)
+        m = re.match(pm.NUMERIC, phone_2)
         self.assertEqual(phone_2, m.group(0))
 
 

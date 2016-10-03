@@ -10,63 +10,9 @@ These regular expressions were inspired in (and improved from) expressions used 
     * NLTK Tweet Tokenizer: http://www.nltk.org/_modules/nltk/tokenize/casual.html#TweetTokenizer
 """
 
-# Patterns:
-# TODO punctuation
-# TODO emoji
-# TODO arrows and decors
-# TODO abreviations
-import re
-
 
 # utility fn and classes
-def re_not(pattern):
-    return r'(?!'+pattern+')'
-
-
-def re_or(patterns):
-    return r'(?:%s)' % "|".join(patterns)
-
-
-def re_group(pattern):
-    return "("+pattern+")"
-
-def re_boundary_s(pattern):
-    return r'(?:(?<=(?:'+pattern+')) | (?<=(?:^)))'
-
-
-def re_boundary_e(pattern):
-    return r'(?='+pattern+'|$)'
-
-
-def compile(pattern):
-    re.compile(pattern, re.UNICODE)
-
-
-class REMatcher:
-    """
-    RegEx Matcher utility class that applies match to a string
-    and saves the state of that match so that we can re-use it
-    in the tokenizer
-    """
-
-    def match(self, pattern, text):
-        """
-        Returns True if the pattern matches input at the begining of the string
-        False otherwise
-
-        :param pattern: the compiled re pattern to be matched in the input
-        :param input: the input where we look for a pattern
-        """
-        m = pattern.match(text)
-        if m is not None:
-            self.input = text
-            self.matched = m
-            return True
-        return False
-
-    def skip(self,group=0):
-        (_, i) = self.matched.span(group)
-        return self.input[i:]
+from deepsign.utils.regex import re_or, re_boundary_s
 
 # punctuation patterns
 
@@ -90,7 +36,7 @@ PARENS_BRACKET = re_or([PARENS_BRACKET_S, PARENS_BRACKET_E])
 
 
 # ubiquitous quote that might appear anywhere
-QUOTE_U = re_or([APOSTROPHE,r'\'{2}',r'\"'])
+QUOTE_U = re_or([APOSTROPHE, r'\'{2}', r'\"'])
 # starting quotes
 QUOTE_S = r'[\u2018\u201C\u0091\u0093\u2039\u00AB\u201A\u201E]{1,2}'
 # ending quotes
@@ -143,7 +89,7 @@ RATIO = r'(?:(?:[1-9]\d+)|\d)(?::\d+)'
 
 DATE_1 = r'[0-9]{1,2}[\-\/][0-9]{1,2}[\-\/][0-9]{2,4}'
 DATE_2 = r'[0-9]{2,4}[\-\/][0-9]{1,2}[\-\/][0-9]{1,2}'
-DATE = re_or([DATE_1,DATE_2])
+DATE = re_or([DATE_1, DATE_2])
 
 TIME = r'\d+(?::\d+){1,2}'
 
@@ -161,7 +107,7 @@ PHONE_LIKE = r'[\+]?(?:\(\d{2,3}\)[\s\-])?\d{2,3}(?:[\s\-]\d{2,4})+'
 # with numbers without conflict
 # e.g. date can be part of ISO8601DATE so we check for that first
 # useful for numeric entity tokenization
-NUMERIC_ENTITY = re_or([
+NUMERIC = re_or([
     ISO8601DATETIME,
     DATE,
     PHONE_LIKE,
@@ -205,7 +151,7 @@ _UNICODE_EXTRA_WORD_CHARS = [
 ]
 
 LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
-LETTER = re_or([LETTER_ACCENT,LETTER_EXTRA])
+LETTER = re_or([LETTER_ACCENT, LETTER_EXTRA])
 
 
 WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
@@ -268,22 +214,16 @@ CONTRACTION_WORD_EXTRA = r"""(?i)
 # original regex from @gruber https://gist.github.com/winzig/8894715
 # just added the optional port number
 URL = r"""
-(?i)
-\b
-(							            # Capture 1: entire matched URL
-  (?:
-    (?:https?:|[A-z]{2,}:)              # URL protocol and colon
-    (?:
-      /{1,3}						    # 1-3 slashes
-      |								    #   or
-      [a-z0-9%]						    # Single letter or digit or '%'
-    )                                   # (Trying not to match e.g. "URI::Escape")
-    |							        #   or
-    [a-z0-9.\-]+[.]
-    (?:[a-z]{2,13})
-    /
-  )
-  (?:							        # One or more:
+    (?i)\b(
+        (?:
+        (?:https?:|[A-z]{2,}:)     # URL protocol and colon
+        (?:/{1,3}|[a-z0-9%])
+        )
+        |
+        [a-z0-9.\-]+[.](?:[a-z]{2,13})
+        /
+    )
+    (?:						    # One or more:
     [^\s()<>{}\[\]]+					# Run of non-space, non-()<>{}[]
     |								    #   or
     \([^\s()]*?\([^\s()]+\)[^\s()]*?\)  # balanced parens, one level deep: (…(…)…)
@@ -312,12 +252,14 @@ URL = r"""
 )
 """
 
+# I use a list to comment the regex so that the verbose flag is not necessary
+# I don't want each pattern to require different flags UNICODE should be the only requirement
 EMAIL = r"""
     (?:(?<=(?:\W))|(?<=(?:^)))                          # e-mail boundary
     (
-        [a-zA-Z0-9.\-_']+                                # user
+        [a-zA-Z0-9.\-_\']+                              # user
         @
-        \b(?:[A-Za-z0-9\-])+(?:\.[A-Za-z0-9\-]+)*         # host
+        \b(?:[A-Za-z0-9\-])+(?:\.[A-Za-z0-9\-]+)*       # host
         \.
         (?:\w{2,})                                      # TLD
     )

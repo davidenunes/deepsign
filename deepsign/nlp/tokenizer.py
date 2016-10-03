@@ -2,22 +2,24 @@
 """
 RexEx Tokenizer
 """
-
+import deepsign.utils.regex
 from deepsign.nlp import patterns as pm
 import re
 
 
 RE = {
-    'SPACES': re.compile(pm.SPACES),
-    'CONTRACTION': re.compile(pm.CONTRACTION),
-    'CONTRACTION_W1': re.compile(pm.CONTRACTION_WORD_1),
-    'CONTRACTION_W2': re.compile(pm.CONTRACTION_WORD_2),
-    'CONTRACTION_W3': re.compile(pm.CONTRACTION_WORD_3),
-    'CONTRACTION_WE': re.compile(pm.CONTRACTION_WORD_EXTRA),
-    'WORD': re.compile(pm.WORD),
-    'NUMBER': re.compile(pm.NUMBER),
-    'PUNCT_SEQ': re.compile(pm.PUNCT_SEQ)
+    'SPACES': re.compile(pm.SPACES, re.UNICODE),
+    'CONTRACTION': re.compile(pm.CONTRACTION, re.UNICODE),
+    'CONTRACTION_W1': re.compile(pm.CONTRACTION_WORD_1, re.UNICODE),
+    'CONTRACTION_W2': re.compile(pm.CONTRACTION_WORD_2, re.UNICODE),
+    'CONTRACTION_W3': re.compile(pm.CONTRACTION_WORD_3, re.UNICODE),
+    'CONTRACTION_WE': re.compile(pm.CONTRACTION_WORD_EXTRA, re.UNICODE),
+    'URL': re.compile(pm.URL, re.UNICODE),
+    'WORD': re.compile(pm.WORD, re.UNICODE),
+    'NUMERIC': re.compile(pm.NUMERIC, re.UNICODE),
+    'PUNCT_SEQ': re.compile(pm.PUNCT_SEQ, re.UNICODE)
 }
+
 
 class Tokenizer:
 
@@ -34,7 +36,7 @@ class Tokenizer:
             return self._next_token()
 
     def _next_token(self):
-        matcher = pm.REMatcher()
+        matcher = deepsign.utils.regex.REMatcher()
         text = self.text
         match_group = -1
 
@@ -58,6 +60,9 @@ class Tokenizer:
         elif matcher.match(RE['CONTRACTION_WE'], text):
             # words with apostrophe (w) -> (w)
             match_group = 0
+        elif matcher.match(RE['URL']):
+            match_group = 0
+
         elif matcher.match(RE['WORD'], text):
             # TODO: Match tokens that might start with words
             """e.g.
@@ -70,13 +75,7 @@ class Tokenizer:
             # TODO test abbreviations
             # TODO test conflict between versions and numbers with dot and coma
             match_group = 0
-        elif matcher.match(RE['NUMBER'], text):
-            # TODO match entities starting with numbers
-            """e.g.
-                - times
-                - dates
-                - version numbers
-            """
+        elif matcher.match(RE['NUMERIC'], text):
             match_group = 0
         elif matcher.match(RE['PUNCT_SEQ'], text):
             # TODO match entities that start with punctuation before this
