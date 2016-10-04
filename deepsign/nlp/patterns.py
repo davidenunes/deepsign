@@ -97,7 +97,7 @@ ISO8601DATETIME = DATE_2+'T'+TIME+'Z'
 DEGREES = r'\u00B0[CF]'
 
 # added [^\d] because versions don't appear integrated in other patterns except for numbers
-VERSION = r'[vV]?\d(?:\.[\dx])+'
+VERSION = r'[vV]?\d(?:\.\d)*(?:\.\d|\.x)'+re_boundary_e("[^\d]")
 
 PHONE_LIKE = r'[\+]?(?:\(\d{2,3}\)[\s\-])?\d{2,3}(?:[\s\-]\d{2,4})+'
 

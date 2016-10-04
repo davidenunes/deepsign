@@ -268,6 +268,7 @@ class TestPatterns(unittest.TestCase):
         date_iso = "2016-10-01T16:15:35Z"
         version_1 = "1.2.1"
         version_2 = "v1.0.3"
+        version_3 = "1.2.x"
         number_1 = "-1.2"
         number_2 = "1.2000,39"
         number_3 = "1,2000.39"
@@ -323,6 +324,9 @@ class TestPatterns(unittest.TestCase):
 
         m = re.match(pm.NUMERIC, version_2)
         self.assertEqual(version_2, m.group(0))
+
+        m = re.match(pm.NUMERIC, version_3)
+        self.assertEqual(version_3, m.group(0))
 
         m = re.match(pm.NUMERIC, number_1)
         self.assertEqual(number_1, m.group(0))
