@@ -41,7 +41,11 @@ class TestTokenizer(unittest.TestCase):
             "I dunno, I'ven't done it.",
             "The okay was received by the anti-acquisition front on its foolishness-filled fish market.",
             "We ran the pre-tests through the post-scripted centrifuge.",
-            "School-aged parents should be aware of the unique problems that they face."]
+            "School-aged parents should be aware of the unique problems that they face.",
+            "Ja'net Bri'an O'neill 't'ony"
+
+        ]
+
 
         self.gold = [
             ["This", "is", "a", "sentence", "."],
@@ -76,7 +80,9 @@ class TestTokenizer(unittest.TestCase):
             ["I", "dunno", ",","I", "'ve", "n't", "done", "it", "."],
             ["The", "okay", "was", "received", "by", "the", "anti", "-", "acquisition", "front", "on", "its","foolishness","-","filled","fish", "market", "."],
             ["We", "ran", "the", "pre", "-","tests", "through", "the", "post", "-","scripted", "centrifuge", "."],
-            ["School", "-", "aged", "parents", "should", "be", "aware", "of", "the", "unique", "problems", "that", "they","face","."]
+            ["School", "-", "aged", "parents", "should", "be", "aware", "of", "the", "unique", "problems", "that", "they","face","."],
+            ["Ja'net", "Bri'an", "O'neill", "'t'ony"]
+
         ]
 
     def test_one_sentence(self):

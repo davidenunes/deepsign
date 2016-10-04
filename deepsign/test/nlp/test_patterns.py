@@ -174,30 +174,29 @@ class TestPatterns(unittest.TestCase):
 
         cw = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
         c_found = cw.match(s)
-        print(s + " ", c_found.groups())
 
         s = "Doesn't've"
         c_found = cw.match(s)
-        print(s + " ", c_found.groups())
 
         s = "n't've"
         c_found = c.match(s)
-        print(s + " ", c_found.groups())
 
         s = "He'dn't've done that"
         c_found = cw.match(s)
-        print(s + " ", c_found.groups())
+
 
     def test_contractions_split(self):
         s1 = "Don't do that again I'm serious, I'll be right there."
         c_split = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
 
         r1 = c_split.findall(s1)
-        print(r1)
+        self.assertListEqual([("Do","n't"),("I","'m"),("I","'ll")],r1)
+
 
         s2 = "I'dn't've what you want though and He wouldn't've that either"
         r2 = c_split.findall(s2)
-        print(r2)
+        self.assertListEqual([("I", "'dn't've"), ("would", "n't've")], r2)
+
 
     def test_contraction_word(self):
         s1 = "Don't"
@@ -373,7 +372,7 @@ class TestPatterns(unittest.TestCase):
 
         abbrev_end = "U.S.."
         m = abbrev_pattern.match(abbrev_end)
-        print(m)
+        self.assertEqual("U.S.", m.group(0))
 
     # TODO finish the vertical emote pattern to match reasonable emoticons
     def test_emoticons(self):

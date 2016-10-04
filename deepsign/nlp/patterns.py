@@ -187,10 +187,7 @@ ABBREV = re_or([ABBREV_SIMPLE, ABBREV_EXTRA])
 PROGRAMMING_LANGUAGES = r'[CF][\-\+#]{1,2}'
 
 
-
-#abbreviations like Ph.D might not have dot
-# U.S.A.
-
+# TODO contractions can perhaps be handled more elegantly
 # Contractions
 CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
 CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)               # 'm 've 'd 'll 're                              # you -> y'all
@@ -221,7 +218,7 @@ _CONTRACTION_WORD_EXTRA = [
     APOSTROPHE+'cause',
     APOSTROPHE+'cuz',
     APOSTROPHE+'[2-9]0s',
-    '[A-HJ-XZn]{apo}{letter}{letter}{letter}*'.format(apo=APOSTROPHE,letter=LETTER),
+    '{apo}?[A-HJ-XZn]{apo}{letter}{letter}{letter}*'.format(apo=APOSTROPHE,letter=LETTER),
     '{letter}{letter}*[aeiouy]{apo}[aeiouA-Z]{letter}+'.format(apo=APOSTROPHE,letter=LETTER),
     '[ldj]'+APOSTROPHE,
     'dunkin'+APOSTROPHE,
