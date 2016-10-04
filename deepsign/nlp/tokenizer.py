@@ -21,6 +21,7 @@ RE = {
     'CENSORED_WORD': re.compile(pm.WORD_CENSORED, re.UNICODE),
     'ABBREVIATION': re.compile(pm.ABBREV, re.UNICODE),
     'SOFT_HYPHEN': re.compile(pm.SOFT_HYPHEN, re.UNICODE),
+    'PROGRAMMING_LANGUAGES': re.compile(pm.PROGRAMMING_LANGUAGES, re.UNICODE),
     'WORD': re.compile(pm.WORD, re.UNICODE),
     'NUMERIC': re.compile(pm.NUMERIC, re.UNICODE),
     'HASHTAG': re.compile(pm.HASHTAG, re.UNICODE),
@@ -56,9 +57,15 @@ class Tokenizer:
         if matcher.match(RE['SPACES'], text):
             # spaces are tokens too
             match_group = 0
+        elif matcher.match(RE['ABBREVIATION'], text):
+            # etc. Ph.D p.m. A.M.
+            match_group = 0
         elif matcher.match(RE['NUMERIC'], text):
             match_group = 0
             rm_soft_hyphen = True
+        elif matcher.match(RE['CONTRACTION_WE'], text):
+            # words with apostrophe (w) -> (w)
+            match_group = 0
         elif matcher.match(RE['CONTRACTION'], text):
             # (do)(n't) -> return (do) ->  skip to (n't)
             match_group = 0
@@ -75,10 +82,6 @@ class Tokenizer:
             # y'all -> (c)(w)
             match_group = 1
             rm_soft_hyphen = True
-        elif matcher.match(RE['CONTRACTION_WE'], text):
-            # words with apostrophe (w) -> (w)
-            match_group = 0
-            rm_soft_hyphen = True
         elif matcher.match(RE['URL'], text):
             # match url and uri but not e-mail
             match_group = 0
@@ -88,13 +91,12 @@ class Tokenizer:
             # match f***k
             match_group = 0
             rm_soft_hyphen = True
-        elif matcher.match(RE['ABBREVIATION'], text):
-            # etc. Ph.D p.m. A.M.
-            match_group = 0
         elif matcher.match(RE['SOFT_HYPHEN'], text):
             # substitute the match
             match_group = 0
             token = "-"
+        elif matcher.match(RE['PROGRAMMING_LANGUAGES'], text):
+            match_group = 0
         elif matcher.match(RE['WORD'], text):
             match_group = 0
             rm_soft_hyphen = True
