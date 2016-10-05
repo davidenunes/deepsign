@@ -15,7 +15,9 @@ RE = {
     'CONTRACTION_W1': re.compile(pm.CONTRACTION_WORD_1, re.UNICODE),
     'CONTRACTION_W2': re.compile(pm.CONTRACTION_WORD_2, re.UNICODE),
     'CONTRACTION_W3': re.compile(pm.CONTRACTION_WORD_3, re.UNICODE),
+    'CONTRACTION_W4': re.compile(pm.CONTRACTION_WORD_4, re.UNICODE),
     'CONTRACTION_WE': re.compile(pm.CONTRACTION_WORD_EXTRA, re.UNICODE),
+    'CONTRACTION_WO': re.compile(pm.CONTRACTION_WORD_OTHER, re.UNICODE),
     'URL': re.compile(pm.URL, re.UNICODE|re.VERBOSE),
     'EMAIL': re.compile(pm.EMAIL, re.UNICODE|re.VERBOSE),
     'CENSORED_WORD': re.compile(pm.WORD_CENSORED, re.UNICODE),
@@ -27,6 +29,7 @@ RE = {
     'HASHTAG': re.compile(pm.HASHTAG, re.UNICODE),
     'USER_HANDLE': re.compile(pm.TWITTER_HANDLE, re.UNICODE),
     'EMOTICON': re.compile(pm.EMOTICON, re.UNICODE),
+    'DEGREES': re.compile(pm.DEGREES, re.UNICODE),
     'PUNCT': re.compile(pm.PUNCT, re.UNICODE)
 }
 
@@ -55,7 +58,6 @@ class Tokenizer:
         # 0 is the whole match
         # 1 the first group (if it exists)
         if matcher.match(RE['SPACES'], text):
-            # spaces are tokens too
             match_group = 0
         elif matcher.match(RE['ABBREVIATION'], text):
             # etc. Ph.D p.m. A.M.
@@ -63,25 +65,28 @@ class Tokenizer:
         elif matcher.match(RE['NUMERIC'], text):
             match_group = 0
             rm_soft_hyphen = True
-        elif matcher.match(RE['CONTRACTION_WE'], text):
-            # words with apostrophe (w) -> (w)
-            match_group = 0
         elif matcher.match(RE['CONTRACTION'], text):
             # (do)(n't) -> return (do) ->  skip to (n't)
             match_group = 0
             rm_soft_hyphen = True
         elif matcher.match(RE['CONTRACTION_W1'], text):
-            # he's don't I'ven't -> (w)(c+)
+            # I'm
             match_group = 1
-            rm_soft_hyphen = True
         elif matcher.match(RE['CONTRACTION_W2'], text):
-            # 'twas 'tis -> (c)(w)
+            # y'all y'know
             match_group = 1
-            rm_soft_hyphen = True
         elif matcher.match(RE['CONTRACTION_W3'], text):
-            # y'all -> (c)(w)
+            # He's He'd woudn't've Mary's
             match_group = 1
-            rm_soft_hyphen = True
+        elif matcher.match(RE['CONTRACTION_W4'], text):
+            # 'tis 'twas
+            match_group = 1
+        elif matcher.match(RE['CONTRACTION_WE'], text):
+            # words with apostrophe from a list (w) -> (w)
+            match_group = 0
+        elif matcher.match(RE['CONTRACTION_WO'], text):
+            # any other words with apostrophe (w) -> (w)
+            match_group = 0
         elif matcher.match(RE['URL'], text):
             # match url and uri but not e-mail
             match_group = 0
@@ -105,6 +110,8 @@ class Tokenizer:
         elif matcher.match(RE['USER_HANDLE'], text):
             match_group = 0
         elif matcher.match(RE['EMOTICON'], text):
+            match_group = 0
+        elif matcher.match(RE['DEGREES'], text):
             match_group = 0
         elif matcher.match(RE['PUNCT'], text):
             match_group = 0

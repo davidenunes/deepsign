@@ -94,7 +94,7 @@ TIME = r'\d+(?::\d+){1,2}'
 
 ISO8601DATETIME = DATE_2+'T'+TIME+'Z'
 
-DEGREES = r'\u00B0[CF]'
+DEGREES = r'\u00b0[CF]'
 
 # added [^\d] because versions don't appear integrated in other patterns except for numbers
 VERSION = r'[vV]?\d(?:\.\d)*(?:\.\d|\.x)'+re_boundary_e("[^\d]")
@@ -189,14 +189,22 @@ PROGRAMMING_LANGUAGES = r'[CF][\-\+#]{1,2}'
 
 # TODO contractions can perhaps be handled more elegantly
 # Contractions
-CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                               # n't
-CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)               # 'm 've 'd 'll 're                              # you -> y'all
+CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                          # n't
+CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)           # 've 'd 'll 're
 CONTRACTION = re_or([CONTRACTION_1, CONTRACTION_2])
 
-CONTRACTION_WORD_1 = '(?i)([a-z]+)' + "({c}+)".format(c=CONTRACTION)                # Don't I'm You're He'll He's
-CONTRACTION_WORD_2 = "(?i)({apo}t)(is|was)".format(apo=APOSTROPHE)                 #'tis 'twas
-CONTRACTION_WORD_3 = "(?i)(y{apo})(all)".format(apo=APOSTROPHE)                    # y'all
+# same as 2 without 'm
+_CONTRACTION_2 = "(?:{apo}(?:[sd]|re|ve|ll))".format(apo=APOSTROPHE)           # 've 'd 'll 're
+_CONTRACTION = re_or([CONTRACTION_1, _CONTRACTION_2])
 
+# We have to catch this separately because of the O'Malley's of this world
+CONTRACTION_WORD_1 = '(?i)(I)({apo}m)'.format(apo=APOSTROPHE)
+CONTRACTION_WORD_2 = '(?i)(y'+APOSTROPHE+')('+LETTER+'{3,})'               # y'all y'know
+
+CONTRACTION_WORD_3 = '(?i)([a-z]+)' + "({c}+)".format(c=_CONTRACTION)          # Don't I'm You're He'll He's
+CONTRACTION_WORD_4 = "(?i)({apo}t)(is|was)".format(apo=APOSTROPHE)            #'tis 'twas
+
+SUBJECT_CONTRACTION = '(?i)([a-z]+)' + "({c}+)".format(c=CONTRACTION)
 
 # NOTE: we have to deal with words that start with apostrophe
 # there are two kinds: the ones that come from contractions after
@@ -218,8 +226,6 @@ _CONTRACTION_WORD_EXTRA = [
     APOSTROPHE+'cause',
     APOSTROPHE+'cuz',
     APOSTROPHE+'[2-9]0s',
-    '{apo}?[A-HJ-XZn]{apo}{letter}{letter}{letter}*'.format(apo=APOSTROPHE,letter=LETTER),
-    '{letter}{letter}*[aeiouy]{apo}[aeiouA-Z]{letter}+'.format(apo=APOSTROPHE,letter=LETTER),
     '[ldj]'+APOSTROPHE,
     'dunkin'+APOSTROPHE,
     'somethin'+APOSTROPHE,
@@ -235,6 +241,12 @@ _CONTRACTION_WORD_EXTRA = [
     'cap'+APOSTROPHE+'n'
 ]
 CONTRACTION_WORD_EXTRA = r'(?i)'+re_or(_CONTRACTION_WORD_EXTRA)
+
+# any other word with an apostrophe O'Neill O'Malley
+CONTRACTION_WORD_OTHER = re_or([
+    r'{apo}?[A-HJ-XZn]{apo}{letter}{letter}{letter}*'.format(apo=APOSTROPHE,letter=LETTER),     # doesn't interfere with I'm or Y'all
+    r'{letter}{letter}*[aeiouy]{apo}[aeiouA-Z]{letter}*'.format(apo=APOSTROPHE,letter=LETTER),
+])
 
 
 # original regex from @gruber https://gist.github.com/winzig/8894715

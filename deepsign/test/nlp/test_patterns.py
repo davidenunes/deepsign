@@ -184,10 +184,9 @@ class TestPatterns(unittest.TestCase):
         s = "He'dn't've done that"
         c_found = cw.match(s)
 
-
     def test_contractions_split(self):
         s1 = "Don't do that again I'm serious, I'll be right there."
-        c_split = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
+        c_split = re.compile(pm.SUBJECT_CONTRACTION, re.UNICODE)
 
         r1 = c_split.findall(s1)
         self.assertListEqual([("Do","n't"),("I","'m"),("I","'ll")],r1)
@@ -196,7 +195,6 @@ class TestPatterns(unittest.TestCase):
         s2 = "I'dn't've what you want though and He wouldn't've that either"
         r2 = c_split.findall(s2)
         self.assertListEqual([("I", "'dn't've"), ("would", "n't've")], r2)
-
 
     def test_contraction_word(self):
         s1 = "Don't"
@@ -207,27 +205,27 @@ class TestPatterns(unittest.TestCase):
         s6 = "y'all"
         s7 = "Give'em"
 
-        r1 = re.match(pm.CONTRACTION_WORD_1, s1)
+        r1 = re.match(pm.CONTRACTION_WORD_3, s1)
         self.assertEqual(len(r1.groups()), 2)
         self.assertTupleEqual(r1.groups(), ("Do", "n't"))
 
-        r2 = re.match(pm.CONTRACTION_WORD_1, s2)
+        r2 = re.match(pm.CONTRACTION_WORD_3, s2)
         self.assertEqual(len(r2.groups()), 2)
         self.assertTupleEqual(r2.groups(), ("Should", "n't've"))
 
-        r3 = re.match(pm.CONTRACTION_WORD_1, s3)
+        r3 = re.match(pm.CONTRACTION_WORD_3, s3)
         self.assertEqual(len(r3.groups()), 2)
         self.assertTupleEqual(r3.groups(), ("He", "'dn't've"))
 
-        r4 = re.match(pm.CONTRACTION_WORD_2, s4)
+        r4 = re.match(pm.CONTRACTION_WORD_4, s4)
         self.assertEqual(len(r4.groups()), 2)
         self.assertTupleEqual(r4.groups(), ("'t", "was"))
 
-        r5 = re.match(pm.CONTRACTION_WORD_2, s5)
+        r5 = re.match(pm.CONTRACTION_WORD_4, s5)
         self.assertEqual(len(r5.groups()), 2)
         self.assertTupleEqual(r5.groups(), ("'t", "was"))
 
-        r6 = re.match(pm.CONTRACTION_WORD_3, s6)
+        r6 = re.match(pm.CONTRACTION_WORD_2, s6)
         self.assertEqual(len(r6.groups()), 2)
         self.assertTupleEqual(r6.groups(), ("y'", "all"))
 
