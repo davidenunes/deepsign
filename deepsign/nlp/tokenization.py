@@ -131,11 +131,13 @@ class Tokenization:
         else:
             self.text = matcher.skip(match_group)
 
+
         return token
 
 
 class Tokenizer:
-    @staticmethod
-    def tokenize(text):
+
+
+    def tokenize(self, text):
         tk = Tokenization(text)
         return [token for token in tk]

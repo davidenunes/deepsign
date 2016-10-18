@@ -12,14 +12,15 @@ import numpy as np
 from tqdm import tqdm
 from collections import Counter
 
-from deepsign.nlp import tokenization
+from deepsign.nlp.tokenization import Tokenizer
+from deepsign.nlp import is_token as itk
 from deepsign.nlp import stoplist
 from deepsign.utils.views import divide_slice
 from itertools import chain
 
 
 def load_tokenizer():
-    tokenizer = tokenizer
+    tokenizer = Tokenizer()
     return tokenizer
 
 
@@ -32,7 +33,10 @@ def load_dataset(hdf5_file):
 
 # TODO check what other useless tokens are put in wacky
 def valid_token(token):
-    if tku.is_punct(token) or token in stoplist.ENGLISH or tku.is_bracket(token):
+    if token in stoplist.ENGLISH or \
+            itk.is_punct(token) or \
+            itk.is_space(token):
+
         return False
 
     custom_stop = ("'s", "@card", "@ord")
@@ -49,9 +53,9 @@ special_tokens = {"URL": "T_URL", "EMAIL": "T_EMAIL"}
 
 def replace_token(token):
     result = token
-    if tku.is_url(token):
+    if itk.is_url(token):
         result = special_tokens["URL"]
-    elif tku.is_email(token):
+    elif itk.is_email(token):
         result = special_tokens["EMAIL"]
 
     return result
@@ -85,22 +89,21 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     sentence_gen = chain.from_iterable(chunk_it(c) for c in chunk_gen)
 
     for sentence in tqdm(sentence_gen, total=num_sentences):
-        t0 = time.time()
+        print(sentence)
         tokens = tokenizer.tokenize(sentence)
-        t1 = time.time()
-        tqdm.write(str(tokens))
-        tqdm.write("Done: {0:.3f} secs ".format(t1 - t0))
-        #tokens = [replace_token(token) for token in tokens if valid_token(token)]
+        tokens = [replace_token(token) for token in tokens if valid_token(token)]
 
-        #for token in tokens:
-        #    freq[token] += 1
+        #tqdm.write(str(tokens))
+
+        for token in tokens:
+            freq[token] += 1
 
     input_hdf5.close()
     tqdm.write("{0} unique words".format(len(freq)))
     # order by frequency
-    #freq = freq.most_common()
+    # freq = freq.most_common()
 
-    #for i in range(10):
+    # for i in range(10):
     #    print("{0}:{1}".format(freq[i][0], freq[i][1]))
 
     # ************************************ WRITE VOCABULARY TO HDF5 **********************************************
@@ -124,7 +127,7 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 100
+    max_sentences = 10000
 
     # corpus and output files
     home = os.getenv("HOME")

@@ -1,31 +1,34 @@
-import unicodedata
+"""
+I could do full match, but in some cases if something doesn't match there are patterns that take a long time to decide
+weather or not something matches (e.g. a bad url). To guarantee that this doesn't happen we trust the tokens are
+segmented properly.
+
+For example something like "(this" will return true on is_parens_bracket because it starts with a parenthesis
+"""
+
 import re
 from deepsign.nlp import patterns
 
 
 def is_space(text):
-    return re.fullmatch(patterns.SPACES, text) is not None
+    return re.match(patterns.SPACES, text) is not None
 
 
 def is_punct(text):
-    for c in text:
-        if not unicodedata.category(c).startswith('P'):
-            return False
-
-    return True
+    return re.match(patterns.PUNCT, text) is not None
 
 
 def is_parens_bracket(text):
-    return re.fullmatch(patterns.PARENS_BRACKET, text) is not None
+    return re.match(patterns.PARENS_BRACKET, text) is not None
 
 
 def is_quote(text):
-    return re.fullmatch(patterns.QUOTE, text) is not None
+    return re.match(patterns.QUOTE, text) is not None
 
 
 def is_url(text):
-    return patterns.RE_URL.fullmatch(text) is not None
+    return re.match(patterns.URL, text) is not None
 
 
 def is_email(text):
-    return patterns.RE_EMAIL.fullmatch(text) is not None
+    return re.match(patterns.EMAIL, text) is not None

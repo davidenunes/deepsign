@@ -154,7 +154,7 @@ LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
 LETTER = re_or([LETTER_NORMAL,LETTER_ACCENT, LETTER_EXTRA])
 
 SOFT_HYPHEN = r'\u00AD'
-WORD = "{letter}(?:{letter}|{digit})*(?:{punct_e}{letter}(?:{letter}|{digit})*)*".format(letter=LETTER, digit=DIGIT, punct_e=PUNCT_END)
+WORD = "{letter}(?:{letter}|{digit})*".format(letter=LETTER, digit=DIGIT)
 
 # f**k s#$t
 WORD_CENSORED = LETTER + '{1,2}' + PUNCT_FN + '{1,}' + LETTER + '{1,3}'

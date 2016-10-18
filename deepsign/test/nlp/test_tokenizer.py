@@ -84,6 +84,15 @@ class TestTokenizer(unittest.TestCase):
             ["Almost", "80", "°C", "or", "°F"]
         ]
 
+    def test_sentence(self):
+        sentence = "a more recent study [ 4 ] find benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
+        exptected = ["a", "more", "recent", "study", "[", "4", "]", "find", "benzyldimethyldodecylammonium", "chloride", ",", "benzyldimethyltetradecylammonium chloride", ",", "and", "benzyldimethylhexadecylammonium", "chloride", ",", "commonly", "know", "as", "benzalkonium", "chloride", "."]
+
+        tokenizer = Tokenizer()
+        tokens = tokenizer.tokenize(sentence)
+
+
+
     def test_tokenizer(self):
         """ Tests a single sentence:
         Useful to debug the tokenizer during development.
