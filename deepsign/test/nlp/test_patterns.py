@@ -2,8 +2,7 @@ import unittest
 
 import deepsign.utils.regex
 from deepsign.nlp import patterns as pm
-from deepsign.nlp import token
-from segtok.tokenizer import web_tokenizer
+from deepsign.nlp import is_token
 import re
 
 

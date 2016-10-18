@@ -2,6 +2,7 @@ import unicodedata
 import re
 from deepsign.nlp import patterns
 
+
 def is_space(text):
     return re.fullmatch(patterns.SPACES, text) is not None
 

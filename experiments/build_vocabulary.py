@@ -12,17 +12,14 @@ import numpy as np
 from tqdm import tqdm
 from collections import Counter
 
-from nltk.tokenize import StanfordTokenizer
-from nltk.tokenize import TreebankWordTokenizer
+from deepsign.nlp import tokenization
 from deepsign.nlp import stoplist
-from deepsign.nlp import token as tku
 from deepsign.utils.views import divide_slice
 from itertools import chain
 
 
 def load_tokenizer():
-    #tokenizer = StanfordTokenizer(path_to_jar="/home/davex32/dev/lib/stanford-postagger/stanford-postagger.jar")
-    tokenizer = TreebankWordTokenizer()
+    tokenizer = tokenizer
     return tokenizer
 
 

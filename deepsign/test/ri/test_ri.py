@@ -55,7 +55,7 @@ class TestRI(unittest.TestCase):
         sparse_array = ri_to_sparse(index1)
         self.assertEqual(len(sparse_array.active), active)
 
-        index2 = ri.from_sparse(dim, active, sparse_array)
+        index2 = ri.ri_from_indexes(dim, active, sparse_array.active)
         ri_v2 = index2.to_vector()
 
         npt.assert_array_equal(ri_v1, ri_v2)

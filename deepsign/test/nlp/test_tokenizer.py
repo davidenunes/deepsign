@@ -1,8 +1,7 @@
 import unittest
 from deepsign.nlp import patterns
-from deepsign.nlp import token
-from deepsign.nlp.tokenizer import tokenize
-from segtok.tokenizer import web_tokenizer
+from deepsign.nlp import is_token
+from deepsign.nlp.tokenization import Tokenizer
 import re
 
 
@@ -85,26 +84,20 @@ class TestTokenizer(unittest.TestCase):
             ["Almost", "80", "°C", "or", "°F"]
         ]
 
-    def test_one_sentence(self):
-        # TODO normalise dots, quotes, etc (or dont)
+    def test_tokenizer(self):
         """ Tests a single sentence:
         Useful to debug the tokenizer during development.
         Just use one of the sentences above along with its gold standard
         or enter a new one bellow
         """
 
+        tokenizer = Tokenizer()
 
         for i in range(len(self.sentences)):
-
             sentence = self.sentences[i]
             gold = self.gold[i]
 
-            #print(sentence)
-            #print("expected: ", gold)
-
-            tokens = [t for t in tokenize(sentence) if not token.is_space(t)]
-            #print("result:   ",tokens)
-
+            tokens = [t for t in tokenizer.tokenize(sentence) if not is_token.is_space(t)]
             self.assertSequenceEqual(tokens,gold)
 
 

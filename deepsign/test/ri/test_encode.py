@@ -24,7 +24,7 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(s)
 
         unique_str = set(data)
-        self.assertEqual(self.sign_index.size(), len(unique_str))
+        self.assertEqual(len(self.sign_index), len(unique_str))
 
         windows = sliding_windows(data, window_size=1)
         vectors = [enc.to_bow(w, self.sign_index) for w in windows]

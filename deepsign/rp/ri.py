@@ -16,7 +16,18 @@ class RandomIndex:
         return v
 
 
-def from_sparse(dim, n_active, active_indexes):
+def ri_from_indexes(dim, n_active, active_indexes):
+    """
+    Creates a random index instance from a given list of active indexes. It assumes the following:
+        -the first half of the indexes corresponds to the positive entries
+        -the second half of the indexes corresponds to the negative entries
+        -the vales of active indexes are >0 and <dim
+
+    :param dim: the dimension of the random index to be created
+    :param n_active: number of active elements
+    :param active_indexes: list of active indexes
+    :return: a new random index instance
+    """
     num_positive = n_active // 2
 
     positive = active_indexes[0:num_positive]

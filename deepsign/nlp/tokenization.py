@@ -34,7 +34,7 @@ RE = {
 }
 
 
-class Tokenizer:
+class Tokenization:
 
     def __init__(self, text):
         self.text = text
@@ -134,6 +134,8 @@ class Tokenizer:
         return token
 
 
-def tokenize(text):
-    tk = Tokenizer(text)
-    return [token for token in tk]
+class Tokenizer:
+    @staticmethod
+    def tokenize(text):
+        tk = Tokenization(text)
+        return [token for token in tk]

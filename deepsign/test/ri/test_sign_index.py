@@ -4,31 +4,30 @@ from deepsign.rp.index import SignIndex
 
 
 class TestSignIndex(unittest.TestCase):
-
     def test_size(self):
         gen = RandomIndexGenerator(100, 10)
         sign_index = SignIndex(generator=gen)
 
         # adding elements should increase size
-        self.assertEqual(sign_index.size(),0)
+        self.assertEqual(len(sign_index), 0)
 
         sign_index.add("0")
-        self.assertEqual(sign_index.size(), 1)
+        self.assertEqual(len(sign_index), 1)
         self.assertEqual(sign_index.nextID, sign_index.get_id("0") + 1)
 
         # duplicated elements are not added
         sign_index.add("0")
-        self.assertEqual(sign_index.size(), 1)
+        self.assertEqual(len(sign_index), 1)
 
         sign_index.add("1")
-        self.assertEqual(sign_index.size(), 2)
+        self.assertEqual(len(sign_index), 2)
 
-        # removeing elements should reduce size
-        size_before = sign_index.size()
+        # removing elements should reduce size
+        size_before = len(sign_index)
 
         sign_index.remove("0")
-        size_after = sign_index.size()
-        self.assertEqual(size_after,size_before-1)
+        size_after = len(sign_index)
+        self.assertEqual(size_after, size_before - 1)
 
     def test_contains(self):
         dim = 100
@@ -53,11 +52,10 @@ class TestSignIndex(unittest.TestCase):
 
         sign_index.add("0")
         ri0 = sign_index.get_ri("0")
-        self.assertIsInstance(ri0,RandomIndex)
+        self.assertIsInstance(ri0, RandomIndex)
 
-        self.assertEqual(ri0.dim,dim)
+        self.assertEqual(ri0.dim, dim)
+
 
 if __name__ == '__main__':
     unittest.main()
-
-
