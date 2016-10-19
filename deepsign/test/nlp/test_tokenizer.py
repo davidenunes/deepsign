@@ -80,13 +80,13 @@ class TestTokenizer(unittest.TestCase):
             ["The", "okay", "was", "received", "by", "the", "anti", "-", "acquisition", "front", "on", "its","foolishness","-","filled","fish", "market", "."],
             ["We", "ran", "the", "pre", "-","tests", "through", "the", "post", "-","scripted", "centrifuge", "."],
             ["School", "-", "aged", "parents", "should", "be", "aware", "of", "the", "unique", "problems", "that", "they","face","."],
-            ["Ja'net", "Bri'an", "O'neill", "'t'ony"],
+            ["Ja'net", "Bri'an", "O'neill", "'", "t'ony"],
             ["Almost", "80", "°C", "or", "°F"]
         ]
 
     def test_sentence(self):
-        sentence = "a more recent study [ 4 ] find benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
-        exptected = ["a", "more", "recent", "study", "[", "4", "]", "find", "benzyldimethyldodecylammonium", "chloride", ",", "benzyldimethyltetradecylammonium chloride", ",", "and", "benzyldimethylhexadecylammonium", "chloride", ",", "commonly", "know", "as", "benzalkonium", "chloride", "."]
+        sentence = "benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
+        exptected = ["benzyldimethyldodecylammonium", "chloride", ",", "benzyldimethyltetradecylammonium chloride", ",", "and", "benzyldimethylhexadecylammonium", "chloride", ",", "commonly", "know", "as", "benzalkonium", "chloride", "."]
 
         tokenizer = Tokenizer()
         tokens = tokenizer.tokenize(sentence)

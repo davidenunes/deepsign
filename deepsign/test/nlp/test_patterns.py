@@ -119,6 +119,12 @@ class TestPatterns(unittest.TestCase):
         self.assertTrue(_matches(url_pattern, url_ssh_2))
         self.assertTrue(_matches(url_pattern, url_ssh_3))
 
+    def test_url_on_word(self):
+        text =  "benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
+        url = re.compile(pm.URL)
+
+        match = url.match(text)
+        self.assertTrue(match is None)
 
     def test_email(self):
         # E-MAIL
@@ -231,6 +237,17 @@ class TestPatterns(unittest.TestCase):
         r7 = re.match(pm.WORD, s7)
         self.assertEqual(len(r7.groups()), 0)
         self.assertEqual(r7.group(), "Give")
+
+    def test_general_contractions(self):
+        word = "benzyldimethyldodecylammonium"
+        contraction_o = re.compile(pm.CONTRACTION_WORD_OTHER)
+
+        match = contraction_o.match(word)
+        self.assertTrue(match is None)
+
+        cont_word = "O'Neil"
+        match = contraction_o.match(cont_word)
+        self.assertTrue(match is not None)
 
     def test_word_version_conflict(self):
         word_pattern = re.compile(pm.WORD, re.UNICODE)

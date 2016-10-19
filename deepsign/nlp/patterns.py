@@ -120,14 +120,13 @@ NUMERIC = re_or([
 ])
 
 
-
 # latin and accented characters
 LETTER_NORMAL = r'(?i)[A-Za-z]'
 LETTER_ACCENT = r'(?i)(?:(?![×Þß÷þø])[a-zÀ-ÿ])'
 
+#TODO using these was causing some words were tacking forever to be matched
 # Extra unicode letters (from Stanford CoreNLP Lexer), I labeled the ranges so that people know what they are doing
 _UNICODE_EXTRA_WORD_CHARS = [
-    '\u00AD',                                                                               # soft hyphen
     '\u0237-\u024F',                                                                        # latin small (ȷùęō)
     '\u02C2-\u02C5\u02D2-\u02DF\u02E5-\u02FF',                                              # modifier letters (ʷʰˁ˟)
     '\u0300-\u036F',                                                                        # combining accents
@@ -150,11 +149,14 @@ _UNICODE_EXTRA_WORD_CHARS = [
     '\u0EB1-\u0EBC\u0EC8-\u0ECD',                                                           # lao
 ]
 
-LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
-LETTER = re_or([LETTER_NORMAL,LETTER_ACCENT, LETTER_EXTRA])
+
 
 SOFT_HYPHEN = r'\u00AD'
-WORD = "{letter}(?:{letter}|{digit})*".format(letter=LETTER, digit=DIGIT)
+
+LETTER_EXTRA = r'['+"".join(_UNICODE_EXTRA_WORD_CHARS)+']'
+LETTER = re_or([LETTER_ACCENT, SOFT_HYPHEN])
+
+WORD = "{letter}(?:{letter}|\d)*".format(letter=LETTER)
 
 # f**k s#$t
 WORD_CENSORED = LETTER + '{1,2}' + PUNCT_FN + '{1,}' + LETTER + '{1,3}'
@@ -243,11 +245,7 @@ _CONTRACTION_WORD_EXTRA = [
 CONTRACTION_WORD_EXTRA = r'(?i)'+re_or(_CONTRACTION_WORD_EXTRA)
 
 # any other word with an apostrophe O'Neill O'Malley
-CONTRACTION_WORD_OTHER = re_or([
-    r'{apo}?[A-HJ-XZn]{apo}{letter}{letter}{letter}*'.format(apo=APOSTROPHE,letter=LETTER),     # doesn't interfere with I'm or Y'all
-    r'{letter}{letter}*[aeiouy]{apo}[aeiouA-Z]{letter}*'.format(apo=APOSTROPHE,letter=LETTER),
-])
-
+CONTRACTION_WORD_OTHER = WORD + APOSTROPHE + WORD
 
 # original regex from @gruber https://gist.github.com/winzig/8894715
 # just added the optional port number
@@ -289,7 +287,6 @@ URL = r"""
     /?
     (?!@)			                    # not succeeded by a @, avoid matching "foo.na" in "foo.na@example.com"
   )
-
 """
 
 # I use a list to comment the regex so that the verbose flag is not necessary
