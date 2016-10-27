@@ -59,6 +59,11 @@ class Tokenization:
         # 1 the first group (if it exists)
         if matcher.match(RE['SPACES'], text):
             match_group = 0
+        elif matcher.match(RE['URL'], text):
+            # match url and uri but not e-mail
+            match_group = 0
+        elif matcher.match(RE['EMAIL'], text):
+            match_group = 0
         elif matcher.match(RE['ABBREVIATION'], text):
             # etc. Ph.D p.m. A.M.
             match_group = 0
@@ -86,11 +91,6 @@ class Tokenization:
             match_group = 0
         elif matcher.match(RE['CONTRACTION_WO'], text):
             # any other words with apostrophe (w) -> (w)
-            match_group = 0
-        elif matcher.match(RE['URL'], text):
-            # match url and uri but not e-mail
-            match_group = 0
-        elif matcher.match(RE['EMAIL'], text):
             match_group = 0
         elif matcher.match(RE['CENSORED_WORD'], text):
             # match f***k

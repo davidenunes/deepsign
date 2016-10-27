@@ -6,7 +6,7 @@ from deepsign.nlp import is_token
 import re
 
 
-def _matches(pattern,text):
+def _matches(pattern, text):
     match = pattern.match(text)
 
     if match is not None:
@@ -18,7 +18,7 @@ def _matches(pattern,text):
 
 def print_matches(pattern_dict, txt):
     print("-------------------")
-    print("matching: "+txt)
+    print("matching: " + txt)
     for k in pattern_dict:
         p = pattern_dict[k]
         m = re.match(p, txt)
@@ -46,7 +46,6 @@ class TestPatterns(unittest.TestCase):
         url_simple_protocol_path3 = "http://domain.com/path+path2+path3"
 
         url_pattern = re.compile(pm.URL, re.VERBOSE | re.UNICODE)
-
 
         self.assertFalse(_matches(url_pattern, reject_url_simple_sub))
         self.assertTrue(_matches(url_pattern, url_simple_port))
@@ -119,8 +118,21 @@ class TestPatterns(unittest.TestCase):
         self.assertTrue(_matches(url_pattern, url_ssh_2))
         self.assertTrue(_matches(url_pattern, url_ssh_3))
 
+
+        # corner cases from dataset, hyphen was not being supported
+        url_data_1 = "www.toolpost.co.uk"
+        url_data_2 = "www.south-west.org.uk"
+        url_data_3 = "www.fairplay.org.uk"
+
+        url_hyphen = "http://www.south-west.org.uk"
+
+        self.assertTrue(_matches(url_pattern, url_data_1))
+        self.assertTrue(_matches(url_pattern, url_data_2))
+        self.assertTrue(_matches(url_pattern, url_data_3))
+        self.assertTrue(_matches(url_pattern, url_hyphen))
+
     def test_url_on_word(self):
-        text =  "benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
+        text = "benzyldimethyldodecylammonium chloride , benzyldimethyltetradecylammonium chloride , and benzyldimethylhexadecylammonium chloride , commonly know as benzalkonium chloride ."
         url = re.compile(pm.URL)
 
         match = url.match(text)
@@ -133,10 +145,10 @@ class TestPatterns(unittest.TestCase):
         email_dotuser = "user.101@mail.tld"
 
         email_pattern = re.compile(pm.EMAIL, re.UNICODE | re.VERBOSE)
-        url_pattern = re.compile(pm.URL, re.VERBOSE|re.UNICODE)
+        url_pattern = re.compile(pm.URL, re.VERBOSE | re.UNICODE)
 
         self.assertTrue(_matches(email_pattern, email_simple))
-        self.assertFalse(_matches(url_pattern,email_simple))
+        self.assertFalse(_matches(url_pattern, email_simple))
         self.assertTrue(_matches(email_pattern, email_sub))
         self.assertTrue(_matches(email_pattern, email_dotuser))
 
@@ -194,8 +206,7 @@ class TestPatterns(unittest.TestCase):
         c_split = re.compile(pm.SUBJECT_CONTRACTION, re.UNICODE)
 
         r1 = c_split.findall(s1)
-        self.assertListEqual([("Do","n't"),("I","'m"),("I","'ll")],r1)
-
+        self.assertListEqual([("Do", "n't"), ("I", "'m"), ("I", "'ll")], r1)
 
         s2 = "I'dn't've what you want though and He wouldn't've that either"
         r2 = c_split.findall(s2)
@@ -257,7 +268,7 @@ class TestPatterns(unittest.TestCase):
 
         # this is a problem, version has to be catched first
         self.assertTrue(word_pattern.match(version) is not None)
-        self.assertTrue(_matches(version_pattern,version))
+        self.assertTrue(_matches(version_pattern, version))
 
     def test_number_patterns(self):
         num_pattenrs = {
@@ -304,11 +315,10 @@ class TestPatterns(unittest.TestCase):
             print_matches(num_pattenrs, phone_1)
             print_matches(num_pattenrs, phone_2)
 
-
-        date_1_match = re.fullmatch(pm.DATE,date_1)
+        date_1_match = re.fullmatch(pm.DATE, date_1)
         self.assertTrue(date_1_match is not None)
 
-        date_2_match = re.fullmatch(pm.DATE,date_2)
+        date_2_match = re.fullmatch(pm.DATE, date_2)
         self.assertTrue(date_2_match is not None)
 
         # numeric entity matching order matters
@@ -330,7 +340,7 @@ class TestPatterns(unittest.TestCase):
         self.assertEqual(date_2, m.group(0))
 
         m = re.match(pm.NUMERIC, date_iso)
-        self.assertEqual(date_iso,m.group(0))
+        self.assertEqual(date_iso, m.group(0))
 
         m = re.match(pm.NUMERIC, version_1)
         self.assertEqual(version_1, m.group(0))
@@ -379,8 +389,7 @@ class TestPatterns(unittest.TestCase):
 
         for abbrev in simple_abbrev:
             m = abbrev_pattern.match(abbrev)
-            self.assertEqual(m.group(0),abbrev)
-
+            self.assertEqual(m.group(0), abbrev)
 
         self.assertTrue(abbrev_pattern.match("it. ") is None)
 
@@ -458,7 +467,7 @@ class TestPatterns(unittest.TestCase):
         for i in range(len(emoticons_joy)):
             emote = emoticons_joy[i]
             match = emote_pattern.match(emote)
-            self.assertTrue(match is not None and len(match.group(0))>0)
+            self.assertTrue(match is not None and len(match.group(0)) > 0)
 
         emoticons_love = [
             "(ﾉ´з｀)ノ",
@@ -504,9 +513,8 @@ class TestPatterns(unittest.TestCase):
         for i in range(len(emoticons_love)):
             emote = emoticons_love[i]
             match = emote_pattern.match(emote)
-            #print(match)
+            # print(match)
             self.assertTrue(match is not None and len(match.group(0)) > 0)
-
 
         emoticons_embarassment = [
             "(⌒_⌒;)",
@@ -531,7 +539,9 @@ class TestPatterns(unittest.TestCase):
         ]
 
         emoticons_negative = [
-            "(＃＞＜)", "(；⌣̀_⌣́)", "☆ｏ(＞＜；)○", "(￣ ￣|||)\n(；￣Д￣)", "(￣□￣」)", "(＃￣0￣)", "(＃￣ω￣)\n(￢_￢;)", "(＞ｍ＜)", "(」゜ロ゜)」", "(〃＞＿＜;〃)\n(＾＾＃)", "(︶︹︺)", "(￣ヘ￣)", "<(￣ ﹌ ￣)>\n(￣︿￣)", "(＞﹏＜)", "(--_--)", "凸(￣ヘ￣)\nヾ( ￣O￣)ツ", "(⇀‸↼‶)", "o(>< )o", "(」＞＜)」\n(ᗒᗣᗕ)՞"
+            "(＃＞＜)", "(；⌣̀_⌣́)", "☆ｏ(＞＜；)○", "(￣ ￣|||)\n(；￣Д￣)", "(￣□￣」)", "(＃￣0￣)", "(＃￣ω￣)\n(￢_￢;)", "(＞ｍ＜)",
+            "(」゜ロ゜)」", "(〃＞＿＜;〃)\n(＾＾＃)", "(︶︹︺)", "(￣ヘ￣)", "<(￣ ﹌ ￣)>\n(￣︿￣)", "(＞﹏＜)", "(--_--)", "凸(￣ヘ￣)\nヾ( ￣O￣)ツ",
+            "(⇀‸↼‶)", "o(>< )o", "(」＞＜)」\n(ᗒᗣᗕ)՞"
         ]
 
         emoticons_anger = [
@@ -570,12 +580,15 @@ class TestPatterns(unittest.TestCase):
         ]
 
         emoticons_sorrow = [
-            "(ノ_<。)", "(*-_-)", "(´-ω-｀)", ".･ﾟﾟ･(／ω＼)･ﾟﾟ･.\n(μ_μ)", "(ﾉД`)", "(-ω-、)", "。゜゜(´Ｏ｀)°゜。\no(TヘTo)", "(；ω；)", "(｡╯3╰｡)", "｡･ﾟﾟ*(>д<)*ﾟﾟ･｡\n( ﾟ，_ゝ｀)", "(个_个)", "(╯︵╰,)", "｡･ﾟ(ﾟ><ﾟ)ﾟ･｡\n( ╥ω╥ )", "(╯_╰)", "(╥_╥)", ".｡･ﾟﾟ･(＞_＜)･ﾟﾟ･｡.\n(／ˍ・、)", "(ノ_<、)", "(╥﹏╥)", "｡ﾟ(｡ﾉωヽ｡)ﾟ｡\n(つω`*)", "(｡T ω T｡)", "(ﾉω･､)", "･ﾟ･(｡>ω<｡)･ﾟ･\n(T_T)", "(>_<)", "(Ｔ▽Ｔ)", "｡ﾟ･ (>﹏<) ･ﾟ｡\no(〒﹏〒)o", "(｡•́︿•̀｡)", "(ಥ﹏ಥ)'"
+            "(ノ_<。)", "(*-_-)", "(´-ω-｀)", ".･ﾟﾟ･(／ω＼)･ﾟﾟ･.\n(μ_μ)", "(ﾉД`)", "(-ω-、)", "。゜゜(´Ｏ｀)°゜。\no(TヘTo)", "(；ω；)",
+            "(｡╯3╰｡)", "｡･ﾟﾟ*(>д<)*ﾟﾟ･｡\n( ﾟ，_ゝ｀)", "(个_个)", "(╯︵╰,)", "｡･ﾟ(ﾟ><ﾟ)ﾟ･｡\n( ╥ω╥ )", "(╯_╰)", "(╥_╥)",
+            ".｡･ﾟﾟ･(＞_＜)･ﾟﾟ･｡.\n(／ˍ・、)", "(ノ_<、)", "(╥﹏╥)", "｡ﾟ(｡ﾉωヽ｡)ﾟ｡\n(つω`*)", "(｡T ω T｡)", "(ﾉω･､)",
+            "･ﾟ･(｡>ω<｡)･ﾟ･\n(T_T)", "(>_<)", "(Ｔ▽Ｔ)", "｡ﾟ･ (>﹏<) ･ﾟ｡\no(〒﹏〒)o", "(｡•́︿•̀｡)", "(ಥ﹏ಥ)'"
         ]
 
-
         emoticons_fear = [
-                  "(ノωヽ)", "(／。＼)", "(ﾉ_ヽ)", "..・ヾ(。＞＜)シ\n(″ロ゛)", "(;;;*_*)", "(・人・)", "＼(〇_ｏ)／\n(/ω＼)", "(/_＼)", "〜(＞＜)〜", "Σ(°△°|||)︴\n(((＞＜)))", "{{ (>_<) }}", "＼(º □ º l|l)/", "〣( ºΔº )〣'"
+            "(ノωヽ)", "(／。＼)", "(ﾉ_ヽ)", "..・ヾ(。＞＜)シ\n(″ロ゛)", "(;;;*_*)", "(・人・)", "＼(〇_ｏ)／\n(/ω＼)", "(/_＼)", "〜(＞＜)〜",
+            "Σ(°△°|||)︴\n(((＞＜)))", "{{ (>_<) }}", "＼(º □ º l|l)/", "〣( ºΔº )〣'"
         ]
 
         emoticons_confusion = [
@@ -679,5 +692,5 @@ class TestPatterns(unittest.TestCase):
             "(･ω<)☆"
         ]
 
-        emoticons_apologizing = ["m(_ _)m", "(シ_ _)シ", "m(. .)m", "<(_ _)>\n人(_ _*)", "(*_ _)人", "m(_ _;m)", "(m;_ _)m\n(シ. .)シ"]
-
+        emoticons_apologizing = ["m(_ _)m", "(シ_ _)シ", "m(. .)m", "<(_ _)>\n人(_ _*)", "(*_ _)人", "m(_ _;m)",
+                                 "(m;_ _)m\n(シ. .)シ"]

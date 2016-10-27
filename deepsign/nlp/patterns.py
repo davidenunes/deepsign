@@ -278,12 +278,13 @@ URL = r"""
   |					                    # OR, the following to match naked domains:
   (?:
     (?<!@)			                    # not preceded by a @, avoid matching foo@_mail.com_
-    [a-z0-9]+
-    (?:[\.\-][a-z0-9]+)?
-    [\.]
-    (?:[a-z]{2,13})
-    (?::\d{2,5})?                       # optional port
-    \b
+    (?:[a-z0-9]+\.)*                    # www or other subdomains
+    (?:
+        [a-z0-9]+(?:\-[a-z0-9]+)*       #domain names possibly separated by hyphen
+        (?:\.[a-z0-9]+)*                #more possible subdomains
+        (?:[\.](?:[a-z]{2,13}))+        # TLD domains: .com .uk.co .org.uk
+        (?::\d{2,5})?                    # optional port
+    )
     /?
     (?!@)			                    # not succeeded by a @, avoid matching "foo.na" in "foo.na@example.com"
   )

@@ -7,7 +7,7 @@ For example something like "(this" will return true on is_parens_bracket because
 """
 
 import re
-from deepsign.nlp import patterns
+from deepsign.nlp import patterns, stoplist
 
 
 def is_space(text):
@@ -27,8 +27,19 @@ def is_quote(text):
 
 
 def is_url(text):
-    return re.match(patterns.URL, text) is not None
+    # TODO have a compile or match function for each pattern
+    # a pattern would have to be an object with a custom match function
+    # with the required flags so that people don't need to inspect code
+    return re.match(patterns.URL, text, re.VERBOSE|re.UNICODE) is not None
 
 
 def is_email(text):
-    return re.match(patterns.EMAIL, text) is not None
+    return re.match(patterns.EMAIL, text, re.VERBOSE|re.UNICODE) is not None
+
+
+def is_currency(text):
+    return re.match(patterns.CURRENCY, text) is not None
+
+
+def is_stopword(token):
+    return token.lower() in stoplist.ENGLISH

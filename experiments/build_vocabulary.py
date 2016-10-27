@@ -33,30 +33,25 @@ def load_dataset(hdf5_file):
 
 # TODO check what other useless tokens are put in wacky
 def valid_token(token):
-    if token in stoplist.ENGLISH or \
-            itk.is_punct(token) or \
-            itk.is_space(token):
-
+    if itk.is_stopword(token) or itk.is_punct(token) or itk.is_space(token):
         return False
 
-    custom_stop = ("'s", "@card", "@ord")
+    # TODO tokenizer should support custom tokens
+    custom_stop = ("@card", "@ord")
     if token in custom_stop:
         return False
 
     return True
 
 
-# TODO replace numbers with T_NUMBER ?
-# TODO replace time with T_TIME?
-special_tokens = {"URL": "T_URL", "EMAIL": "T_EMAIL"}
-
-
 def replace_token(token):
     result = token
     if itk.is_url(token):
-        result = special_tokens["URL"]
+        result = "T_URL"
     elif itk.is_email(token):
-        result = special_tokens["EMAIL"]
+        result = "T_EMAIL"
+    elif itk.is_currency(token):
+        result = "T_CURRENCY"
 
     return result
 
@@ -89,7 +84,7 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     sentence_gen = chain.from_iterable(chunk_it(c) for c in chunk_gen)
 
     for sentence in tqdm(sentence_gen, total=num_sentences):
-        print(sentence)
+        #tqdm.write(sentence)
         tokens = tokenizer.tokenize(sentence)
         tokens = [replace_token(token) for token in tokens if valid_token(token)]
 
@@ -101,10 +96,10 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     input_hdf5.close()
     tqdm.write("{0} unique words".format(len(freq)))
     # order by frequency
-    # freq = freq.most_common()
+    freq = freq.most_common()
 
-    # for i in range(10):
-    #    print("{0}:{1}".format(freq[i][0], freq[i][1]))
+    for i in range(10):
+        print("{0}:{1}".format(freq[i][0], freq[i][1]))
 
     # ************************************ WRITE VOCABULARY TO HDF5 **********************************************
     if output_file is not None:
@@ -127,12 +122,12 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 10000
+    max_sentences = 1000
 
     # corpus and output files
     home = os.getenv("HOME")
-    corpus_file = "/data/datasets/wacky.hdf5"
-    corpus_file = home + corpus_file
-    output_file = home + "/data/results/wacky_index.hdf5"
+    corpus_file = home + "/data/datasets/wacky.hdf5"
+    index_filename = home + "/data/results/wacky_index.hdf5"
 
-    build_vocabulary(corpus_file, None, max_sentences)
+    index_filename = None
+    build_vocabulary(corpus_file, index_filename, max_sentences)

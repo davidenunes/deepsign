@@ -2,8 +2,22 @@ import unittest
 from deepsign.nlp import patterns
 from deepsign.nlp import is_token
 from deepsign.nlp.tokenization import Tokenizer
+from deepsign.nlp.tokenization import RE as tokenizer_p
+
+from deepsign.utils.regex import REMatcher
 import re
 
+
+def test_pattern_sequence(pattern_seq, text):
+    """receives a sequence of pattern tuples (name, pattern)
+    and tests this sequence against a given text
+    """
+    matcher = REMatcher()
+
+    for (p_name, p) in pattern_seq:
+        if matcher.match(p,text):
+            return p_name
+    return None
 
 class TestTokenizer(unittest.TestCase):
     def setUp(self):
@@ -109,7 +123,47 @@ class TestTokenizer(unittest.TestCase):
             tokens = [t for t in tokenizer.tokenize(sentence) if not is_token.is_space(t)]
             self.assertSequenceEqual(tokens,gold)
 
+    def test_on_url(self):
+        tokenizer = Tokenizer()
 
+        pattern_name_seq = [
+            "SPACES",
+            "URL",
+            "EMAIL",
+            "ABBREVIATION",
+            "NUMERIC",
+            "CONTRACTION",
+            "CONTRACTION_W1",
+            "CONTRACTION_W2",
+            "CONTRACTION_W3",
+            "CONTRACTION_W4",
+            "CONTRACTION_WE",
+            "CONTRACTION_WO",
+            "CENSORED_WORD",
+            "SOFT_HYPHEN",
+            "PROGRAMMING_LANGUAGES",
+            "WORD",
+            "HASHTAG",
+            "USER_HANDLE",
+            "EMOTICON",
+            "DEGREES",
+            "PUNCT"
+        ]
+
+        pattern_seq = [(name,tokenizer_p[name]) for name in pattern_name_seq]
+
+        url1 = "www.newstatesman.co.uk/upstarts/upstarts2002shortlist.htm"
+        url2 = "www.south-west.org.uk"
+        url3 = "www.toolpost.co.uk"
+        url4 = "www.fairplay.org.uk"
+
+        self.assertEqual("URL",test_pattern_sequence(pattern_seq,url1))
+
+        self.assertEqual("URL",test_pattern_sequence(pattern_seq,url2))
+
+        self.assertEqual("URL",test_pattern_sequence(pattern_seq,url3))
+
+        self.assertEqual("URL",test_pattern_sequence(pattern_seq,url4))
 
 
 
