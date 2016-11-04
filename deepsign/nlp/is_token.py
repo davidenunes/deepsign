@@ -9,6 +9,11 @@ For example something like "(this" will return true on is_parens_bracket because
 import re
 from deepsign.nlp import patterns, stoplist
 
+def is_numeric(text):
+    return re.match(patterns.NUMERIC, text) is not None
+
+def is_word(text):
+    return re.match(patterns.WORD, text) is not None
 
 def is_space(text):
     return re.match(patterns.SPACES, text) is not None
@@ -41,5 +46,16 @@ def is_currency(text):
     return re.match(patterns.CURRENCY, text) is not None
 
 
-def is_stopword(token):
-    return token.lower() in stoplist.ENGLISH
+def is_stopword(text):
+    return text.lower() in stoplist.ENGLISH
+
+
+def is_copyright(text):
+    return re.match(patterns.COPYRIGHT, text) is not None
+
+
+# TODO add patterns for time
+# Days of the Week, Months, Years, Today, Yesterday, Tomorrow
+# Abbrev of Months
+# Abbrev of epochs in the 60s
+# Decades sixties

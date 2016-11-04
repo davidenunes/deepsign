@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# from nltk.tokenize import StanfordTokenizer
-# tokenizer = StanfordTokenizer(path_to_jar="/home/davex32/dev/deepsign/libs/stanford-postagger/stanford-postagger.jar")
-# tokenizer.tokenize("something something")
-
 import time
 import h5py
 import os.path
@@ -33,10 +29,12 @@ def load_dataset(hdf5_file):
 
 # TODO check what other useless tokens are put in wacky
 def valid_token(token):
-    if itk.is_stopword(token) or itk.is_punct(token) or itk.is_space(token):
+    if itk.is_punct(token) or itk.is_space(token) or itk.is_copyright(token):
         return False
 
-    # TODO tokenizer should support custom tokens
+    # TODO tokenizer should support custom tokens often these might be odd patterns
+    # that get torn appart by the tokenizer like @ord@ and @card@ because @ is not
+    # something used as a separator
     custom_stop = ("@card", "@ord")
     if token in custom_stop:
         return False
@@ -71,7 +69,7 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
 
     # ************************************ PROCESS VOCABULARY **************************************************
     # load one sentence in memory at a time
-    # perhaps this is too slow, should I load chunks at a time and then create a generator for each slice inthe chunk?
+    # perhaps this is too slow, should I load chunks at a time and then create a generator for each slice in the chunk?
     chunk_size = 2
     n_chunks = num_sentences // chunk_size
     chunk_slices = divide_slice(num_sentences, n_chunks)
@@ -84,12 +82,12 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     sentence_gen = chain.from_iterable(chunk_it(c) for c in chunk_gen)
 
     for sentence in tqdm(sentence_gen, total=num_sentences):
-        #tqdm.write(sentence)
         tokens = tokenizer.tokenize(sentence)
         tokens = [replace_token(token) for token in tokens if valid_token(token)]
+        # filter stopwords
+        #tokens = [token for token in tokens if not itk.is_stopword(token)]
 
         #tqdm.write(str(tokens))
-
         for token in tokens:
             freq[token] += 1
 
@@ -99,35 +97,39 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     freq = freq.most_common()
 
     for i in range(10):
-        print("{0}:{1}".format(freq[i][0], freq[i][1]))
+        (w,f) = freq[i]
+        print("{0}:{1}".format(w, f))
 
     # ************************************ WRITE VOCABULARY TO HDF5 **********************************************
     if output_file is not None:
         output_hdf5 = h5py.File(output_file, 'w')
         word_ids = range(len(freq))
-        # convoluted scheme of spaCy
-        vocabulary = np.array([w for (w, _) in freq])
+
+        # encode explicitly so that hdf5 can take an array of variable length strings and store it
+        vocabulary = np.array([freq[i][0].encode("utf8") for i in range(len(freq))])
+
 
         # the hdf5 needs to store variable-length strings with a specific encoding (UTF-8 in this case)
         dt = h5py.special_dtype(vlen=str)
         output_hdf5.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="gzip")
         print("vocabulary written")
 
-        freq = np.array([f for (_, f) in freq])
+        freq = np.array([freq[i][1] for i in range(len(freq))])
         output_hdf5.create_dataset("frequencies", data=freq, compression="gzip")
         print("frequencies written")
+
         output_hdf5.close()
         print("done")
 
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 1000
+    max_sentences = 1000000
 
     # corpus and output files
     home = os.getenv("HOME")
     corpus_file = home + "/data/datasets/wacky.hdf5"
-    index_filename = home + "/data/results/wacky_index.hdf5"
+    index_filename = home + "/data/results/wacky_vocabulary_stop.hdf5"
 
-    index_filename = None
-    build_vocabulary(corpus_file, index_filename, max_sentences)
+    #index_filename = None
+    build_vocabulary(corpus_file,index_filename, max_sentences)

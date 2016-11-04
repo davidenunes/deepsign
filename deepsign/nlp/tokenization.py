@@ -136,8 +136,6 @@ class Tokenization:
 
 
 class Tokenizer:
-
-
     def tokenize(self, text):
         tk = Tokenization(text)
         return [token for token in tk]

@@ -21,7 +21,7 @@ SPACES = r'\s+'
 NOT_SPACE = r'[^\s]+'
 
 APOSTROPHE = r'[\'\u201B\u02BC\u2018\u2019\u2032\u0091\u0092\u0060]'
-HYPHEN = r'[\-_\u058A\u2010\u2011]'
+HYPHEN = r'[\-_\u058A\u2010-\u2015]'
 
 
 # didn't include all the symbols just the ones I thought it could appear
@@ -54,7 +54,7 @@ QUOTE = re_or([
 #
 # I did include small and fullwidth punctuation (dunno where to expect that though)
 
-PUNCT_FN = r'[\\\/@#_\*&\=\+%<>~\*^]'
+PUNCT_FN = r'[\\\/@#_\*&\=\+%<>~\*^\|]'
 
 DOTS = r'(?:\.\.\.|[\u0085\u2025\u2026]|\.\s\.\s\.)'
 
@@ -81,7 +81,7 @@ SUBSUP_NUMBER = r'[\u207A\u207B\u208A\u208B]?(?:[\u2070\u00B9\u00B2\u00B3\u2074-
 LIKELY_FRACTIONS = r'(?:\d{1,4}[\- \u00A0])?\d{1,4}(?:\\?\/|\u2044)\d{1,4}'
 VULGAR_FRACTIONS = r'[\u00BC\u00BD\u00BE\u2153-\u215E]'
 
-CURRENCY = r'[\u0024\u058f\u060b\u09f2\u09f3\u09fb\u0af1\u0bf9\u0e3f\u17db\ua838\ufdfc\ufe69\uff04\uffe0\uffe1\uffe5\uffe6\u00a2-\u00a5\u20a0]'
+CURRENCY = r'[$¢£¤¥֏؋৲৳৻૱௹฿៛\u20a0-\u20bd\ua838\ufdfc\ufe69\uff04\uffe0\uffe1\uffe5\uffe6]'
 
 PERCENT = NUMBER+'%'
 RATIO = r'(?:(?:[1-9]\d+)|\d)(?::\d+)'
@@ -351,4 +351,7 @@ EMOTICON = re_or([
 ])
 
 ARROWS = re_or([r'(?:<*[{hyphen}=]*>+|<+[{hyphen}=]*>*)', '[\u2190-\u21ff]+']).format(hyphen=HYPHEN)
+
+# copyright, registered, copyleft
+COPYRIGHT = r'[\u00A9\u00AE\u2184\u2122]'
 
