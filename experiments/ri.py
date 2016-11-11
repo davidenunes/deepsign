@@ -28,8 +28,9 @@ def synch_occurr(occurr_dict, occurr_dataset):
     for i in word_ids:
         occurr_dataset[i] += occurr_dict[i].to_vector()
 
-def process_corpus(corpus_file, output_file, max_rows=0, window_size=3, ri_dim=1000, ri_active=10):
-    input_hdf5 = h5py.File(corpus_file, 'r')
+
+def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=1000, ri_active=10):
+    input_hdf5 = h5py.File(input_file, 'r')
     dataset_name = "sentences_lemmatised"
     dataset = input_hdf5[dataset_name]
 
@@ -40,7 +41,7 @@ def process_corpus(corpus_file, output_file, max_rows=0, window_size=3, ri_dim=1
 
     gen = chunk_it(dataset, nrows, chunk_size=200)
     tokenizer = Tokenizer()
-    pipe = WaCKyPipe(gen,tokenizer, filter_stop=False)
+    pipe = WaCKyPipe(gen, tokenizer, filter_stop=False)
 
     ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
     sign_index = SignIndex(ri_gen)
@@ -62,7 +63,6 @@ def process_corpus(corpus_file, output_file, max_rows=0, window_size=3, ri_dim=1
 
         # encode each window as a bag-of-words and add to occurrencies
         for window in s_windows:
-            tqdm.write(str(window))
             bow_vector = to_bow(window, sign_index)
             bow_vector = views.np_to_sparse(bow_vector)
             sign_id = sign_index.get_id(window.target)
@@ -87,8 +87,6 @@ def process_corpus(corpus_file, output_file, max_rows=0, window_size=3, ri_dim=1
 
     # ************************************** END PROCESS CORPUS ********************************************************
 
-
-    # ************************************** WRITE INDEX & FREQ ********************************************************
     if output_file is not None:
         word_ids = range(len(occurr_dataset))
         print("processing {0} word vectors".format(len(word_ids)))
@@ -113,7 +111,7 @@ def process_corpus(corpus_file, output_file, max_rows=0, window_size=3, ri_dim=1
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 1
+    max_sentences = 10000
 
     # corpus and output files
     home = os.getenv("HOME")

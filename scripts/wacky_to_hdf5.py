@@ -26,7 +26,7 @@ from deepsign.io.corpora.wacky import WaCKyCorpus
 
 dir = sys.argv[1]
 h5f_name = os.path.join(dir,"wacky.hdf5")
-dataset_name = "sentences_lemmatised"
+dataset_name = "sentences"
 
 # open hdf5 file and create dataset
 h5f = h5py.File(h5f_name, "a")

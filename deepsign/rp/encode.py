@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import linalg as LA
+import time
 
 
 def to_bow(window, sign_index):
@@ -11,6 +12,7 @@ def to_bow(window, sign_index):
     bow_v = np.sum(ri_vs, axis=0)
 
     return bow_v
+
 
 def to_bow_dir(window, sign_index, perm_matrix):
     target_v = sign_index.get_ri(window.target).to_vector()
