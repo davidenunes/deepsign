@@ -29,4 +29,4 @@ st nd rd th
 """
 
 ENGLISH_LIST = _ENGLISH_STOP.split()
-ENGLISH = set(w for w in ENGLISH_LIST.split() if w)
+ENGLISH = set(ENGLISH_LIST)

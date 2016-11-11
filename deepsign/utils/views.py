@@ -1,10 +1,9 @@
-import itertools
 import numpy as np
-
+from itertools import chain,tee
 
 def _pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
-    a, b = itertools.tee(iterable)
+    a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
 
@@ -119,4 +118,13 @@ def ri_to_sparse(random_index):
     return SparseArray(dim=random_index.dim, active=active, values=values)
 
 
+def chunk_it(dataset, nrows, chunk_size=1):
+    if chunk_size > nrows:
+        chunk_size = nrows
 
+    n_chunks = nrows // chunk_size
+    chunk_slices = divide_slice(nrows, n_chunks)
+    chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
+
+    row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    return row_gen
