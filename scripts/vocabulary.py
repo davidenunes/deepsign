@@ -13,7 +13,9 @@ from experiments.pipe.wacky_pipe import WaCKyPipe
 
 def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     input_hdf5 = h5py.File(corpus_file, 'r')
-    dataset_name = "sentences_lemmatised"
+    #dataset_name = "sentences_lemmatised"
+    dataset_name = "sentences"
+
     dataset = input_hdf5[dataset_name]
 
     if max_sentences > 0:
@@ -21,14 +23,16 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
     else:
         num_sentences = len(dataset)
 
-    gen = chunk_it(dataset,num_sentences,chunk_size=500)
+    gen = chunk_it(dataset,num_sentences,chunk_size=250)
     tokenizer = Tokenizer()
     pipe = WaCKyPipe(gen,tokenizer,filter_stop=False)
     freq = Counter()
 
     for tokens in tqdm(pipe, total=num_sentences):
+        #tqdm.write(str(tokens))
         for token in tokens:
-            freq[token] += 1
+            normal_token = token.lower()
+            freq[normal_token] += 1
 
     input_hdf5.close()
     tqdm.write("{0} unique words".format(len(freq)))
@@ -62,12 +66,12 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 1000
+    max_sentences = 10000
 
     # corpus and output files
     home = os.getenv("HOME")
-    corpus_file = home + "/data/datasets/wacky.hdf5"
-    index_filename = home + "/data/results/wacky_vocabulary_stop.hdf5"
+    corpus_file = home + "/data/datasets/wacky_1M.hdf5"
+    index_filename = home + "/data/results/wacky_vocab_1M.hdf5"
 
     index_filename = None
     build_vocabulary(corpus_file,index_filename, max_sentences)

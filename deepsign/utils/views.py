@@ -8,7 +8,7 @@ def _pairwise(iterable):
     return zip(a, b)
 
 
-def divide_slice(n, n_slices=1):
+def divide_slice(n, n_slices=1, offset=0):
     """ Splits a vector with n elements equally into n_slices
     returning a list of index ranges for that vector, each range corresponds
     to a slice.
@@ -25,7 +25,7 @@ def divide_slice(n, n_slices=1):
         ss.append(s)
 
     ss.append(n)
-    ranges = [range(s[0],s[1]) for s in _pairwise(ss)]
+    ranges = [range(s[0]+offset,s[1]+offset) for s in _pairwise(ss)]
 
     return ranges
 
@@ -124,6 +124,26 @@ def chunk_it(dataset, nrows, chunk_size=1):
 
     n_chunks = nrows // chunk_size
     chunk_slices = divide_slice(nrows, n_chunks)
+    chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
+
+    row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    return row_gen
+
+def subset_chunk_it(dataset, data_range, chunk_size=1):
+    """Allows to iterate over a given subset of a given dataset by loading chunks at a time
+
+    dataset: the given dataset
+    data_range: a range from which we will extract the n chunks to be loaded from the dataset
+    chunk_size: length of each chunk to be loaded, this determines the number of chunks
+
+    """
+    nrows = len(data_range)
+
+    if chunk_size > nrows:
+        chunk_size = nrows
+
+    n_chunks = nrows // chunk_size
+    chunk_slices = divide_slice(nrows, n_chunks, data_range.start)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
     row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)

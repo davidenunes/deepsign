@@ -134,3 +134,5 @@ class TrieSignIndex:
             pass
 
         return sign
+
+

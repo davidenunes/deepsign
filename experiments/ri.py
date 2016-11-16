@@ -111,7 +111,7 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 10000
+    max_sentences = 10
 
     # corpus and output files
     home = os.getenv("HOME")

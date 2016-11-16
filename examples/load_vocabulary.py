@@ -26,8 +26,8 @@ ri_gen = RandomIndexGenerator(dim=1000, active=10)
 sign_index = SignIndex(ri_gen)
 
 trie = marisa_trie.Trie(words)
-print("banana" in trie)
-print(trie.key_id("banana"))
+print("hello" in trie)
+print(trie.key_id("hello"))
 print(trie.restore_key(148960))
 
 

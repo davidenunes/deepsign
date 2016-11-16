@@ -21,11 +21,22 @@ import sys
 import os
 import fnmatch
 import re
+from tqdm import tqdm
 import h5py
 from deepsign.io.corpora.wacky import WaCKyCorpus
 
-dir = sys.argv[1]
-h5f_name = os.path.join(dir,"wacky.hdf5")
+
+dir="/home/davex32/Dropbox/research/Data/WaCKy"
+output_fname = "wacky_10M.hdf5"
+lemmatize = False
+# global sentence count
+
+max_sentences = 10000000
+num_sentences = 0
+pbar = tqdm(total=max_sentences)
+
+
+h5f_name = os.path.join(dir,output_fname)
 dataset_name = "sentences"
 
 # open hdf5 file and create dataset
@@ -37,7 +48,7 @@ num_rows = 0
 EXPAND_HDF5_BY = 1000
 
 
-lemma = bool(sys.argv[2])
+
 base_filename = ""
 file_number_re = re.compile('(\d{1,2})')
 
@@ -64,24 +75,35 @@ def hdf5_clean():
 def convert_file(file_name):
     file_name = os.path.join(dir, file_name)
     print("Converting %s into %s" % (file_name, h5f_name))
-    reader = WaCKyCorpus(file_name, lemma)
+    reader = WaCKyCorpus(file_name, lemmatize)
+
+    global max_sentences
+    global num_sentences
+    global pbar
 
     for sentence in reader:
+        if max_sentences is not None and num_sentences >= max_sentences:
+                break
         if len(sentence) > 1:
             s = " ".join(sentence)
             hdf5_append(s)
+            num_sentences +=1
+            pbar.update(1)
 
     reader.source.close()
     print("Finished with: ", file_name)
 
-
 print("Processing WaCKy corpus files in ",dir)
 files = [f for f in os.listdir(dir) if fnmatch.fnmatch(f,"*.xml.gz")]
 
+
+
+
 # convert each file
 for file in files:
-    convert_file(file)
-
+        convert_file(file)
+        if max_sentences is not None and num_sentences >= max_sentences:
+            break
 hdf5_clean()
 
 
