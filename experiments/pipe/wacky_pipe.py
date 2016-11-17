@@ -38,8 +38,8 @@ class WaCKyPipe:
     def __next__(self):
         sentence = next(self.datagen)
         tokens = self.tokenizer.tokenize(sentence)
-        tokens = [token.lower() for token in tokens]
         tokens = [match_replace(token,replacements) for token in tokens if not invalid_token(token)]
+        tokens = [token.lower() for token in tokens]
         if self.filter_stop:
             tokens = [token for token in tokens if not itk.is_stopword(token)]
 

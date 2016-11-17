@@ -49,21 +49,21 @@ class RandomIndexGenerator:
         if seed:
             random.seed(seed)
 
-        self.random_state = random.getstate()
+        #self.random_state = random.getstate()
         self.dim = dim
         self.num_active = active
 
     def generate(self):
         # ensure that you can make other calls to random
-        random.setstate(self.random_state)
+        #random.setstate(self.random_state)
 
-        active_indexes = random.sample(range(0, self.dim), self.num_active)
+        active_indexes = random.sample(range(self.dim), self.num_active)
 
         num_positive = self.num_active // 2
         positive = active_indexes[0:num_positive]
         negative = active_indexes[num_positive:len(active_indexes)]
 
         # ensure that you can make other calls to random
-        self.random_state = random.getstate()
+        #self.random_state = random.getstate()
 
         return RandomIndex(self.dim, positive, negative)

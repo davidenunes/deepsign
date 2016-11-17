@@ -1,10 +1,12 @@
 import os
 import h5py
 from deepsign.utils.views import chunk_it
-from deepsign.rp.index import SignIndex
+from deepsign.rp.index import TrieSignIndex
 import marisa_trie
 from deepsign.rp.ri import RandomIndexGenerator
 from tqdm import tqdm
+import numpy as np
+import time
 
 home = os.getenv("HOME")
 result_path = home+"/data/results/"
@@ -21,14 +23,25 @@ print(vocabulary[1:10])
 print(frequencies[1:10])
 print("unique words: ", len(vocabulary))
 
-words = chunk_it(vocabulary,len(vocabulary),chunk_size=1000)
+words = chunk_it(vocabulary, len(vocabulary), chunk_size=1000)
+
+
+print(np.array(vocabulary[1:2]))
+print()
+
+t0 = time.time()
+trie = marisa_trie.Trie(list(vocabulary[()]), weights=list(frequencies[()]))
+t1 = time.time()
+print(t1-t0)
+
+
 ri_gen = RandomIndexGenerator(dim=1000, active=10)
-sign_index = SignIndex(ri_gen)
 
-trie = marisa_trie.Trie(words)
+t0 = time.time()
+sign_index = TrieSignIndex(ri_gen, list(vocabulary[()]))
+t1 = time.time()
+print(t1-t0)
 
-print("t_url" in trie)
-print("t_url:", trie["t_url"])
 
 
 #index = SignIndex

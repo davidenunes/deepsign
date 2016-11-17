@@ -3,7 +3,7 @@ from deepsign.rp import ri
 from deepsign.utils.views import ri_to_sparse
 import numpy as np
 import numpy.testing as npt
-
+import time
 
 class TestRI(unittest.TestCase):
     def test_generator(self):
@@ -26,7 +26,11 @@ class TestRI(unittest.TestCase):
 
         vectors = [gen.generate().to_vector() for x in range(0, 18)]
 
-        for v in vectors: print(v)
+        t0 = time.time()
+        for i in range(pow(10, 4)):
+            v = gen.generate()
+        t1 = time.time()
+        print("time to generate: ",t1-t0)
 
     def test_rescale(self):
         dim = 10

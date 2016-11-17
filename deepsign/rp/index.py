@@ -65,13 +65,22 @@ class SignIndex:
 
 
 class TrieSignIndex:
-    def __init__(self, generator, signs=[]):
+    def __init__(self, generator, signs=[], frequencies=None, pregen_indexes=False):
         """
         :param generator a random index generator
+        :param signs an iterable of signs to be added
+        :param frequencies an iterable with expected lookup frequencies
+        :param pregen_indexes if true generates all the indexes for all the signs
         """
         self.generator = generator
-        self.sign_trie = marisa_trie.Trie(signs)
-        self.random_indexes = {i: generator.generate() for i in range(len(signs))}
+        n_signs = len(signs)
+
+        self.sign_trie = marisa_trie.Trie(signs, weights=frequencies)
+        self.pregen_indexes = pregen_indexes
+        if pregen_indexes:
+            self.random_indexes = {i: generator.generate() for i in range(n_signs)}
+        else:
+            self.random_indexes = dict()
 
     def __len__(self):
         return len(self.sign_trie)
@@ -103,12 +112,6 @@ class TrieSignIndex:
             # build the new trie
             self.sign_trie = marisa_trie.Trie(signs)
 
-            # generate more ris
-            new_ids = range(n_prev_ids, n_prev_ids + len(new_signs))
-
-            new_ri = {i: self.generator.generate() for i in new_ids}
-            self.random_indexes.update(new_ri)
-
     def remove(self, sign):
         """Removes a sign from the index
 
@@ -117,14 +120,21 @@ class TrieSignIndex:
 
         :param sign: the sign to be removed
         """
-        new_signs = [s for s in self.sign_trie.keys() if s != sign]
-        # update trie
-        self.sign_trie = marisa_trie.Trie(new_signs)
+        if sign in self.sign_trie:
+            sid = self.sign_trie[sign]
+            new_signs = [s for s in self.sign_trie.keys() if s != sign]
+            # update trie
+            self.sign_trie = marisa_trie.Trie(new_signs)
+            if sid in self.random_indexes:
+                self.random_indexes.pop(sign)
 
     def get_ri(self, sign):
         v = None
         if sign in self.sign_trie:
             sid = self.sign_trie[sign]
+
+            if not self.pregen_indexes and sid not in self.random_indexes:
+                self.random_indexes[sid] = self.generator.generate()
             v = self.random_indexes[sid]
         return v
 

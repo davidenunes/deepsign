@@ -23,24 +23,29 @@ def update_ri(dataset_ri, current_ri):
     return dataset_ri + current_ri.to_vector()
 
 
-def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=1000, ri_active=10):
-    input_hdf5 = h5py.File(input_file, 'r')
-    dataset_name = "sentences_lemmatised"
+def process_corpus(corpus_file, vocab_file, output_file, max_rows=0, window_size=3, ri_dim=1000, ri_active=10):
+    input_hdf5 = h5py.File(corpus_file, 'r')
+    dataset_name = "sentences"
     dataset = input_hdf5[dataset_name]
+
+    # load sign index based on vocabulary
+    h5vocab = h5py.File(vocab_file, 'r')
+    vocabulary = h5vocab["vocabulary"]
+
+    ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
+
+    sign_index = TrieSignIndex(generator=ri_gen,
+                               signs=list(vocabulary[()]),
+                               pregen_indexes=True)
 
     if max_rows > 0:
         nrows = min(max_rows, len(dataset))
     else:
         nrows = len(dataset)
 
-    gen = chunk_it(dataset, nrows, chunk_size=200)
+    sentences = chunk_it(dataset, nrows, chunk_size=250)
     tokenizer = Tokenizer()
-    pipe = WaCKyPipe(gen, tokenizer, filter_stop=False)
-
-    ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
-    sign_index = SignIndex(ri_gen)
-
-    current_ri = dict()
+    pipe = WaCKyPipe(sentences, tokenizer, filter_stop=False)
 
     # avg are stored as is since there is no guarantee that these will be sparse (depends on the params)
     if output_file is not None:
@@ -49,8 +54,9 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
         occurr_synch_t = 1000
 
     num_updates = 0
+    current_ri = dict()
     for tokens in tqdm(pipe, total=nrows):
-        sign_index.add_all(tokens)
+        #sign_index.add_all(tokens)
 
         # get sliding windows of given size
         s_windows = sliding(tokens, window_size=window_size)
@@ -69,12 +75,12 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
             num_updates += 1
 
 
-        #if num_updates >= occurr_synch_t:
-        #    tqdm.write("Synching occurrences...")
-        #    synch_occurr(current_ri, ri_dataset)
-        #    current_ri = dict()
-        #    num_updates = 0
-        #    tqdm.write("done")
+        if output_file is not None and num_updates >= occurr_synch_t:
+            tqdm.write("Syncing Vectors...")
+            h5utils.update_dataset(ri_dataset, current_ri, update_fn=update_ri)
+            current_ri = dict()
+            num_updates = 0
+            tqdm.write("done")
 
     if output_file is not None:
         h5utils.update_dataset(ri_dataset, current_ri, update_fn=update_ri)
@@ -105,13 +111,16 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 10
+    max_sentences = 10000
 
     # corpus and output files
     home = os.getenv("HOME")
-    corpus_file = home + "/data/datasets/wacky.hdf5"
-    results_file = home + "/data/results/ri.hdf5"
+    corpus_file = home + "/data/datasets/wacky_1M.hdf5"
+    results_file = home + "/data/results/wacky_ri_1M.hdf5"
+
+    vocab_file = home + "/data/results/wacky_vocab_1M.hdf5"
+
 
     results_file = None
-    process_corpus(corpus_file, results_file, max_sentences,
+    process_corpus(corpus_file, vocab_file, results_file, max_sentences,
                    window_size=3, ri_dim=1000, ri_active=10)
