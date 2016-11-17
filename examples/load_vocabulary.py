@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 home = os.getenv("HOME")
 result_path = home+"/data/results/"
-vocab_fname = "wacky_vocabulary.hdf5"
+vocab_fname = "wacky_vocab_1M.hdf5"
 vocab_file = result_path + vocab_fname
 
 h5v = h5py.File(vocab_file, 'r')
@@ -26,16 +26,9 @@ ri_gen = RandomIndexGenerator(dim=1000, active=10)
 sign_index = SignIndex(ri_gen)
 
 trie = marisa_trie.Trie(words)
-print("hello" in trie)
-print(trie.key_id("hello"))
-print(trie.restore_key(148960))
 
-
-for w in trie.keys(u'bana'):
-    print(w)
-
-print("pimba" in trie)
-
+print("t_url" in trie)
+print("t_url:", trie["t_url"])
 
 
 #index = SignIndex

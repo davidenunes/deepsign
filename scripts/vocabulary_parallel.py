@@ -58,6 +58,7 @@ def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
     pool = Pool(n_processes)
 
     result = pool.map(func=word_frequencies, iterable=args)
+    pool.close()
 
     # agglomerate results
     freq = Counter()
