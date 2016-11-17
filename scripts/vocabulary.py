@@ -51,7 +51,6 @@ def build_vocabulary(corpus_file, output_file=None, max_sentences=0):
         # the hdf5 needs to store variable-length strings with a specific encoding (UTF-8 in this case)
         vocabulary = np.array([freq[i][0].encode("utf8") for i in range(len(freq))])
 
-
         dt = h5py.special_dtype(vlen=str)
         output_hdf5.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="gzip")
         print("vocabulary written")

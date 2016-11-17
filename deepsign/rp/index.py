@@ -65,7 +65,7 @@ class SignIndex:
 
 
 class TrieSignIndex:
-    def __init__(self, generator, signs):
+    def __init__(self, generator, signs=[]):
         """
         :param generator a random index generator
         """
@@ -95,6 +95,8 @@ class TrieSignIndex:
         new_signs = [s for s in signs if s not in self.sign_trie]
         if len(new_signs) > 0:
             old_signs = self.sign_trie.keys()
+            n_prev_ids = len(self.sign_trie)
+
             # the key ids are preserved
             signs = old_signs + new_signs
 
@@ -102,15 +104,22 @@ class TrieSignIndex:
             self.sign_trie = marisa_trie.Trie(signs)
 
             # generate more ris
-            n_prev_ids = len(self.sign_trie)
             new_ids = range(n_prev_ids, n_prev_ids + len(new_signs))
 
             new_ri = {i: self.generator.generate() for i in new_ids}
             self.random_indexes.update(new_ri)
 
-
     def remove(self, sign):
-        raise Exception("Operation not supported by TrieSignIndex")
+        """Removes a sign from the index
+
+        Remove is expensive because marisa trie does not support efficient removal.
+        Removing signs creates a new trie from scratch.
+
+        :param sign: the sign to be removed
+        """
+        new_signs = [s for s in self.sign_trie.keys() if s != sign]
+        # update trie
+        self.sign_trie = marisa_trie.Trie(new_signs)
 
     def get_ri(self, sign):
         v = None

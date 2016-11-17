@@ -1,10 +1,10 @@
-from deepsign.rp import ri
-import numpy as np
-import h5py
 import os.path
 
-from deepsign.io import h5utils
+import h5py
+import numpy as np
 
+from deepsign.rp import ri
+from deepsign.utils import h5utils
 
 home = os.getenv("HOME")
 result_path = home+"/data/results/"
@@ -52,7 +52,7 @@ print("random index sum vectors written")
 dset0 = h5f.create_dataset("test init",shape=(0,gen.dim),maxshape=(None,gen.dim))
 print("0 shape dataset length:", len(dset0))
 
-h5utils.expand(dset0,1)
+h5utils.expand(dset0, 1)
 print("0 shape dataset length:", len(dset0))
 print("len after expand:", len(dset0))
 #print("contains",dset0[0])

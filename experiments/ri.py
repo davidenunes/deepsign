@@ -9,24 +9,18 @@ from deepsign.nlp.tokenization import Tokenizer
 
 from experiments.pipe.wacky_pipe import WaCKyPipe
 
-from deepsign.rp.index import SignIndex
+from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import RandomIndexGenerator
 from deepsign.rp.encode import to_bow
 import deepsign.utils.views as views
 import numpy as np
 from tqdm import tqdm
 
+from deepsign.utils import h5utils
 
-def synch_occurr(occurr_dict, occurr_dataset):
-    word_ids = sorted(occurr_dict.keys())
-    max_id = word_ids[-1]
-    if max_id >= len(occurr_dataset):
-        add_rows = max_id-len(occurr_dataset) + 1
-        occurr_dataset.resize(occurr_dataset.shape[0] + add_rows, 0)
 
-    # update dataset file
-    for i in word_ids:
-        occurr_dataset[i] += occurr_dict[i].to_vector()
+def update_ri(dataset_ri, current_ri):
+    return dataset_ri + current_ri.to_vector()
 
 
 def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=1000, ri_active=10):
@@ -46,12 +40,12 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
     ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
     sign_index = SignIndex(ri_gen)
 
-    occurr = dict()
+    current_ri = dict()
 
     # avg are stored as is since there is no guarantee that these will be sparse (depends on the params)
     if output_file is not None:
         output_hdf5 = h5py.File(output_file, 'a')
-        occurr_dataset = output_hdf5.create_dataset("ri_sum", shape=(0, ri_dim), maxshape=(None, ri_dim), compression="gzip")
+        ri_dataset = output_hdf5.create_dataset("ri_sum", shape=(0, ri_dim), maxshape=(None, ri_dim), compression="gzip")
         occurr_synch_t = 1000
 
     num_updates = 0
@@ -67,28 +61,28 @@ def process_corpus(input_file, output_file, max_rows=0, window_size=3, ri_dim=10
             bow_vector = views.np_to_sparse(bow_vector)
             sign_id = sign_index.get_id(window.target)
 
-            if sign_id not in occurr:
-                occurr[sign_id] = bow_vector
+            if sign_id not in current_ri:
+                current_ri[sign_id] = bow_vector
             else:
-                current_vector = occurr[sign_id]
-                occurr[sign_id] = bow_vector + current_vector
+                current_vector = current_ri[sign_id]
+                current_ri[sign_id] = bow_vector + current_vector
             num_updates += 1
 
 
         #if num_updates >= occurr_synch_t:
         #    tqdm.write("Synching occurrences...")
-        #    synch_occurr(occurr, occurr_dataset)
-        #    occurr = dict()
+        #    synch_occurr(current_ri, ri_dataset)
+        #    current_ri = dict()
         #    num_updates = 0
         #    tqdm.write("done")
 
     if output_file is not None:
-        synch_occurr(occurr, occurr_dataset)
+        h5utils.update_dataset(ri_dataset, current_ri, update_fn=update_ri)
 
     # ************************************** END PROCESS CORPUS ********************************************************
 
     if output_file is not None:
-        word_ids = range(len(occurr_dataset))
+        word_ids = range(len(ri_dataset))
         print("processing {0} word vectors".format(len(word_ids)))
 
         print("writing to ", output_file)
