@@ -3,12 +3,15 @@ from numpy import linalg as LA
 import time
 
 
-def to_bow(window, sign_index):
+def to_bow(window, sign_index, include_target=True):
     left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
     right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
     target_v = [sign_index.get_ri(window.target).to_vector()]
 
-    ri_vs = left_vs + target_v + right_vs
+    ri_vs = left_vs + right_vs
+    if include_target:
+        ri_vs = ri_vs + target_v
+
     bow_v = np.sum(ri_vs, axis=0)
 
     return bow_v
