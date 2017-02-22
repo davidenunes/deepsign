@@ -26,13 +26,15 @@ import h5py
 from deepsign.io.corpora.wacky import WaCKyCorpus
 
 
-dir="/home/davex32/Dropbox/research/Data/WaCKy"
-output_fname = "wacky_10M.hdf5"
+dir="/home/davex32/data/datasets/wacky"
+output_fname = "wacky_20M.hdf5"
 lemmatize = False
 # global sentence count
 
-max_sentences = 10000000
+max_sentences = 20000000
 num_sentences = 0
+
+
 pbar = tqdm(total=max_sentences)
 
 
