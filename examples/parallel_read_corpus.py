@@ -13,7 +13,7 @@ from spacy.en import English
 
 from deepsign.utils.views import divide_slice
 from deepsign.rp.index import SignIndex
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 
 
 from tqdm import tqdm
@@ -45,7 +45,7 @@ def load_dataset():
 # do something with the dataset
 
 # Create Sign RI Index
-ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_num_active)
+ri_gen = Generator(dim=ri_dim, active=ri_num_active)
 sign_index = SignIndex(ri_gen)
 
 max_sentences = 200000

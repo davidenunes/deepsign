@@ -4,7 +4,7 @@ from deepsign.nlp.tokenization import Tokenizer
 from experiments.pipe.wacky_pipe import WaCKyPipe
 from deepsign.utils.views import sliding_windows, np_to_sparse, divide_slice
 from deepsign.rp.encode import to_bow
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 from deepsign.rp.index import TrieSignIndex
 from tqdm import tqdm
 import os
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     vocabulary = h5v["vocabulary"]
     frequencies = h5v["frequencies"]
 
-    ri_gen = RandomIndexGenerator(dim=1000, active=10)
+    ri_gen = Generator(dim=1000, active=10)
     sign_index = TrieSignIndex(generator=ri_gen,
                                signs=list(vocabulary[()]),
                                pregen_indexes=True)

@@ -1,11 +1,11 @@
 import unittest
-from deepsign.rp.ri import RandomIndexGenerator, RandomIndex
+from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.index import TrieSignIndex
 
 
 class TestTrieSignIndex(unittest.TestCase):
     def test_size(self):
-        gen = RandomIndexGenerator(100, 10)
+        gen = Generator(100, 10)
         sign_index = TrieSignIndex(generator=gen)
 
         # adding elements should increase size
@@ -32,7 +32,7 @@ class TestTrieSignIndex(unittest.TestCase):
         dim = 100
         act = 10
 
-        gen = RandomIndexGenerator(dim, act)
+        gen = Generator(dim, act)
         sign_index = TrieSignIndex(generator=gen)
 
         sign_index.add("0")
@@ -47,7 +47,7 @@ class TestTrieSignIndex(unittest.TestCase):
         dim = 100
         act = 10
 
-        gen = RandomIndexGenerator(dim, act)
+        gen = Generator(dim, act)
         sign_index = TrieSignIndex(gen)
 
         sign_index.add("0")

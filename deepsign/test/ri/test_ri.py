@@ -10,7 +10,7 @@ class TestRI(unittest.TestCase):
         dim = 18
         active = 2
 
-        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+        gen = ri.Generator(dim=dim, active=active)
 
         ri1 = gen.generate()
 
@@ -36,7 +36,7 @@ class TestRI(unittest.TestCase):
         dim = 10
         active = 4
 
-        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+        gen = ri.Generator(dim=dim, active=active)
 
         ri1 = gen.generate().to_vector()
         ri2 = gen.generate().to_vector()
@@ -51,7 +51,7 @@ class TestRI(unittest.TestCase):
         dim = 100
         active = 4
 
-        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+        gen = ri.Generator(dim=dim, active=active)
 
         index1 = gen.generate()
         ri_v1 = index1.to_vector()

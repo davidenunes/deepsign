@@ -1,6 +1,6 @@
 import unittest
 from deepsign.rp import ri
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 import numpy as np
 import numpy.testing as npt
 
@@ -11,7 +11,7 @@ class TestSparseNPView(unittest.TestCase):
     def setUp(self):
         dim = 1000
         act = 10
-        self.generator = RandomIndexGenerator(dim=dim, active=act)
+        self.generator = Generator(dim=dim, active=act)
 
     def test_ri_to_sparse(self):
         ri_vector = self.generator.generate().to_vector()

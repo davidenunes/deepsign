@@ -8,12 +8,26 @@ class RandomIndex:
         self.positive = positive
         self.negative = negative
         self.dim = dim
+        self.s = len(positive)+len(negative)
 
     def to_vector(self):
         v = np.zeros(self.dim)
         v[self.positive] = 1
         v[self.negative] = -1
         return v
+
+    def get_positive_vector(self):
+        v = np.zeros(self.dim)
+        v[self.positive] = 1
+        return v
+
+    def get_negative_vector(self):
+        v = np.zeros(self.dim)
+        v[self.negative] = 1
+        return v
+
+    def __str__(self):
+        return "RI"+str((self.dim,self.s))+":\n\t+1 = "+str(self.positive)+"\n\t-1 = "+str(self.negative)
 
 
 def ri_from_indexes(dim, n_active, active_indexes):
@@ -36,7 +50,7 @@ def ri_from_indexes(dim, n_active, active_indexes):
     return RandomIndex(dim=dim, positive=positive, negative=negative)
 
 
-class RandomIndexGenerator:
+class Generator:
     """ A random-state-preserving random index generator.
 
     Generates ternary random index instances which can then be converted to sparse vectors.

@@ -5,7 +5,7 @@ import numpy.testing as np_test
 import deepsign.rp.encode as enc
 from deepsign.rp.index import SignIndex
 from deepsign.rp.permutations import PermutationGenerator
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 from deepsign.utils.views import sliding_windows
 
 
@@ -13,7 +13,7 @@ class TestEncode(unittest.TestCase):
     def setUp(self):
         dim = 10
         act = 2
-        self.generator = RandomIndexGenerator(dim=dim, active=act)
+        self.generator = Generator(dim=dim, active=act)
         self.sign_index = SignIndex(self.generator)
         self.perm_generator = PermutationGenerator(dim=dim)
 

@@ -10,7 +10,7 @@ from deepsign.nlp.tokenization import Tokenizer
 from experiments.pipe.wacky_pipe import WaCKyPipe
 
 from deepsign.rp.index import TrieSignIndex
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 from deepsign.rp.encode import to_bow
 import deepsign.utils.views as views
 import numpy as np
@@ -32,7 +32,7 @@ def process_corpus(corpus_file, vocab_file, output_file, max_rows=0, window_size
     h5vocab = h5py.File(vocab_file, 'r')
     vocabulary = h5vocab["vocabulary"]
 
-    ri_gen = RandomIndexGenerator(dim=ri_dim, active=ri_active)
+    ri_gen = Generator(dim=ri_dim, active=ri_active)
 
     sign_index = TrieSignIndex(generator=ri_gen,
                                signs=list(vocabulary[()]),

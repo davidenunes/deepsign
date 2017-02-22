@@ -3,7 +3,7 @@ import h5py
 from deepsign.utils.views import chunk_it
 from deepsign.rp.index import TrieSignIndex
 import marisa_trie
-from deepsign.rp.ri import RandomIndexGenerator
+from deepsign.rp.ri import Generator
 from tqdm import tqdm
 import numpy as np
 import time
@@ -35,7 +35,7 @@ t1 = time.time()
 print(t1-t0)
 
 
-ri_gen = RandomIndexGenerator(dim=1000, active=10)
+ri_gen = Generator(dim=1000, active=10)
 
 t0 = time.time()
 sign_index = TrieSignIndex(ri_gen, list(vocabulary[()]))

@@ -8,7 +8,7 @@ class TestRISVD(unittest.TestCase):
     def test_svd(self):
         dim = 500
         active = 5
-        gen = ri.RandomIndexGenerator(dim=dim, active=active)
+        gen = ri.Generator(dim=dim, active=active)
 
         num_samples = 100
 
