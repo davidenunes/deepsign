@@ -5,7 +5,7 @@ import numpy as np
 
 home = os.getenv("HOME")
 result_path = home+"/data/datasets/"
-vocab_h5 = result_path + "wacky_vocab_10M.hdf5"
+vocab_h5 = result_path + "wacky_vocab_20M.hdf5"
 print("Reading from ", vocab_h5)
 h5f = h5py.File(vocab_h5, 'r')
 

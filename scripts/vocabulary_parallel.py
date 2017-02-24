@@ -94,12 +94,12 @@ def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
 
 if __name__ == '__main__':
     # model parameters
-    max_sentences = 1000000
+    max_sentences = 20000000
 
     # corpus and output files
     home = os.getenv("HOME")
-    corpus_file = home + "/data/datasets/wacky_1M.hdf5"
-    index_filename = home + "/data/datasets/wacky_vocab_1M.hdf5"
+    corpus_file = home + "/data/datasets/wacky_20M.hdf5"
+    index_filename = home + "/data/datasets/wacky_vocab_20M.hdf5"
 
     #index_filename = None
     parallel_word_count(corpus_file, index_filename, max_sentences,n_processes=8)
