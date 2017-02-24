@@ -6,9 +6,9 @@ import numpy as np
 import tensorflow as tf
 
 # random index dimension
-k = 10
-s = 2
-h_dim = 4
+k = 1000
+s = 10
+h_dim = 300
 ri_gen = RIGen(active=s, dim=k)
 
 r = ri_gen.generate()
@@ -16,8 +16,11 @@ print(str(r))
 
 pos_labels = Input(n_units=k, name="ri_pos")
 neg_labels = Input(n_units=k, name="ri_neg")
+
+labels = Input(n_units=k,name="ri_labels")
+
 input = Input(n_units=k, name="ri")
-h = Dense(input, n_units=h_dim,act=Act.relu, init=glorot, name="features")
+h = Dense(input, n_units=h_dim, init=glorot, name="features")
 pos_out = Dense(h, n_units=k, init=glorot, bias=True, name="pos_out")
 neg_out = Dense(h, n_units=k, init=glorot, bias=True, name="neg_out")
 
@@ -31,11 +34,25 @@ out = pos_sample-neg_sample
 loss1 = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=pos_labels(), logits=pos_out()))
 loss2 = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=neg_labels(), logits=neg_out()))
 
-loss = loss1 + loss2 / 2
+# 3 adding one weight regularisation
+w_reg = tf.nn.l2_loss(pos_out.weights) * 0.001
+w_reg += tf.nn.l2_loss(neg_out.weights) * 0.001
+
+loss = ((loss1 + loss2) / 2.0) + w_reg
+#loss = loss1 *0.5 + loss2 * 0.5
 
 perplexity = tf.pow(2.0, loss)
 
-optimizer = tf.train.GradientDescentOptimizer(0.01)
+
+
+#regression architecture
+ri_out = Dense(h, n_units=k, init=glorot,act=Act.tanh, bias=True, name="ri_out")
+#ri_loss = tf.
+
+
+
+#optimizer = tf.train.AdagradOptimizer(0.1)
+optimizer = tf.train.GradientDescentOptimizer(0.1)
 train_step = optimizer.minimize(loss)
 
 # Perplexity (PPL): Exponential of average negative log likelihood
@@ -58,7 +75,7 @@ with tf.Session() as ss:
                                       neg_labels(): y_neg
                                       })
 
-        if i % 100 == 0:
+        if i % 1000 == 0:
             result = ss.run(loss, feed_dict={input(): x,
                                                    pos_labels(): y_pos,
                                                    neg_labels(): y_neg
