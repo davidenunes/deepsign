@@ -8,7 +8,7 @@ from collections import Counter
 
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.utils.views import subset_chunk_it, divide_slice
-from experiments.pipe.wacky_pipe import WaCKyPipe
+from experiments.pipe.bnc_pipe import BNCPipe
 from multiprocessing import Pool
 
 
@@ -25,7 +25,8 @@ def word_frequencies(args):
     gen = subset_chunk_it(dataset, data_slice, chunk_size=100)
 
     pbar = tqdm(total=len(data_slice))
-    pipe = WaCKyPipe(gen)
+
+    pipe = BNCPipe(gen)
     freq = Counter()
 
     for tokens in pipe:
@@ -91,8 +92,8 @@ def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
 
 
 if __name__ == '__main__':
-    # model parameters
-    max_sentences = 6000000
+    # all sentences
+    max_sentences = None
 
     # corpus and output files
     home = os.getenv("HOME")

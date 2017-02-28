@@ -118,12 +118,24 @@ def ri_to_sparse(random_index):
     return SparseArray(dim=random_index.dim, active=active, values=values)
 
 
-def chunk_it(dataset, nrows, chunk_size=1):
-    if chunk_size > nrows:
-        chunk_size = nrows
+def chunk_it(dataset, n_rows=None, chunk_size=1):
+    """
+    Allos to iterate over dataset by loading chunks at a time using slices
+    up until a given nrows
 
-    n_chunks = nrows // chunk_size
-    chunk_slices = divide_slice(nrows, n_chunks)
+    :param dataset: the dataset we wish to iterate over
+    :param n_rows: number of rows we want to take from the dataset (start at 0)
+    :param chunk_size: the chunk size to be loaded into the memory
+    :return: and iterator over the elements of dataset with buffered slicing
+    """
+    if n_rows is None:
+        n_rows = len(dataset)
+
+    if chunk_size > n_rows:
+        chunk_size = n_rows
+
+    n_chunks = n_rows // chunk_size
+    chunk_slices = divide_slice(n_rows, n_chunks)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
     row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)

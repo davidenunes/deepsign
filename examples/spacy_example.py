@@ -3,6 +3,7 @@ import spacy.parts_of_speech as POS
 from spacy.strings import StringStore
 from spacy.tokens import Doc
 
+from spacy.en import Tokenizer
 
 
 print("Loading English Model...")

@@ -44,6 +44,9 @@ class WaCKyCorpus:
         else:
             self.source = open(f_in, 'r', encoding='latin-1')
 
+    def close(self):
+        self.source.close()
+
     def __iter__(self):
         return self
 
@@ -65,6 +68,7 @@ class WaCKyCorpus:
 
     def __next__(self):
         if not self.has_next_sentence():
+            self.source.close()
             raise StopIteration
 
         done = False

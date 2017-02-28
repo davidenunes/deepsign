@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     ri_gen = Generator(dim=1000, active=10)
     sign_index = TrieSignIndex(generator=ri_gen,
-                               signs=list(vocabulary[()]),
+                               vocabulary=list(vocabulary[()]),
                                pregen_indexes=True)
 
     print("done")

@@ -1,6 +1,11 @@
 from deepsign.nlp import is_token as itk
 from deepsign.utils.listx import match_replace
+
 from spacy.en import English
+from deepsign.nlp.tokenization import Tokenizer
+
+
+
 
 # token replacement rules
 replacements = (
@@ -10,41 +15,36 @@ replacements = (
 )
 
 
-# invalid token functions
-# TODO check what other tokens appear in wacky
-# TODO the custom tokens should be detected directly tokenizer as custom rules
-# these appear as @card@ but are tokenised as @card @...
-_wacky_tokens = ("@card", "@ord")
-
-
 def invalid_token(token):
-    if (itk.is_punct(token) or itk.is_space(token) or itk.is_copyright(token) or token in _wacky_tokens):
+    if (itk.is_punct(token) or itk.is_space(token)):
         return True
     return False
 
 
-class WaCKyPipe:
+class BNCPipe:
     def __init__(self, datagen):
         self.datagen = datagen
+
         print("Loading Spacy EN Model...")
         self.reaload()
         print("done")
 
+        #self.tk = Tokenizer()
 
     def __iter__(self):
         return self
 
     def __next__(self):
         sentence = next(self.token_gen)
-        tokens = [token.orth_ for token in sentence]
-        tokens = [match_replace(token,replacements) for token in tokens if not invalid_token(token)]
-        tokens = [token.lower() for token in tokens]
-
-        #sentence = next(self.datagen)
         #tokens = self.tokenizer.tokenize(sentence)
+        #tokens = sentence.split()
+        tokens = [token.orth_ for token in sentence]
+        #tokens = self.tk.tokenize(sentence)
+        #tokens = [match_replace(token,replacements) for token in tokens if not invalid_token(token)]
+        tokens = [token.lower() for token in tokens if not invalid_token(token)]
+
 
         return tokens
-
 
     def reaload(self):
         self.nlp = English(entity=False, tagger=False, parser=False)

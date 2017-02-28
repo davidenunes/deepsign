@@ -56,6 +56,16 @@ class TestSignIndex(unittest.TestCase):
 
         self.assertEqual(ri0.dim, dim)
 
+    def test_contains_id(self):
+        dim = 100
+        act = 10
+
+        gen = Generator(dim, act)
+        sign_index = SignIndex(gen)
+
+        id = 0
+        self.assertFalse(sign_index.contains_id(id))
+
 
 if __name__ == '__main__':
     unittest.main()

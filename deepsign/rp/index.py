@@ -25,6 +25,9 @@ class SignIndex:
     def contains(self, sign):
         return sign in self.signs
 
+    def contains_id(self,sign_id):
+        return id in self.signs.inv
+
     def add(self, sign):
         if sign not in self.signs:
             # 1 - get next id
@@ -59,28 +62,48 @@ class SignIndex:
 
     def get_sign(self, sign_id):
         sign = None
+
         if sign_id in self.signs.inv:
             sign = self.signs.inv[sign_id]
         return sign
 
 
 class TrieSignIndex:
-    def __init__(self, generator, signs=[], frequencies=None, pregen_indexes=False):
+    @staticmethod
+    def map_frequencies(vocabulary,frequencies,sign_trie):
+        """creates a new dict mapping ids from sign_trie to the frequencies of the words
+        in a given vocabulary (also stored in the given sign_trie_index
+
+        :param vocab: a list of words
+        :param freq: a list of frequencies for the given words
+        :param sign_trie: a sign index with all the given words
+        :return:
+        """
+        freq = {}
+        for i in range(len(sign_trie)):
+            w = vocabulary[i]
+            f = frequencies[i]
+            freq[sign_trie.get_id(w)] = f
+
+        return freq
+
+    def __init__(self, generator, vocabulary=[], pregen_indexes=False):
         """
         :param generator a random index generator
-        :param signs an iterable of signs to be added
+        :param vocabulary an iterable of signs to be added
         :param frequencies an iterable with expected lookup frequencies
         :param pregen_indexes if true generates all the indexes for all the signs
         """
         self.generator = generator
-        n_signs = len(signs)
+        n_signs = len(vocabulary)
 
-        self.sign_trie = marisa_trie.Trie(signs, weights=frequencies)
+        self.sign_trie = marisa_trie.Trie(vocabulary)
         self.pregen_indexes = pregen_indexes
         if pregen_indexes:
             self.random_indexes = {i: generator.generate() for i in range(n_signs)}
         else:
             self.random_indexes = dict()
+
 
     def __len__(self):
         return len(self.sign_trie)
@@ -145,13 +168,14 @@ class TrieSignIndex:
         return sign_id
 
     def get_sign(self, sign_id):
-        sign = None
-
         try:
-            self.sign_trie.restore_key(sign_id)
+            return self.sign_trie.restore_key(sign_id)
         except KeyError:
-            pass
+            return None
 
-        return sign
+    def contains_id(self,sign_id):
+        return sign_id < len(self.sign_trie)
+
+
 
 

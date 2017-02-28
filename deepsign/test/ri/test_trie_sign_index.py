@@ -43,7 +43,7 @@ class TestTrieSignIndex(unittest.TestCase):
 
         self.assertFalse(sign_index.contains("0"))
 
-    def test_get(self):
+    def test_get_ri(self):
         dim = 100
         act = 10
 
@@ -56,6 +56,37 @@ class TestTrieSignIndex(unittest.TestCase):
         self.assertIsInstance(ri0, RandomIndex)
 
         self.assertEqual(ri0.dim, dim)
+
+    def test_get_sign(self):
+        dim = 100
+        act = 10
+        gen = Generator(dim, act)
+
+        signs = [str(i) for i in range(10)]
+        sign_index = TrieSignIndex(gen, vocabulary=signs)
+
+        for s in signs:
+            self.assertTrue(sign_index.contains(s))
+            id = sign_index.get_id(s)
+            self.assertTrue(sign_index.contains_id(id))
+            s2 = sign_index.get_sign(id)
+            self.assertEqual(s,s2)\
+
+
+
+        #get sign for an id that doesn't exist
+        id = 86
+        s = sign_index.get_sign(id)
+        self.assertEqual(s,None)
+        self.assertFalse(sign_index.contains_id(id))
+
+        self.assertEqual(len(sign_index.sign_trie),len(signs))
+
+        self.assertTrue(sign_index.contains_id(len(signs)-1))
+        self.assertFalse(sign_index.contains_id(len(signs)))
+
+        #self.assertTrue(sign_index)
+
 
 
 if __name__ == '__main__':

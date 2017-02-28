@@ -35,7 +35,7 @@ def process_corpus(corpus_file, vocab_file, output_file, max_rows=0, window_size
     ri_gen = Generator(dim=ri_dim, active=ri_active)
 
     sign_index = TrieSignIndex(generator=ri_gen,
-                               signs=list(vocabulary[()]),
+                               vocabulary=list(vocabulary[()]),
                                pregen_indexes=True)
 
     if max_rows > 0:

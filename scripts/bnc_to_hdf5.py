@@ -23,22 +23,21 @@ import fnmatch
 import re
 from tqdm import tqdm
 import h5py
-from deepsign.io.corpora.wacky import WaCKyCorpus
+from deepsign.io.corpora.bnc import BNCReader,file_walker
 
+home = os.getenv("HOME")
+data_dir = home+"/data/datasets"
+bnc_dir = data_dir+"/bnc/Texts"
 
-dir="/home/davex32/data/datasets/wacky"
-output_fname = "wacky_6M.hdf5"
-lemmatize = False
+output_fname = "bnc_full.hdf5"
+
 # global sentence count
 
-max_sentences = 6000000
+max_sentences = None
 num_sentences = 0
 
 
-pbar = tqdm(total=max_sentences)
-
-
-h5f_name = os.path.join(dir,output_fname)
+h5f_name = os.path.join(data_dir,output_fname)
 dataset_name = "sentences"
 
 # open hdf5 file and create dataset
@@ -51,12 +50,9 @@ EXPAND_HDF5_BY = 1000
 
 
 
-base_filename = ""
-file_number_re = re.compile('(\d{1,2})')
 
-
-if not os.path.isdir(dir):
-    sys.exit("No such directory: {}".format(dir))
+if not os.path.isdir(bnc_dir):
+    sys.exit("No such directory: {}".format(bnc_dir))
 
 
 def hdf5_append(sentence):
@@ -74,14 +70,12 @@ def hdf5_clean():
     h5f.close()
 
 
-def convert_file(file_name):
-    file_name = os.path.join(dir, file_name)
-    print("Converting %s into %s" % (file_name, h5f_name))
-    reader = WaCKyCorpus(file_name, lemmatize)
+def convert_file(filename):
+    reader = BNCReader(filename)
 
     global max_sentences
     global num_sentences
-    global pbar
+
 
     for sentence in reader:
         if max_sentences is not None and num_sentences >= max_sentences:
@@ -90,19 +84,15 @@ def convert_file(file_name):
             s = " ".join(sentence)
             hdf5_append(s)
             num_sentences +=1
-            pbar.update(1)
 
     reader.source.close()
-    print("Finished with: ", file_name)
-
-print("Processing WaCKy corpus files in ",dir)
-files = [f for f in os.listdir(dir) if fnmatch.fnmatch(f,"*.xml.gz")]
 
 
 
+print("Processing BNC corpus files in ",bnc_dir)
+files = file_walker(bnc_dir)
 
-# convert each file
-for file in files:
+for file in tqdm(sorted(files)):
         convert_file(file)
         if max_sentences is not None and num_sentences >= max_sentences:
             break
