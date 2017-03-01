@@ -8,6 +8,6 @@ tqdm>=4.11.2
 bidict>=0.13.0
 zarr>=1.1.0
 marisa-trie>=0.7.2
-tensorflow>=1.0.0
+tensorflow-gpu>=1.0.0
 seaborn<=0.7.1
 

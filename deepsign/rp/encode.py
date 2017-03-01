@@ -3,16 +3,24 @@ from numpy import linalg as LA
 import time
 
 
-def to_bow(window, sign_index, include_target=True):
+def to_bow(window, sign_index, include_target=True, normalise=False):
+    ri_vs = []
+    ri_vs.append(np.zeros(sign_index.feature_dim()))
+    if include_target:
+        target_v = [sign_index.get_ri(window.target).to_vector()]
+        ri_vs.append(target_v)
+
     left_vs = [sign_index.get_ri(s).to_vector() for s in window.left]
     right_vs = [sign_index.get_ri(s).to_vector() for s in window.right]
-    target_v = [sign_index.get_ri(window.target).to_vector()]
 
-    ri_vs = left_vs + right_vs
-    if include_target:
-        ri_vs = ri_vs + target_v
-
+    ri_vs = ri_vs + left_vs + right_vs
     bow_v = np.sum(ri_vs, axis=0)
+
+    if normalise:
+        m = np.max(np.abs(bow_v), axis=0)
+        # if left and right are empty and target = true
+        if m != 0:
+            bow_v /= m
 
     return bow_v
 
@@ -64,5 +72,3 @@ def to_bow_order(window, sign_index, perm_matrix):
             bow_order_v += rv_perm
 
     return bow_order_v
-
-

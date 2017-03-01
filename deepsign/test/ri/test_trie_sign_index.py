@@ -1,6 +1,7 @@
 import unittest
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.index import TrieSignIndex
+import os
 
 
 class TestTrieSignIndex(unittest.TestCase):
@@ -86,6 +87,26 @@ class TestTrieSignIndex(unittest.TestCase):
         self.assertFalse(sign_index.contains_id(len(signs)))
 
         #self.assertTrue(sign_index)
+
+    def test_save(self):
+        dim = 100
+        act = 10
+        gen = Generator(dim, act)
+
+        signs = [str(i) for i in range(10)]
+        sign_index = TrieSignIndex(gen, vocabulary=signs)
+
+
+
+
+        filename = "index"
+        dir = os.getwd()
+
+
+
+        os.path.isfile
+
+
 
 
 

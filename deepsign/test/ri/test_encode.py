@@ -7,6 +7,7 @@ from deepsign.rp.index import SignIndex
 from deepsign.rp.permutations import PermutationGenerator
 from deepsign.rp.ri import Generator
 from deepsign.utils.views import sliding_windows
+import numpy as np
 
 
 class TestEncode(unittest.TestCase):
@@ -29,6 +30,24 @@ class TestEncode(unittest.TestCase):
         windows = sliding_windows(data, window_size=1)
         vectors = [enc.to_bow(w, self.sign_index) for w in windows]
         self.assertEqual(len(vectors), len(windows))
+
+    def test_bow_normalise(self):
+        data = ["A", "A"]
+
+        for s in data:
+            self.sign_index.add(s)
+
+        unique_str = set(data)
+        self.assertEqual(len(self.sign_index), len(unique_str))
+
+        windows = sliding_windows(data, window_size=1)
+        norm_bow = enc.to_bow(windows[0], self.sign_index,normalise=True,include_target=True)
+        self.assertEqual(np.max(norm_bow),1)
+
+
+        unorm_bow = enc.to_bow(windows[0], self.sign_index, normalise=False,include_target=True)
+        self.assertEqual(np.max(unorm_bow),2)
+
 
     def test_bow_ignore_order(self):
         data1 = ["A", "B"]

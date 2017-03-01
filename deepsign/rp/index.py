@@ -1,7 +1,8 @@
 from bidict import bidict
 import marisa_trie
+import numpy as np
 import os
-
+import h5py
 
 class SignIndex:
     def __init__(self, generator):
@@ -25,7 +26,7 @@ class SignIndex:
     def contains(self, sign):
         return sign in self.signs
 
-    def contains_id(self,sign_id):
+    def contains_id(self, sign_id):
         return id in self.signs.inv
 
     def add(self, sign):
@@ -70,7 +71,7 @@ class SignIndex:
 
 class TrieSignIndex:
     @staticmethod
-    def map_frequencies(vocabulary,frequencies,sign_trie):
+    def map_frequencies(vocabulary, frequencies, sign_trie):
         """creates a new dict mapping ids from sign_trie to the frequencies of the words
         in a given vocabulary (also stored in the given sign_trie_index
 
@@ -103,7 +104,6 @@ class TrieSignIndex:
             self.random_indexes = {i: generator.generate() for i in range(n_signs)}
         else:
             self.random_indexes = dict()
-
 
     def __len__(self):
         return len(self.sign_trie)
@@ -173,8 +173,51 @@ class TrieSignIndex:
         except KeyError:
             return None
 
-    def contains_id(self,sign_id):
+    def contains_id(self, sign_id):
         return sign_id < len(self.sign_trie)
+
+    def save(self, filename, dir):
+        """
+        Saves the current index to an hdf5 store
+        :param filename: the filename without extension that will be used
+        to store the index, uses hdf5 as extension
+        """
+        output_dir = dir
+        if not os.path.exists(output_dir):
+            output_dir = os.getcwd()
+        output_file = output_dir + "/" + filename + ".hdf5"
+        h5index = h5py.File(output_file, 'w')
+
+        keys = self.sign_trie.items()
+        ws, ids = zip(*keys)
+
+        # save signs
+        dt = h5py.special_dtype(vlen=str)
+        h5index.create_dataset("signs", data=np.array(ws), dtype=dt, compression="gzip")
+
+        # save random indexes
+        if len(self.random_indexes) == 0:
+            self.random_indexes = {i: self.generator.generate() for i in range(len(self))}
+
+        ris = [self.random_indexes[id] for id in ids]
+        ris = np.array([ri.positive + ri.negative for ri in ris])
+
+        ri_dataset = h5index.create_dataset("ri", data=ris, compression="gzip")
+        ri_dataset.attrs["k"] = self.generator.dim
+        ri_dataset.attrs["s"] = self.generator.num_active
+
+        h5index.close()
+
+        #ri_vectors = [sign_index.get_ri(w.decode("UTF-8")) for w in word_ids]
+        # store random indexes as a list of positive indexes followed by negative indexes
+        #ri_sparse = np.array([ri.positive + ri.negative for ri in ri_vectors])
+        #index_data = output_hdf5.create_dataset(dataset_name, data=ri_sparse, compression="gzip")
+        #print("random index vectors written")
+        #index_data.attrs["dimension"] = ri_dim
+        #index_data.attrs["active"] = ri_active
+
+
+
 
 
 
