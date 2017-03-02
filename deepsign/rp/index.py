@@ -3,6 +3,9 @@ import marisa_trie
 import numpy as np
 import os
 import h5py
+import random
+import pickle
+from deepsign.rp.ri import Generator, ri_from_indexes
 
 class SignIndex:
     def __init__(self, generator):
@@ -176,49 +179,77 @@ class TrieSignIndex:
     def contains_id(self, sign_id):
         return sign_id < len(self.sign_trie)
 
-    def save(self, filename, dir):
+    def save(self, output_file):
         """
         Saves the current index to an hdf5 store
         :param filename: the filename without extension that will be used
         to store the index, uses hdf5 as extension
+
+        :return the path where the index was saved
         """
-        output_dir = dir
-        if not os.path.exists(output_dir):
-            output_dir = os.getcwd()
-        output_file = output_dir + "/" + filename + ".hdf5"
         h5index = h5py.File(output_file, 'w')
 
         keys = self.sign_trie.items()
         ws, ids = zip(*keys)
 
+        ws = np.array([w.encode("UTF-8") for w in ws])
+
         # save signs
         dt = h5py.special_dtype(vlen=str)
-        h5index.create_dataset("signs", data=np.array(ws), dtype=dt, compression="gzip")
+        h5index.create_dataset("signs", data=ws, dtype=dt, compression="gzip")
 
         # save random indexes
         if len(self.random_indexes) == 0:
             self.random_indexes = {i: self.generator.generate() for i in range(len(self))}
 
-        ris = [self.random_indexes[id] for id in ids]
+        ris = (self.random_indexes[id] for id in ids)
         ris = np.array([ri.positive + ri.negative for ri in ris])
 
         ri_dataset = h5index.create_dataset("ri", data=ris, compression="gzip")
         ri_dataset.attrs["k"] = self.generator.dim
         ri_dataset.attrs["s"] = self.generator.num_active
 
+        # store generator state
+        state = random.getstate()
+        b_state = pickle.dumps(state,pickle.HIGHEST_PROTOCOL)
+        ri_dataset.attrs["state"] = np.void(b_state)
+
         h5index.close()
 
-        #ri_vectors = [sign_index.get_ri(w.decode("UTF-8")) for w in word_ids]
-        # store random indexes as a list of positive indexes followed by negative indexes
-        #ri_sparse = np.array([ri.positive + ri.negative for ri in ri_vectors])
-        #index_data = output_hdf5.create_dataset(dataset_name, data=ri_sparse, compression="gzip")
-        #print("random index vectors written")
-        #index_data.attrs["dimension"] = ri_dim
-        #index_data.attrs["active"] = ri_active
+    @staticmethod
+    def load(input_file):
+        """
+        loads a random index state from a file created using save
 
+        :param filename: name of the file e.g. index.hdf5
+        :param dir: directory where this file is located
+        :return: a new TrieSignIndex
+        """
+        h5index = h5py.File(input_file, 'r')
 
+        sign_data = h5index["signs"]
+        ri_data = h5index["ri"]
+        ri_k = ri_data.attrs["k"]
+        ri_s = ri_data.attrs["s"]
 
+        # set random state
+        random_state = pickle.loads(ri_data.attrs["state"].tostring())
+        random.setstate(random_state)
 
+        generator = Generator(dim=ri_k,active=ri_s)
+        index = TrieSignIndex(generator,vocabulary=list(sign_data),pregen_indexes=False)
 
+        random_indexes = {}
 
+        #load random indexes into index
+        for i in range(len(ri_data)):
+            w = sign_data[i]
+            id = index.get_id(w)
+            ri = ri_from_indexes(ri_k,ri_data[i])
+            random_indexes[id] = ri
+        index.random_indexes = random_indexes
+
+        h5index.close()
+
+        return index
 

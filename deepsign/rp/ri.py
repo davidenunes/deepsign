@@ -30,7 +30,8 @@ class RandomIndex:
         return "RI"+str((self.dim,self.s))+":\n\t+1 = "+str(self.positive)+"\n\t-1 = "+str(self.negative)
 
 
-def ri_from_indexes(dim, n_active, active_indexes):
+
+def ri_from_indexes(dim, active_indexes):
     """
     Creates a random index instance from a given list of active indexes. It assumes the following:
         -the first half of the indexes corresponds to the positive entries
@@ -42,6 +43,8 @@ def ri_from_indexes(dim, n_active, active_indexes):
     :param active_indexes: list of active indexes
     :return: a new random index instance
     """
+    n_active = len(active_indexes)
+
     num_positive = n_active // 2
 
     positive = active_indexes[0:num_positive]
@@ -63,7 +66,6 @@ class Generator:
         if seed:
             random.seed(seed)
 
-        #self.random_state = random.getstate()
         self.dim = dim
         self.num_active = active
 

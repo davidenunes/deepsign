@@ -1,5 +1,7 @@
 import numpy as np
 from itertools import chain,tee
+from deepsign.rp.ri import RandomIndex
+
 
 def _pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
@@ -116,7 +118,6 @@ def ri_to_sparse(random_index):
     values = [1]*len(random_index.positive) + [-1]*len(random_index.negative)
 
     return SparseArray(dim=random_index.dim, active=active, values=values)
-
 
 def chunk_it(dataset, n_rows=None, chunk_size=1):
     """
