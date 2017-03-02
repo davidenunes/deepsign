@@ -5,9 +5,8 @@ from tqdm import tqdm
 
 from experiments.pipe.bnc_pipe import BNCPipe
 from deepsign.utils.views import chunk_it
-from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.index import TrieSignIndex
-from deepsign.rp.ri import Generator, RandomIndex
+from deepsign.rp.ri import Generator
 
 from deepsign.utils.views import sliding_windows
 
@@ -15,7 +14,6 @@ from deepsign.rp.encode import to_bow
 from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
 
 import numpy as np
-from tensorx.models.nrp import NRP
 import tensorflow as tf
 from tensorx.models.nrp import NRP
 from tensorx.layers import Input
@@ -35,24 +33,31 @@ s = 10  # num active indexes
 # context windows
 window_size = 3  # sliding window size
 subsampling = True
-freq_cut = pow(10,-4)
+freq_cut = pow(10, -4)
 
 # neural net
 h_dim = 300  # dimension for hidden layer
 batch_size = 50
 
+# output
+home = os.getenv("HOME")
+result_dir = home + "/data/results/"
+index_file = result_dir + "index.hdf5"
+model_file = result_dir + "model_bnc"
+
 # ======================================================================================
 # Load Corpus
 # ======================================================================================
-home = os.getenv("HOME")
 data_dir = home + "/data/datasets/"
 corpus_file = data_dir + "bnc_full.hdf5"
 
 corpus_hdf5 = h5py.File(corpus_file, 'r')
 corpus_dataset = corpus_hdf5["sentences"]
 # iterates over lines but loads them as chunks
-n_rows = 100000
-sentences = chunk_it(corpus_dataset,n_rows=n_rows, chunk_size=40000)
+# n_rows = 100000
+# sentences = chunk_it(corpus_dataset,n_rows=n_rows, chunk_size=40000)
+n_rows = len(corpus_dataset)
+sentences = chunk_it(corpus_dataset, chunk_size=40000)
 
 pipeline = BNCPipe(datagen=sentences)
 # ======================================================================================
@@ -65,14 +70,12 @@ ri_gen = Generator(dim=k, active=s)
 print("Loading Vocabulary...")
 sign_index = TrieSignIndex(ri_gen, list(vocab_hdf5["vocabulary"][:]), pregen_indexes=False)
 
-
 if subsampling:
     freq = TrieSignIndex.map_frequencies(list(vocab_hdf5["vocabulary"][:]),
                                          list(vocab_hdf5["frequencies"][:]),
                                          sign_index)
 
     total_freq = np.sum(vocab_hdf5["frequencies"])
-
 
 print("done")
 
@@ -83,10 +86,11 @@ pos_labels = Input(n_units=k, name="yp")
 neg_labels = Input(n_units=k, name="yn")
 
 model = NRP(k_dim=k, h_dim=h_dim)
-loss = model.get_loss(pos_labels,neg_labels)
-loss = loss + model.embedding_regularisation() * 0.001
+loss = model.get_loss(pos_labels, neg_labels)
+loss = loss + model.embedding_regularisation(weight=0.001)
+loss = loss + model.output_regularisation(weight=0.001)
 
-perplexity = model.get_perplexity(pos_labels,neg_labels)
+perplexity = model.get_perplexity(pos_labels, neg_labels)
 
 learning_rate = 0.2
 optimizer = tf.train.AdagradOptimizer(learning_rate)
@@ -102,15 +106,17 @@ try:
     # init model variables
     tf_session.run(var_init)
 
+
     def keep_token(token):
         fw = freq[sign_index.get_id(token)]
-        p = ss_prob(fw,total_freq)
+        p = ss_prob(fw, total_freq)
         if np.random.rand() < p:
-                return False
+            return False
         return True
 
+
     if subsampling:
-        windows_stream = (sliding_windows(list(filter(keep_token,tokens)), window_size) for tokens in pipeline)
+        windows_stream = (sliding_windows(list(filter(keep_token, tokens)), window_size) for tokens in pipeline)
     else:
         windows_stream = (sliding_windows(tokens, window_size) for tokens in pipeline)
 
@@ -122,7 +128,6 @@ try:
         if len(windows) > 0:
             # list of (target,ctx)
             for window in windows:
-
                 target = sign_index.get_ri(window.target).to_vector()
                 ctx = to_bow(window, sign_index, include_target=False, normalise=True)
 
@@ -143,30 +148,49 @@ try:
             yn = np.abs(yn)
 
             # current perplexity
-            if i % 1000 == 0:
+            if i % 10000 == 0:
                 current_perplexity = tf_session.run(perplexity, {
                     model.input(): x,
                     pos_labels(): yp,
                     neg_labels(): yn
                 })
-                print("\nbatch shape: ",x.shape)
-                print("perplexity:",current_perplexity)
+                print("\nbatch shape: ", x.shape)
+                print("perplexity:", current_perplexity)
 
             # train step
             for e in range(3):
-                tf_session.run(train_step,{
+                tf_session.run(train_step, {
                     model.input(): x,
                     pos_labels(): yp,
                     neg_labels(): yn
                 })
 
-
             x_samples = []
             c_samples = []
 
+    # train last batch
+    if len(x_samples) > 0:
+        # train step
+        for e in range(3):
+            tf_session.run(train_step, {
+                model.input(): x,
+                pos_labels(): yp,
+                neg_labels(): yn
+            })
+
+        x_samples = []
+        c_samples = []
 
     corpus_hdf5.close()
     vocab_hdf5.close()
+
+    print("saving model")
+    # save random indexes and model
+    sign_index.save(index_file)
+    model.save(tf_session, filename=model_file)
+
+    print("done")
+
     tf_session.close()
 
 # ======================================================================================
