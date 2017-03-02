@@ -11,6 +11,9 @@ class TOEFLReader:
         self.questions = []
         self.answers = []
 
+        questions_file = open(questions_file)
+        answers_file = open(answers_file)
+
         question_it = iter(questions_file)
         answer_it = iter(answers_file)
 
@@ -36,6 +39,9 @@ class TOEFLReader:
             (_,a) = line.split()
             a = ord(a) - 97
             self.answers.append(a)
+
+        questions_file.close()
+        answers_file.close()
 
     def answer(self,question_index):
         return self.answers[question_index]

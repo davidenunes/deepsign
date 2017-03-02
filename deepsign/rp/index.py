@@ -6,6 +6,7 @@ import h5py
 import random
 import pickle
 from deepsign.rp.ri import Generator, ri_from_indexes
+from tqdm import tqdm
 
 class SignIndex:
     def __init__(self, generator):
@@ -227,26 +228,31 @@ class TrieSignIndex:
         """
         h5index = h5py.File(input_file, 'r')
 
-        sign_data = h5index["signs"]
-        ri_data = h5index["ri"]
-        ri_k = ri_data.attrs["k"]
-        ri_s = ri_data.attrs["s"]
+        signs = h5index["signs"]
+        indexes = h5index["ri"]
+        ri_k = indexes.attrs["k"]
+        ri_s = indexes.attrs["s"]
 
         # set random state
-        random_state = pickle.loads(ri_data.attrs["state"].tostring())
+        random_state = pickle.loads(indexes.attrs["state"].tostring())
         random.setstate(random_state)
 
         generator = Generator(dim=ri_k,active=ri_s)
-        index = TrieSignIndex(generator,vocabulary=list(sign_data),pregen_indexes=False)
+        index = TrieSignIndex(generator,vocabulary=list(signs[:]),pregen_indexes=False)
 
         random_indexes = {}
 
+
+        signs = list(signs[:])
+        indexes = list(indexes[:])
+
         #load random indexes into index
-        for i in range(len(ri_data)):
-            w = sign_data[i]
+        for i in tqdm(range(len(indexes))):
+            w = signs[i]
             id = index.get_id(w)
-            ri = ri_from_indexes(ri_k,ri_data[i])
+            ri = ri_from_indexes(ri_k,indexes[i])
             random_indexes[id] = ri
+
         index.random_indexes = random_indexes
 
         h5index.close()
