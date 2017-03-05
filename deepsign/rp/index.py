@@ -1,12 +1,10 @@
 from bidict import bidict
 import marisa_trie
 import numpy as np
-import os
 import h5py
 import random
 import pickle
 from deepsign.rp.ri import Generator, ri_from_indexes
-from tqdm import tqdm
 
 class SignIndex:
     def __init__(self, generator):
@@ -246,8 +244,8 @@ class TrieSignIndex:
         signs = list(signs[:])
         indexes = list(indexes[:])
 
-        #load random indexes into index
-        for i in tqdm(range(len(indexes))):
+        # load random indexes into index
+        for i in range(len(indexes)):
             w = signs[i]
             id = index.get_id(w)
             ri = ri_from_indexes(ri_k,indexes[i])

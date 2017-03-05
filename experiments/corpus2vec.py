@@ -27,16 +27,16 @@ from tensorx.layers import Input
 # Parameters
 # ======================================================================================
 # random indexing
-k = 1000  # random index dim
+k = 2000  # random index dim
 s = 10  # num active indexes
 
 # context windows
-window_size = 3  # sliding window size
+window_size = 2  # sliding window size
 subsampling = True
 freq_cut = pow(10, -4)
 
 # neural net
-h_dim = 300  # dimension for hidden layer
+h_dim = 600  # dimension for hidden layer
 batch_size = 50
 
 # output
@@ -57,7 +57,7 @@ corpus_dataset = corpus_hdf5["sentences"]
 # n_rows = 100000
 # sentences = chunk_it(corpus_dataset,n_rows=n_rows, chunk_size=40000)
 n_rows = len(corpus_dataset)
-sentences = chunk_it(corpus_dataset, chunk_size=40000)
+sentences = chunk_it(corpus_dataset, chunk_size=100000)
 
 pipeline = BNCPipe(datagen=sentences)
 # ======================================================================================
@@ -87,12 +87,14 @@ neg_labels = Input(n_units=k, name="yn")
 
 model = NRP(k_dim=k, h_dim=h_dim)
 loss = model.get_loss(pos_labels, neg_labels)
-loss = loss + model.embedding_regularisation(weight=0.001)
-loss = loss + model.output_regularisation(weight=0.001)
+
+# turn off norm regularisation
+#loss = loss + model.embedding_regularisation(weight=0.001)
+#loss = loss + model.output_regularisation(weight=0.001)
 
 perplexity = model.get_perplexity(pos_labels, neg_labels)
 
-learning_rate = 0.2
+learning_rate = 0.05
 optimizer = tf.train.AdagradOptimizer(learning_rate)
 train_step = optimizer.minimize(loss)
 var_init = tf.global_variables_initializer()
@@ -158,7 +160,7 @@ try:
                 print("perplexity:", current_perplexity)
 
             # train step
-            for e in range(3):
+            for e in range(1):
                 tf_session.run(train_step, {
                     model.input(): x,
                     pos_labels(): yp,
@@ -171,7 +173,7 @@ try:
     # train last batch
     if len(x_samples) > 0:
         # train step
-        for e in range(3):
+        for e in range(1):
             tf_session.run(train_step, {
                 model.input(): x,
                 pos_labels(): yp,
