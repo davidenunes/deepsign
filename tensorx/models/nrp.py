@@ -4,6 +4,14 @@ import tensorflow as tf
 
 
 class ANN:
+
+    def input(self):
+        """
+        Returns a tensor with the input placeholder
+        :return:
+        """
+        return self.x()
+
     def save(self, session, filename, step=None):
         saver = tf.train.Saver()
         # saves in name.meta
@@ -14,8 +22,9 @@ class ANN:
         saver.restore(session, filename)
 
 
+
 class NRP(ANN):
-    def __init__(self, k_dim, h_dim=300,h_init=glorot):
+    def __init__(self, k_dim, h_dim=300,h_init=glorot,h_act=tf.identity):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
         :param k_dim: dimensionality of input and output layers
@@ -26,7 +35,7 @@ class NRP(ANN):
 
         # model definition
         x = Input(n_units=k_dim, name="x")
-        h = Dense(x, n_units=h_dim, init=h_init, name="W_f")
+        h = Dense(x, n_units=h_dim, init=h_init, name="W_f", act=h_act)
         yp = Dense(h, n_units=k_dim, init=glorot, bias=True, name="W_p")
         yn = Dense(h, n_units=k_dim, init=glorot, bias=True, name="W_n")
 
@@ -35,12 +44,6 @@ class NRP(ANN):
         self.yp = yp
         self.yn = yn
 
-    def input(self):
-        """
-        Returns a tensor with the input placeholder
-        :return:
-        """
-        return self.x()
 
     def output_sample(self):
         """
@@ -94,7 +97,52 @@ class NRP(ANN):
         return wp_reg * weight + wn_reg * weight
 
 
+class NRPRegression(ANN):
+    def __init__(self, k_dim, h_dim=300,h_init=glorot,h_act=tf.identity):
+        """
+        Creates a neural random projections model based on maximum likelihood of context outputs
+        :param k_dim: dimensionality of input and output layers
+        :param h_dim: dimensionality for embeddings layer
+        """
+        self.k_dim = k_dim
+        self.h_dim = h_dim
 
-# 3 adding one weight regularisation
-# w_reg = tf.nn.l2_loss(pos_out.weights) * 0.001
-# w_reg += tf.nn.l2_loss(neg_out.weights) * 0.001
+        # model definition
+        x = Input(n_units=k_dim, name="x")
+        h = Dense(x, n_units=h_dim, init=h_init, name="W_f", act=h_act)
+        y = Dense(h, n_units=k_dim, init=glorot, bias=True, name="W_o", act=Act.tanh)
+
+        self.x = x
+        self.h = h
+        self.y = y
+
+    def get_loss(self, labels_out):
+        """
+        Get a tensor for computing the sigmoid cross entropy with logits loss for this model
+        :param labels_p: input layer with positive output labels
+        :param labels_n: input layer with negative output labels
+        :return:
+        """
+        if not isinstance(labels_out,Input):
+            raise ValueError("labels need to be tensorx.layers.Input instances")
+
+        loss_reg = tf.reduce_mean(tf.squared_difference(labels_out(),self.y()))
+
+        return loss_reg
+
+    def output_sample(self):
+        """
+        Samples from the output distribution by flipping "coins" rp_i and rn_i for each bit on
+        the output layer for positve and negative entries respectively
+
+            (y_i = +1)  if rp_i < yp_i
+            (y_i = -1) if rn_i < yn_i
+        :returns:
+            a tensor that samples from the output distributions
+        :expects:
+            an input tensor to be fed
+        """
+        sample = tf.cast(tf.less(tf.random_uniform([1, self.k_dim]), tf.abs(self.y())), tf.float32)
+        sign_sample = sample * tf.sign(self.y())
+
+        return sign_sample

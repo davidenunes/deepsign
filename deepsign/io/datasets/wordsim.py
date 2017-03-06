@@ -12,6 +12,9 @@ class WordSim353Reader:
         self.sim = []
         self.rel = []
 
+        sim_file = open(sim_file)
+        rel_file = open(rel_file)
+
         for line in sim_file:
             (w1,w2,score) = line.split()
             if lowercase:

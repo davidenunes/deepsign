@@ -8,7 +8,7 @@ import numpy as np
 home = os.getenv("HOME")
 data_dir = home + "/data/datasets/"
 result_dir = home + "/data/results/"
-model_dir = result_dir + "nrp/300d_reg_all/"
+model_dir = result_dir + "nrp/600d_4000_10_reg_all/"
 model_file = model_dir + "model_bnc"
 
 weights_file = model_dir + "embeddings.npy"
@@ -16,8 +16,8 @@ weights_file = model_dir + "embeddings.npy"
 
 # load model
 print("loading model")
-k = 1000
-h_dim = 300
+k = 4000
+h_dim = 600
 model = NRP(k_dim=k, h_dim=h_dim)
 
 tf_session = tf.Session()
