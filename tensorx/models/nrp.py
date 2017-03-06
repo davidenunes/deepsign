@@ -15,7 +15,7 @@ class ANN:
 
 
 class NRP(ANN):
-    def __init__(self, k_dim, h_dim=300):
+    def __init__(self, k_dim, h_dim=300,h_init=glorot):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
         :param k_dim: dimensionality of input and output layers
@@ -26,7 +26,7 @@ class NRP(ANN):
 
         # model definition
         x = Input(n_units=k_dim, name="x")
-        h = Dense(x, n_units=h_dim, init=glorot, name="W_f")
+        h = Dense(x, n_units=h_dim, init=h_init, name="W_f")
         yp = Dense(h, n_units=k_dim, init=glorot, bias=True, name="W_p")
         yn = Dense(h, n_units=k_dim, init=glorot, bias=True, name="W_n")
 

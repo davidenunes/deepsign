@@ -17,6 +17,7 @@ import numpy as np
 import tensorflow as tf
 from tensorx.models.nrp import NRP
 from tensorx.layers import Input
+from functools import partial
 
 # ======================================================================================
 # util fn
@@ -27,8 +28,8 @@ from tensorx.layers import Input
 # Parameters
 # ======================================================================================
 # random indexing
-k = 2000  # random index dim
-s = 10  # num active indexes
+k = 4000  # random index dim
+s = 10    # num active indexes
 
 # context windows
 window_size = 2  # sliding window size
@@ -38,12 +39,15 @@ freq_cut = pow(10, -4)
 # neural net
 h_dim = 600  # dimension for hidden layer
 batch_size = 50
+learning_rate = 0.1
+
 
 # output
 home = os.getenv("HOME")
-result_dir = home + "/data/results/"
+result_dir = home + "/data/results/2000_10_decay/"
 index_file = result_dir + "index.hdf5"
 model_file = result_dir + "model_bnc"
+
 
 # ======================================================================================
 # Load Corpus
@@ -85,18 +89,29 @@ print("done")
 pos_labels = Input(n_units=k, name="yp")
 neg_labels = Input(n_units=k, name="yn")
 
-model = NRP(k_dim=k, h_dim=h_dim)
+# embedding init
+h_init = partial(tf.random_uniform,minval=-1,maxval=1)
+
+model = NRP(k_dim=k, h_dim=h_dim, h_init=h_init)
 loss = model.get_loss(pos_labels, neg_labels)
 
 # turn off norm regularisation
-#loss = loss + model.embedding_regularisation(weight=0.001)
-#loss = loss + model.output_regularisation(weight=0.001)
+loss = loss + model.embedding_regularisation(weight=0.001)
+loss = loss + model.output_regularisation(weight=0.001)
 
 perplexity = model.get_perplexity(pos_labels, neg_labels)
 
-learning_rate = 0.05
-optimizer = tf.train.AdagradOptimizer(learning_rate)
-train_step = optimizer.minimize(loss)
+
+#optimizer = tf.train.AdagradOptimizer(learning_rate)
+#train_step = optimizer.minimize(loss)
+
+global_step = tf.Variable(0, trainable=False)
+decaying_learning_rate = tf.train.exponential_decay(learning_rate, global_step,100000, 0.96, staircase=True)
+train_step = (
+    tf.train.GradientDescentOptimizer(decaying_learning_rate)
+    .minimize(loss, global_step=global_step)
+)
+
 var_init = tf.global_variables_initializer()
 
 tf_session = tf.Session()
