@@ -1,6 +1,9 @@
 from tensorx.layers import Input, Dense, Act
 from tensorx.init import glorot
 import tensorflow as tf
+from functools import partial
+
+random_uniform_init = partial(tf.random_uniform, minval=-1,maxval=1)
 
 
 class ANN:
@@ -144,5 +147,61 @@ class NRPRegression(ANN):
         """
         sample = tf.cast(tf.less(tf.random_uniform([1, self.k_dim]), tf.abs(self.y())), tf.float32)
         sign_sample = sample * tf.sign(self.y())
+
+        return sign_sample
+
+
+class NRPSkipReg(ANN):
+    def __init__(self, k_dim, h_dim=300,h_init=random_uniform_init,h_act=tf.identity,window_reach=2):
+        """
+        Creates a neural random projections model based on maximum likelihood of context outputs
+        :param k_dim: dimensionality of input and output layers
+        :param h_dim: dimensionality for embeddings layer
+
+        """
+        self.window_reach = window_reach
+        self.k_dim = k_dim
+        self.h_dim = h_dim
+
+        # model definition
+        x = Input(n_units=k_dim, name="x")
+        self.x = x
+        h = Dense(x, n_units=h_dim, init=h_init, name="embeddings", act=h_act)
+        self.h = h
+
+        self.y = []
+        for i in range(window_reach*2):
+            self.y.append(Dense(h,n_units=k_dim,init=random_uniform_init,bias=True,act=Act.tanh,name="y_"+i))
+
+    def get_loss(self, labels_out):
+        """
+        Get a tensor for computing the sigmoid cross entropy with logits loss for this model
+        :param labels_out a list of input layers where random indexes are fed
+        :return:
+        """
+        if len(labels_out) != self.window_reach*2:
+            raise ValueError("Number of labels has to match number of context words")
+
+        loss_reg = 0
+        for i in range(self.window_reach*2):
+            loss_reg += tf.reduce_mean(tf.squared_difference(labels_out[i](),self.y[i]()))
+
+        return loss_reg
+
+    def output_sample(self,i):
+        """
+        Samples from the output distribution by flipping "coins" rp_i and rn_i for each bit on
+        the output layer i for positve and negative entries respectively
+
+            (y_i = +1)  if rp_i < yp_i
+            (y_i = -1) if rn_i < yn_i
+        :returns:
+            a tensor that samples from the output distributions
+        :expects:
+            an input tensor to be fed
+        """
+        out_layer = self.y[i]
+        sample = tf.cast(tf.less(tf.random_uniform([1, self.k_dim]), tf.abs(out_layer())), tf.float32)
+        sign_sample = sample * tf.sign(out_layer())
 
         return sign_sample

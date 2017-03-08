@@ -90,7 +90,8 @@ pos_labels = Input(n_units=k, name="yp")
 neg_labels = Input(n_units=k, name="yn")
 
 # embedding init
-h_init = partial(tf.random_uniform,minval=-1,maxval=1)
+#h_init = partial(tf.random_uniform,minval=-1,maxval=1)
+h_init = tf.zeros
 
 model = NRP(k_dim=k, h_dim=h_dim, h_init=h_init)
 loss = model.get_loss(pos_labels, neg_labels)
