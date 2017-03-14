@@ -6,13 +6,13 @@ import tensorflow as tf
 
 from tensorx.init import glorot
 from tensorx.layers import Input, Dense, Act
-from tensorx.sparsemax import sparsemax, sparsemax_loss
+from tensorx.sparsemax.sparsemax import sparsemax
+from tensorx.sparsemax.sparsemax_loss import sparsemax_loss
 
-random_uniform_init = partial(tf.random_uniform, minval=-1,maxval=1)
+random_uniform_init = partial(tf.random_uniform, minval=-1, maxval=1)
 
 
 class ANN:
-
     def input(self):
         """
         Returns a tensor with the input placeholder
@@ -27,7 +27,7 @@ class ANN:
         w = session.run(self.h.weights)
 
         save_dir = os.path.dirname(filename)
-        embeddings_file = os.path.join(save_dir,"embeddings.npy")
+        embeddings_file = os.path.join(save_dir, "embeddings.npy")
         np.save(embeddings_file, w)
 
     def load(self, session, filename):
@@ -35,9 +35,8 @@ class ANN:
         saver.restore(session, filename)
 
 
-
 class NRP(ANN):
-    def __init__(self, k_dim, h_dim=300,h_init=glorot,h_act=tf.identity):
+    def __init__(self, k_dim, h_dim=300, h_init=glorot, h_act=tf.identity):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
         :param k_dim: dimensionality of input and output layers
@@ -56,7 +55,6 @@ class NRP(ANN):
         self.h = h
         self.yp = yp
         self.yn = yn
-
 
     def output_sample(self):
         """
@@ -81,7 +79,7 @@ class NRP(ANN):
         :param labels_n: input layer with negative output labels
         :return:
         """
-        if not (isinstance(labels_p,Input) and isinstance(labels_n,Input)):
+        if not (isinstance(labels_p, Input) and isinstance(labels_n, Input)):
             raise ValueError("labels need to be tensorx.layers.Input instances")
 
         loss_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_p(), logits=self.yp()))
@@ -100,18 +98,18 @@ class NRP(ANN):
         """
         return tf.pow(2.0, self.get_loss(labels_p, labels_n))
 
-    def embedding_regularisation(self,weight):
+    def embedding_regularisation(self, weight):
         w_reg = tf.nn.l2_loss(self.h.weights)
         return w_reg * weight
 
-    def output_regularisation(self,weight):
+    def output_regularisation(self, weight):
         wp_reg = tf.nn.l2_loss(self.yp.weights)
         wn_reg = tf.nn.l2_loss(self.yn.weights)
         return wp_reg * weight + wn_reg * weight
 
 
 class NRPRegression(ANN):
-    def __init__(self, k_dim, h_dim=300,h_init=glorot,h_act=tf.identity):
+    def __init__(self, k_dim, h_dim=300, h_init=glorot, h_act=tf.identity):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
         :param k_dim: dimensionality of input and output layers
@@ -136,10 +134,10 @@ class NRPRegression(ANN):
         :param labels_n: input layer with negative output labels
         :return:
         """
-        if not isinstance(labels_out,Input):
+        if not isinstance(labels_out, Input):
             raise ValueError("labels need to be tensorx.layers.Input instances")
 
-        loss_reg = tf.reduce_mean(tf.squared_difference(labels_out(),self.y()))
+        loss_reg = tf.reduce_mean(tf.squared_difference(labels_out(), self.y()))
 
         return loss_reg
 
@@ -162,7 +160,7 @@ class NRPRegression(ANN):
 
 
 class NRPSkipReg(ANN):
-    def __init__(self, k_dim, h_dim=300,h_init=random_uniform_init,h_act=tf.identity,window_reach=2):
+    def __init__(self, k_dim, h_dim=300, h_init=random_uniform_init, h_act=tf.identity, window_reach=2):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
         :param k_dim: dimensionality of input and output layers
@@ -180,8 +178,8 @@ class NRPSkipReg(ANN):
         self.h = h
 
         self.y = []
-        for i in range(window_reach*2):
-            self.y.append(Dense(h,n_units=k_dim,init=random_uniform_init,bias=True,act=Act.tanh,name="y_"+i))
+        for i in range(window_reach * 2):
+            self.y.append(Dense(h, n_units=k_dim, init=random_uniform_init, bias=True, act=Act.tanh, name="y_" + i))
 
     def get_loss(self, labels_out):
         """
@@ -189,16 +187,16 @@ class NRPSkipReg(ANN):
         :param labels_out a list of input layers where random indexes are fed
         :return:
         """
-        if len(labels_out) != self.window_reach*2:
+        if len(labels_out) != self.window_reach * 2:
             raise ValueError("Number of labels has to match number of context words")
 
         loss_reg = 0
-        for i in range(self.window_reach*2):
-            loss_reg += tf.reduce_mean(tf.squared_difference(labels_out[i](),self.y[i]()))
+        for i in range(self.window_reach * 2):
+            loss_reg += tf.reduce_mean(tf.squared_difference(labels_out[i](), self.y[i]()))
 
         return loss_reg
 
-    def output_sample(self,i):
+    def output_sample(self, i):
         """
         Samples from the output distribution by flipping "coins" rp_i and rn_i for each bit on
         the output layer i for positve and negative entries respectively
@@ -231,6 +229,7 @@ class NRPCBow(ANN):
     I'm testing to see if negative sampling can be avoided since I can't use softmax because my outputs are not in the
     one-hot-encoding.
     """
+
     def __init__(self, k_dim, h_dim=300, h_init=random_uniform_init, h_act=tf.identity):
         self.k_dim = k_dim
         self.h_dim = h_dim
@@ -239,7 +238,36 @@ class NRPCBow(ANN):
         self.x = Input(n_units=k_dim, name="x")
         self.h = Dense(self.x, n_units=h_dim, init=h_init, name="embeddings", act=h_act)
 
-        yp = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, act=sparsemax, name="W_p")
-        yn = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, act=sparsemax, name="W_n")
+        # concat positive and negative predictions into a single layer
+        self.logits = Dense(self.h,
+                       n_units=k_dim * 2,
+                       init=random_uniform_init,
+                       bias=True,
+                       name="logits")
+
+        self.y = sparsemax(self.logits())
+
+        # self.yp = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, name="y_p")
+        # self.yn = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, name="y_n")
+
+    def get_loss(self,labels_out):
+        if not isinstance(labels_out, Input):
+            raise ValueError("labels need to be tensorx.layers.Input instances")
+        return tf.reduce_mean(sparsemax_loss(self.logits(), self.y, labels_out()))
+
+    def output_sample(self):
+        """
+            Samples from the output layer to get an output vector. The output vector of this network
+            architecture has the distribution for the positive and negative labels expected in the output
+            we multiply the logits by a constant t>= 1 before applying a sparsemax function to make the
+            resulting distribution p = sparsemax(tz) more sparse.
+
+            we predict a label yi to be 1 if yi > 0
 
 
+        :return: a vector of shape [,self.k_dim*2] with the yi = 1 for the labels predicted to be on
+        :requires: an input layer to be fed to the model
+        """
+        t = 1.5
+        output = sparsemax(self.logits()*t)
+        return output

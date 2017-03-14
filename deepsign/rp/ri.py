@@ -8,12 +8,33 @@ class RandomIndex:
         self.positive = positive
         self.negative = negative
         self.dim = dim
+        self.s = len(positive) + len(negative)
         self.s = len(positive)+len(negative)
 
     def to_vector(self):
         v = np.zeros(self.dim)
         v[self.positive] = 1
         v[self.negative] = -1
+        return v
+
+    def to_dist_vector(self):
+        """
+        Returns a vector of dimension dim*2 with the sparse distribution for the positive
+        and negative labels concatenated [pos dist][neg dist]
+        :return:
+        """
+        v = np.zeros(self.dim*2)
+        v[self.positive] = 1 / self.s
+        negative = np.array(self.negative)+self.dim
+        v[negative] = 1 / self.s
+        return v
+
+    def to_class_vector(self):
+        """Same as dist vector but returns a binary version of all active classes"""
+        v = np.zeros(self.dim * 2)
+        v[self.positive] = 1
+        negative = np.array(self.negative) + self.dim
+        v[negative] = 1
         return v
 
     def get_positive_vector(self):

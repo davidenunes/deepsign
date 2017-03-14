@@ -46,7 +46,7 @@ def sparsemax_loss(logits, sparsemax, labels, name=None):
     shifted_logits = logits - \
         math_ops.reduce_mean(logits, axis=1)[:, array_ops.newaxis]
 
-    # sum over support
+    # sum over support (support = predicted labels)
     support = math_ops.cast(sparsemax > 0, sparsemax.dtype)
     sum_s = support * sparsemax * (shifted_logits - 0.5 * sparsemax)
 

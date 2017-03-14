@@ -64,6 +64,16 @@ class TestRI(unittest.TestCase):
 
         npt.assert_array_equal(ri_v1, ri_v2)
 
+    def test_to_dist_vector(self):
+        dim = 10
+        active = 4
+        gen = ri.Generator(dim=dim, active=active)
+        ri1 = gen.generate()
+
+        print(ri1)
+        dist_v1 = ri1.to_dist_vector()
+        print(dist_v1)
+
 
 if __name__ == '__main__':
     unittest.main()

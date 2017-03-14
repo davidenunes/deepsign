@@ -25,10 +25,10 @@ v_1[3] = 0
 v_1[4] = 2
 
 v_2 = np.zeros([6])
-v_2[0] = 0.33333
+v_2[0] = 0.5
 v_2[2] = 0
 v_2[3] = 0
-v_2[4] = 0.33333
+v_2[4] = 0.5
 
 
 print("output: ", session.run(sparsemax(input1),feed_dict={input1:[v_1]}))

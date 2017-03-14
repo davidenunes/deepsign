@@ -14,7 +14,7 @@ import tensorflow as tf
 # random index dimension
 k = 1000
 s = 4
-h_dim = 100
+h_dim = 10
 ri_gen = RIGen(active=s, dim=k)
 perm_generator = PermutationGenerator(dim=k)
 perm = perm_generator.matrix()
@@ -28,20 +28,15 @@ prob_label = Input(n_units=k * 2, name="ri_classes")
 prob_model = NRPCBow(k_dim=k, h_dim=h_dim)
 prob_loss = prob_model.get_loss(prob_label)
 
-optimizer = tf.train.AdagradOptimizer(learning_rate=0.5)
+optimizer = tf.train.AdagradOptimizer(learning_rate=1)
 train_step = optimizer.minimize(prob_loss)
 init = tf.global_variables_initializer()
 
 toy_corpus = [
-    "A 3",
     "A 1",
     "B 1",
-    "B 3",
     "B 2",
-    "C 3",
-    "C 2",
-    "D 4",
-    "D 4"
+    "C 2"
 ]
 
 sentences = [s.split() for s in toy_corpus]
@@ -55,7 +50,7 @@ for sentence in sentences:
 index = TrieSignIndex(ri_gen, vocab, pregen_indexes=True)
 print("vocabulary size: ", len(index))
 
-window_size = 2
+window_size = 1
 
 ss = tf.Session()
 ss.run(init)
@@ -69,7 +64,7 @@ x_samples = []
 y_samples = []
 
 # repeat for n epochs
-for epoch in repeat(sentences, 100):
+for epoch in repeat(sentences, 10):
     #print(i)
     for sentence in epoch:
         windows = sliding_windows(sentence, window_size)
@@ -93,10 +88,11 @@ for epoch in repeat(sentences, 100):
 
         print(current_loss)
 
-        ss.run(train_step, {
-            prob_model.input(): x_samples,
-            prob_label(): y_samples
-        })
+        for i in range(10):
+            ss.run(train_step, {
+                prob_model.input(): x_samples,
+                prob_label(): y_samples
+            })
 
         x_samples = []
         y_samples = []
@@ -113,29 +109,20 @@ print(embeddings.shape)
 A = np.matmul(index.get_ri("A").to_vector(), embeddings)
 B = np.matmul(index.get_ri("B").to_vector(), embeddings)
 C = np.matmul(index.get_ri("C").to_vector(), embeddings)
-D = np.matmul(index.get_ri("D").to_vector(), embeddings)
-C3 = np.matmul(index.get_ri("3").to_vector(), embeddings)
+
+
 C2 = np.matmul(index.get_ri("2").to_vector(), embeddings)
 C1 = np.matmul(index.get_ri("1").to_vector(), embeddings)
-C4 = np.matmul(index.get_ri("4").to_vector(), embeddings)
+
 
 print("A---A ", cosine(A, A))
 print("A---B ", cosine(A, B))
 print("A---C ", cosine(A, C))
-print("A---D ", cosine(A, D))
-print("B---D ", cosine(B, D))
-print("C---D ", cosine(C, D))
-print("\n")
-print("C3---A", cosine(C3, A))
-print("C3---B", cosine(C3, B))
-print("C3---C", cosine(C3, C))
-print("C3---D", cosine(C3, D))
 
 print("\n")
 print("C1---A", cosine(C1, A))
 print("C1---B", cosine(C1, B))
 print("C1---C", cosine(C1, C))
-print("C1---D", cosine(C1, D))
 print("C1---C2", cosine(C1, C2))
 
 ss.close()
