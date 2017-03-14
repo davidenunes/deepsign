@@ -3,7 +3,7 @@ import sys
 import h5py
 from tqdm import tqdm
 
-from experiments.pipe.bnc_pipe import BNCPipe
+from experiments.pipe.wacky_pipe import WaCKyPipe
 from deepsign.utils.views import chunk_it
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
@@ -28,8 +28,8 @@ from functools import partial
 # Parameters
 # ======================================================================================
 # random indexing
-k = 4000  # random index dim
-s = 10    # num active indexes
+k = 1000  # random index dim
+s = 4    # num active indexes
 
 # context windows
 window_size = 2  # sliding window size
@@ -37,14 +37,12 @@ subsampling = True
 freq_cut = pow(10, -4)
 
 # neural net
-h_dim = 600  # dimension for hidden layer
-batch_size = 50
-learning_rate = 0.1
-
+h_dim = 300  # dimension for hidden layer
+batch_size = 10
 
 # output
 home = os.getenv("HOME")
-result_dir = home + "/data/results/2000_10_decay/"
+result_dir = home + "/data/results/"
 index_file = result_dir + "index.hdf5"
 model_file = result_dir + "model_bnc"
 
@@ -53,21 +51,21 @@ model_file = result_dir + "model_bnc"
 # Load Corpus
 # ======================================================================================
 data_dir = home + "/data/datasets/"
-corpus_file = data_dir + "bnc_full.hdf5"
+corpus_file = data_dir + "wacky_6M.hdf5"
 
 corpus_hdf5 = h5py.File(corpus_file, 'r')
 corpus_dataset = corpus_hdf5["sentences"]
 # iterates over lines but loads them as chunks
-# n_rows = 100000
-# sentences = chunk_it(corpus_dataset,n_rows=n_rows, chunk_size=40000)
+#n_rows = 100000
+#sentences = chunk_it(corpus_dataset,n_rows=n_rows, chunk_size=20000)
 n_rows = len(corpus_dataset)
 sentences = chunk_it(corpus_dataset, chunk_size=100000)
 
-pipeline = BNCPipe(datagen=sentences)
+pipeline = WaCKyPipe(datagen=sentences)
 # ======================================================================================
 # Load Vocabulary
 # ======================================================================================
-vocab_file = data_dir + "bnc_vocab_spacy.hdf5"
+vocab_file = data_dir + "wacky_vocab_6M_spacy.hdf5"
 vocab_hdf5 = h5py.File(vocab_file, 'r')
 
 ri_gen = Generator(dim=k, active=s)
@@ -97,21 +95,21 @@ model = NRP(k_dim=k, h_dim=h_dim, h_init=h_init)
 loss = model.get_loss(pos_labels, neg_labels)
 
 # turn off norm regularisation
-loss = loss + model.embedding_regularisation(weight=0.001)
-loss = loss + model.output_regularisation(weight=0.001)
+# loss = loss + model.embedding_regularisation(weight=0.001)
+# loss = loss + model.output_regularisation(weight=0.001)
 
 perplexity = model.get_perplexity(pos_labels, neg_labels)
 
+learning_rate = 0.5
+optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+train_step = optimizer.minimize(loss)
 
-#optimizer = tf.train.AdagradOptimizer(learning_rate)
-#train_step = optimizer.minimize(loss)
-
-global_step = tf.Variable(0, trainable=False)
-decaying_learning_rate = tf.train.exponential_decay(learning_rate, global_step,100000, 0.96, staircase=True)
-train_step = (
-    tf.train.GradientDescentOptimizer(decaying_learning_rate)
-    .minimize(loss, global_step=global_step)
-)
+#global_step = tf.Variable(0, trainable=False)
+#decaying_learning_rate = tf.train.exponential_decay(learning_rate, global_step,100000, 0.96, staircase=True)
+#train_step = (
+#    tf.train.GradientDescentOptimizer(decaying_learning_rate)
+#    .minimize(loss, global_step=global_step)
+#)
 
 var_init = tf.global_variables_initializer()
 
@@ -166,14 +164,14 @@ try:
             yn = np.abs(yn)
 
             # current perplexity
-            if i % 10000 == 0:
+            if i % 1000 == 0:
                 current_perplexity = tf_session.run(perplexity, {
                     model.input(): x,
                     pos_labels(): yp,
                     neg_labels(): yn
                 })
                 print("\nbatch shape: ", x.shape)
-                print("perplexity:", current_perplexity)
+                print("current perplexity:", current_perplexity)
 
             # train step
             for e in range(1):

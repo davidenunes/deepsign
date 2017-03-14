@@ -7,5 +7,5 @@ tqdm>=4.11.2
 bidict>=0.13.0
 marisa-trie>=0.7.2
 seaborn<=0.7.1
-tensorflow-gpu>=1.0.0
+tensorflow>=1.0.0
 

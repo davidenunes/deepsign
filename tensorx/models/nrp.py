@@ -1,7 +1,12 @@
-from tensorx.layers import Input, Dense, Act
-from tensorx.init import glorot
-import tensorflow as tf
+import os
 from functools import partial
+
+import numpy as np
+import tensorflow as tf
+
+from tensorx.init import glorot
+from tensorx.layers import Input, Dense, Act
+from tensorx.sparsemax import sparsemax, sparsemax_loss
 
 random_uniform_init = partial(tf.random_uniform, minval=-1,maxval=1)
 
@@ -19,6 +24,11 @@ class ANN:
         saver = tf.train.Saver()
         # saves in name.meta
         saver.save(session, filename, global_step=step)
+        w = session.run(self.h.weights)
+
+        save_dir = os.path.dirname(filename)
+        embeddings_file = os.path.join(save_dir,"embeddings.npy")
+        np.save(embeddings_file, w)
 
     def load(self, session, filename):
         saver = tf.train.Saver()
@@ -205,3 +215,31 @@ class NRPSkipReg(ANN):
         sign_sample = sample * tf.sign(out_layer())
 
         return sign_sample
+
+
+class NRPCBow(ANN):
+    """Neural Random Projections with Continuous Bag-of-Words architecture
+
+    This model resembles CBOW from mikolov but instead of using one-hot-encoding, it uses random projections to encode
+    both the input bag-of-words and the output.
+
+    The output layer uses a sparsemax activation and the corresponding sparsemax loss function. This makes the network
+    output sparse probability distributions and supports multi-label outputs.
+
+    We use 2 output layers one for positive features and one for negative features of the random index.
+
+    I'm testing to see if negative sampling can be avoided since I can't use softmax because my outputs are not in the
+    one-hot-encoding.
+    """
+    def __init__(self, k_dim, h_dim=300, h_init=random_uniform_init, h_act=tf.identity):
+        self.k_dim = k_dim
+        self.h_dim = h_dim
+
+        # model definition
+        self.x = Input(n_units=k_dim, name="x")
+        self.h = Dense(self.x, n_units=h_dim, init=h_init, name="embeddings", act=h_act)
+
+        yp = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, act=sparsemax, name="W_p")
+        yn = Dense(self.h, n_units=k_dim, init=random_uniform_init, bias=True, act=sparsemax, name="W_n")
+
+

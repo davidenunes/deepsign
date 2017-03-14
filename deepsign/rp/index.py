@@ -98,10 +98,10 @@ class TrieSignIndex:
         :param pregen_indexes if true generates all the indexes for all the signs
         """
         self.generator = generator
-        n_signs = len(vocabulary)
 
+        n_signs = len(vocabulary)
         self.sign_trie = marisa_trie.Trie(vocabulary)
-        self.pregen_indexes = pregen_indexes
+
         if pregen_indexes:
             self.random_indexes = {i: generator.generate() for i in range(n_signs)}
         else:
@@ -154,14 +154,15 @@ class TrieSignIndex:
                 self.random_indexes.pop(sign)
 
     def get_ri(self, sign):
-        v = None
-        if sign in self.sign_trie:
+        if sign not in self.sign_trie:
+            return None
+        else:
             sid = self.sign_trie[sign]
-
-            if not self.pregen_indexes and sid not in self.random_indexes:
+            # if ris were not pre-generated generate new one
+            if sid not in self.random_indexes:
                 self.random_indexes[sid] = self.generator.generate()
-            v = self.random_indexes[sid]
-        return v
+
+        return self.random_indexes[sid]
 
     def get_id(self, sign):
         sign_id = None
@@ -188,20 +189,16 @@ class TrieSignIndex:
         """
         h5index = h5py.File(output_file, 'w')
 
-        keys = self.sign_trie.items()
-        ws, ids = zip(*keys)
-
-        ws = np.array([w.encode("UTF-8") for w in ws])
+        # save only items for wich we have a random index
+        ids = self.random_indexes.keys()
+        vocab = [self.sign_trie.restore_key(id) for id in ids]
+        vocab = np.array([w.encode("UTF-8") for w in vocab])
 
         # save signs
         dt = h5py.special_dtype(vlen=str)
-        h5index.create_dataset("signs", data=ws, dtype=dt, compression="gzip")
+        h5index.create_dataset("signs", data=vocab, dtype=dt, compression="gzip")
 
-        # save random indexes
-        if len(self.random_indexes) == 0:
-            self.random_indexes = {i: self.generator.generate() for i in range(len(self))}
-
-        ris = (self.random_indexes[id] for id in ids)
+        ris = (self.random_indexes.get(id) for id in ids)
         ris = np.array([ri.positive + ri.negative for ri in ris])
 
         ri_dataset = h5index.create_dataset("ri", data=ris, compression="gzip")
@@ -239,7 +236,6 @@ class TrieSignIndex:
         index = TrieSignIndex(generator,vocabulary=list(signs[:]),pregen_indexes=False)
 
         random_indexes = {}
-
 
         signs = list(signs[:])
         indexes = list(indexes[:])
