@@ -5,8 +5,8 @@ import numpy as np
 
 home = os.getenv("HOME")
 result_path = home+"/data/datasets/"
-corpus_h5 = result_path + "wacky_6M.hdf5"
-vocab_h5 = result_path + "wacky_vocab_6M_spacy.hdf5"
+corpus_h5 = result_path + "bnc.hdf5"
+vocab_h5 = result_path + "bnc_vocab_lemma.hdf5"
 
 #corpus_h5 = result_path + "bnc_full.hdf5"
 #vocab_h5 = result_path + "bnc_vocab.hdf5"
@@ -27,8 +27,8 @@ print("Top 10: %s" % str(vocab[0:10]))
 
 print("Last 10: %s" % str(vocab[-11:-1]))
 
-
-freq_threshold = 0
+# frequency thresholding could be useful
+freq_threshold = 447
 if freq_threshold > 0:
     indexes = np.where(freq[:] >= freq_threshold)[0]
     indexes = slice(0,len(indexes),1)

@@ -1,5 +1,5 @@
 from tensorx.layers import Input
-from tensorx.models.nrp import NRPCBow
+from tensorx.models.nrp import NRP
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 
@@ -16,7 +16,7 @@ r2 = ri_gen.generate()
 
 labels = Input(n_units=k*2, name="ri")
 
-model = NRPCBow(k_dim=k,h_dim=h_dim)
+model = NRP(k_dim=k, h_dim=h_dim)
 loss = model.get_loss(labels)
 
 

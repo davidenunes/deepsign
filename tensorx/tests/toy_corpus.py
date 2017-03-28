@@ -1,5 +1,5 @@
 from tensorx.layers import Input
-from tensorx.models.nrp import NRPRegression, NRPCBow
+from tensorx.models.nrp import NRPRegression, NRP
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 from deepsign.utils.views import sliding_windows
@@ -25,7 +25,7 @@ perm = perm_generator.matrix()
 #reg_loss = reg_model.get_loss(reg_labels)
 
 prob_label = Input(n_units=k * 2, name="ri_classes")
-prob_model = NRPCBow(k_dim=k, h_dim=h_dim)
+prob_model = NRP(k_dim=k, h_dim=h_dim)
 prob_loss = prob_model.get_loss(prob_label)
 
 optimizer = tf.train.AdagradOptimizer(learning_rate=0.5)

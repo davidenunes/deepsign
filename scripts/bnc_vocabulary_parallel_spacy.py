@@ -10,7 +10,7 @@ from deepsign.nlp.tokenization import Tokenizer
 from deepsign.utils.views import subset_chunk_it, divide_slice
 from experiments.pipe.bnc_pipe import BNCPipe
 from multiprocessing import Pool
-
+import argparse
 
 def word_frequencies(args):
     """
@@ -18,7 +18,7 @@ def word_frequencies(args):
     :param data_slice: a range with the subset of the file to be read
     :return: a Counter with the frequency of the tokens found
     """
-    fname, data_slice = args
+    fname, data_slice, lemmatize = args
     input_hdf5 = h5py.File(fname, 'r')
     dataset_name = "sentences"
     dataset = input_hdf5[dataset_name]
@@ -26,7 +26,7 @@ def word_frequencies(args):
 
     pbar = tqdm(total=len(data_slice))
 
-    pipe = BNCPipe(gen)
+    pipe = BNCPipe(gen,lemmas=lemmatize)
     freq = Counter()
 
     for tokens in pipe:
@@ -40,7 +40,7 @@ def word_frequencies(args):
     return freq
 
 
-def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
+def parallel_word_count(corpus_file, output_file,lemmatize, max_rows=None, n_processes=8):
     # get data slices
     input_hdf5 = h5py.File(corpus_file, 'r')
     dataset_name = "sentences"
@@ -48,12 +48,12 @@ def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
     nrows = len(dataset)
     input_hdf5.close()
 
-    if max_rows is not None and max_rows < nrows:
+    if max_rows !=-1 and max_rows < nrows:
         nrows = max_rows
 
     data_slices = divide_slice(nrows, n_processes, 0)
 
-    args = [(corpus_file, data_slice) for data_slice in data_slices]
+    args = [(corpus_file, data_slice, lemmatize) for data_slice in data_slices]
     pool = Pool(n_processes)
 
     result = pool.map(func=word_frequencies, iterable=args)
@@ -92,13 +92,21 @@ def parallel_word_count(corpus_file, output_file, max_rows=None, n_processes=8):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Neural Random Projections arguments")
+    parser.add_argument('-lemmas', dest="lemmas", type=bool, default=True)
+    parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/datasets/")
+    parser.add_argument('-corpus_file', dest="corpus_file", type=str, default="bnc.hdf5")
+    parser.add_argument('-out_file', dest="out_file", type=str, default="bnc_vocab_lemma.hdf5")
+    parser.add_argument('-n_sentences', dest="n_sentences", type=int, default=-1)
+    args = parser.parse_args()
+
     # all sentences
     max_sentences = None
 
     # corpus and output files
     home = os.getenv("HOME")
-    corpus_file = home + "/data/datasets/wacky_6M.hdf5"
-    index_filename = home + "/data/datasets/wacky_vocab_6M_spacy.hdf5"
+    corpus_file = home + args.data_dir + args.corpus_file
+    index_filename = home + args.data_dir + args.out_file
 
     #index_filename = None
-    parallel_word_count(corpus_file, index_filename, max_sentences,n_processes=2)
+    parallel_word_count(corpus_file, index_filename, args.lemmas, args.n_sentences,n_processes=2)

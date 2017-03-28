@@ -2,7 +2,7 @@ from spacy.en import English
 
 
 print("Loading English Model...")
-nlp =  English(entity=False,tagger=False,parser=False)
+nlp =  English(entity=False,parser=False)
 print("Done!")
 
 print("Vocab. Size: ",len(nlp.vocab.strings))
@@ -10,7 +10,7 @@ print("hello" in nlp.vocab.strings)
 
 #loads the entire nlp pipeline with parser, named-entity recognition, pos tagger
 tokens = nlp(u'Mr Anderson, welcome back, we missed you.')
-tokens = [token for token in tokens]
+tokens = [token.lemma_ for token in tokens]
 print(tokens)
 
 tokens = nlp.tokenizer('Mr Anderson, welcome back, we missed you.')

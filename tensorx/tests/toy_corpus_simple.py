@@ -1,5 +1,5 @@
 from tensorx.layers import Input
-from tensorx.models.nrp import NRPRegression, NRPCBow
+from tensorx.models.nrp import NRPRegression, NRP
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 from deepsign.utils.views import sliding_windows
@@ -15,7 +15,7 @@ import tensorflow as tf
 # random index dimension
 k = 1000
 s = 10
-h_dim = 10
+h_dim = 300
 ri_gen = RIGen(active=s, dim=k)
 perm_generator = PermutationGenerator(dim=k)
 perm = perm_generator.matrix()
@@ -27,8 +27,10 @@ perm = perm_generator.matrix()
 
 prob_label = Input(n_units=k * 2, name="ri_classes")
 #prob_model = NRPCBow(k_dim=k, h_dim=h_dim, h_init=tf.zeros)
-prob_model = NRPCBow(k_dim=k, h_dim=h_dim)
-prob_loss = prob_model.get_loss(prob_label)
+prob_model = NRP(k_dim=k, h_dim=h_dim,h_init=tf.zeros)
+#prob_model = NRP(k_dim=k, h_dim=h_dim)
+#prob_loss = prob_model.get_loss(prob_label)
+prob_loss = prob_model.get_softmax_loss(prob_label)
 
 # zero init seems to work better for embeddings
 optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
@@ -78,7 +80,7 @@ y_samples = []
 #ep = 3000 minimum with adadelta
 # rmsprop too slow
 # ep = 270 min for adam 0.001 Adam works well for online learning??
-ep = 50
+ep = 300
 
 for epoch in tqdm(repeat(sentences, ep),total=ep):
     #print(i)

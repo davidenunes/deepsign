@@ -20,14 +20,14 @@ class ANN:
         """
         return self.x()
 
-    def save(self, session, filename, step=None):
+    def save(self, session, model_filename, embeddings_name, step=None):
         saver = tf.train.Saver()
         # saves in name.meta
-        saver.save(session, filename, global_step=step)
+        saver.save(session, model_filename, global_step=step)
         w = session.run(self.h.weights)
 
-        save_dir = os.path.dirname(filename)
-        embeddings_file = os.path.join(save_dir, "embeddings.npy")
+        save_dir = os.path.dirname(model_filename)
+        embeddings_file = os.path.join(save_dir, "embeddings_{}.npy".format(embeddings_name))
         np.save(embeddings_file, w)
 
     def load(self, session, filename):
@@ -35,7 +35,7 @@ class ANN:
         saver.restore(session, filename)
 
 
-class NRP(ANN):
+class NRPSigmoid(ANN):
     def __init__(self, k_dim, h_dim=300, h_init=glorot, h_act=tf.identity):
         """
         Creates a neural random projections model based on maximum likelihood of context outputs
@@ -215,7 +215,7 @@ class NRPSkipReg(ANN):
         return sign_sample
 
 
-class NRPCBow(ANN):
+class NRP(ANN):
     """Neural Random Projections with Continuous Bag-of-Words architecture
 
     This model resembles CBOW from mikolov but instead of using one-hot-encoding, it uses random projections to encode
@@ -254,6 +254,12 @@ class NRPCBow(ANN):
         if not isinstance(labels_out, Input):
             raise ValueError("labels need to be tensorx.layers.Input instances")
         return tf.reduce_mean(sparsemax_loss(self.logits(), self.y, labels_out()))
+
+    def get_softmax_loss(self, labels_out):
+        if not isinstance(labels_out, Input):
+            raise ValueError("labels need to be tensorx.layers.Input instances")
+        return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels_out(),logits=self.logits()))
+
 
     def output_sample(self):
         """

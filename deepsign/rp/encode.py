@@ -4,8 +4,8 @@ import time
 
 
 def to_bow(window, sign_index, include_target=True, normalise=False):
-    ri_vs = []
-    ri_vs.append(np.zeros(sign_index.feature_dim()))
+    ri_vs = [np.zeros(sign_index.feature_dim())]
+
     if include_target:
         target_v = [sign_index.get_ri(window.target).to_vector()]
         ri_vs.append(target_v)

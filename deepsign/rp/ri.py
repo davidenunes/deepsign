@@ -9,7 +9,6 @@ class RandomIndex:
         self.negative = negative
         self.dim = dim
         self.s = len(positive) + len(negative)
-        self.s = len(positive)+len(negative)
 
     def to_vector(self):
         v = np.zeros(self.dim)
