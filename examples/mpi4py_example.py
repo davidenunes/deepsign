@@ -1,14 +1,103 @@
-"""
-Using mpi4py to train tensorflow models in parallel Asynchronously
+#!/usr/bin/env python
+
+""" Run with
+    mpirun -n 10 python -m scripts.parallel.word_frequency
+
+    Using mpi4py to train tensorflow models in parallel Asynchronously
 """
 from mpi4py import MPI
+
+import time
+from deepsign.utils.views import divide_slice, subset_chunk_it
+import numpy as np
+import h5py
+import os
+from tqdm import tqdm
+from experiments.pipe.bnc_pipe import BNCPipe
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+home = os.getenv("HOME")
+data_dir = home + "/data/datasets/"
+corpus_file = data_dir + "bnc.hdf5"
 
-if rank == 0:
-    print("master")
+
+class Tags():
+    FINISHED = 0
+    RESULT = 1
+
+
+comm = MPI.COMM_WORLD
+
+
+size = comm.size
+num_slaves = size-1
+num_rows = 1000
+
+# ======================================================================================
+# Master Node
+# ======================================================================================
+if comm.rank == 0:
+
+    # open hdf5 file and get the dataset
+    corpus_hdf5 = h5py.File(corpus_file, 'r')
+    corpus_dataset = corpus_hdf5["sentences"]
+
+    if num_rows == -1:
+        num_rows = len(corpus_dataset)
+
+
+    print("Master Node: preparing data, processing [ %d of %d ]"%(num_rows,len(corpus_dataset)))
+
+    subset_slices = divide_slice(n=num_rows, n_slices=num_slaves)
+
+    print("Sending Tasks to %d nodes"%(num_slaves))
+    # send slices
+    for node in range(1,size):
+        slice_i = node-1
+        comm.send(subset_slices[slice_i],dest=node)
+
+    print("Data Delivered")
+    num_finished = 0
+
+    while num_finished < num_slaves:
+        print("Waiting for results...")
+        status = MPI.Status()
+        data = comm.recv(source=MPI.ANY_SOURCE, status=status)
+        tag = status.Get_tag()
+        source = status.Get_source()
+        if tag == Tags.FINISHED:
+            print("Node %d Finished" % (source))
+            num_finished += 1
+        else:
+            pass
+            #print("Received from %d: " % (source), data)
+
+    print("All Done in root!")
+
+# ======================================================================================
+# Slave Node
+# ======================================================================================
 else:
-    print("slave")
+    subset_slice = comm.recv(source=0)
+    print("Node %d: Processing slice: " % comm.rank, str(subset_slice))
+
+    # open hdf5 file and get the dataset
+    corpus_hdf5 = h5py.File(corpus_file, 'r')
+    corpus_dataset = corpus_hdf5["sentences"]
+
+    sentences = subset_chunk_it(corpus_dataset, subset_slice, chunk_size=1000)
+    pipeline = BNCPipe(datagen=sentences, lemmas=True)
+
+    for sentence in tqdm(pipeline,total=len(subset_slice)):
+        #print("Node %d: " % comm.rank, sentence)
+        pass
+
+    dummy_results = np.arange(10, dtype='i')
+    comm.send(dummy_results, dest=0, tag=Tags.RESULT)
+    time.sleep(2)
+    comm.send("Done", dest=0, tag=Tags.FINISHED)
+
+    corpus_hdf5.close()
