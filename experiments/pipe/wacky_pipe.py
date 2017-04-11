@@ -1,6 +1,6 @@
 from deepsign.nlp import is_token as itk
 from deepsign.utils.listx import match_replace
-from spacy.en import English
+import spacy
 
 # token replacement rules
 replacements = (
@@ -47,7 +47,7 @@ class WaCKyPipe:
 
 
     def reaload(self):
-        self.nlp = English(entity=False, tagger=False, parser=False)
+        self.nlp = spacy.load("en", entity=False, parser=False, vectors=False)
         self.token_gen = self.nlp.pipe(self.datagen, batch_size=10000, n_threads=4)
         #self.token_gen = (self.nlp(sentence) for sentence in self.datagen)
 

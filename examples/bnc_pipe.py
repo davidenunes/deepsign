@@ -5,7 +5,6 @@ from deepsign.utils.views import chunk_it, sliding_windows
 from deepsign.rp.encode import to_bow
 from tqdm import tqdm
 from deepsign.rp.index import SignIndex,Generator
-from joblib import Parallel, delayed
 
 home = os.getenv("HOME")
 
@@ -33,6 +32,6 @@ for s in tqdm(pipeline,total=n_rows):
 
     for window in windows:
         pass
-      #words = window.left + window.right
+        #words = window.left + window.right
         #ris = [index.get_ri(word).to_vector() for word in words]
         bow = to_bow(window,index,include_target=False,normalise=True)

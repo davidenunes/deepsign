@@ -45,7 +45,7 @@ class BNCPipe:
         # I just need the tagger for lemmas
 
         if load_model:
-            self.nlp = spacy.load("en")
+            self.nlp = spacy.load("en", entity=False, parser=False, vectors=False)
         #self.nlp = English(entity=False, parser=False)
         self.token_gen = self.nlp.pipe(datagen, batch_size=4000, n_threads=3)
         #self.token_gen = (self.nlp(sentence) for sentence in self.datagen)
