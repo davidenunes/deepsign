@@ -1,7 +1,7 @@
 from unittest import TestCase
 from deepsign.rp.ri import Generator
 import tensorflow as tf
-from tensorx.models.nrp import NRP
+from tensorx.models.nrp2 import NRP
 from functools import partial
 from deepsign.utils.views import sliding_windows
 from tensorx.layers import Input
@@ -79,62 +79,70 @@ class TestRIEmbeddings(TestCase):
         
         """
 
-        n_rows = 100
-        n_cols = 10
+        n_rows = 8
+        n_cols = 2
 
-        n_active = 4
+        n_active = 2
 
-        full_input = tf.placeholder(dtype=tf.float32, shape=[1,n_rows])
+        full_input = tf.placeholder(dtype=tf.float32, shape=[1, n_rows])
         var1 = tf.Variable(tf.random_uniform(shape=[n_rows, n_cols], minval=-1, maxval=1), name="var1")
 
-        output1 = tf.matmul(full_input,var1)
+        output1 = tf.matmul(full_input, var1)
 
-        id_input = tf.placeholder(dtype=tf.int32, shape=[None,n_active])
+        id_input = tf.placeholder(dtype=tf.int32, shape=[None, n_active])
         var2 = tf.Variable(var1.initialized_value(), name="var2")
-        lookup = tf.nn.embedding_lookup(params=var2,ids=id_input)
+        lookup = tf.nn.embedding_lookup(params=var2, ids=id_input)
 
         # axis = 0 guarantees that we are summing the columns of each vector
-        output2 = tf.reduce_sum(lookup,axis=1)
+        output2 = tf.reduce_sum(lookup, axis=1)
 
         # create a random objective with the same shape as the embeddings
         # the gradient updates should be the same with and without the embedding lookup
 
-        target_out = tf.random_uniform(shape=[1,n_cols], minval=-1, maxval=1, name="target")
+        target_output = np.random.uniform(low=-1, high=1, size=n_cols)
+        target_output = np.asmatrix(target_output)
 
         # create a random input to simulate a RI
         gen = Generator(active=n_active, dim=n_rows)
         ri = gen.generate()
-        ri_indexes = ri.positive+ri.negative
+        ri_indexes = ri.positive + ri.negative
         ri_indexes = np.asmatrix(ri_indexes)
 
         ri_vector = np.zeros(n_rows)
         ri_vector[ri_indexes] = 1
         ri_vector = np.asmatrix(ri_vector)
 
-        print("indexes:", ri_indexes)
-        #print(ri_vector)
-        loss1 = tf.losses.mean_squared_error(labels=target_out,predictions=output1)
-        loss2 = tf.losses.mean_squared_error(labels=target_out,predictions=output2)
+        target_label = tf.placeholder(shape=[1, n_cols], dtype=tf.float32, name="labels")
+        loss1 = tf.losses.mean_squared_error(labels=target_label, predictions=output1)
+        loss2 = tf.losses.mean_squared_error(labels=target_label, predictions=output2)
 
         var1_grad = tf.gradients(loss1, var1)
         var2_grad = tf.gradients(loss2, var2)
-
 
         init = tf.global_variables_initializer()
         with tf.Session() as ss:
             ss.run(init)
 
-            r1 = ss.run(output1,feed_dict={full_input:ri_vector})
-            r2 = ss.run(output2,feed_dict={id_input: ri_indexes})
-            np.testing.assert_array_equal(r1,r2)
+            out1 = ss.run(output1, feed_dict={full_input: ri_vector})
+            out2 = ss.run(output2, feed_dict={id_input: ri_indexes})
+            np.testing.assert_array_equal(out1, out2)
 
-            # the result is the same, but are the gradient updates the same?
-            grads1 = ss.run(var1_grad, feed_dict={full_input:ri_vector})
-            print(grads1)
+            l1 = ss.run(tf.reduce_mean(tf.squared_difference(output1, target_output)),
+                        feed_dict={full_input: ri_vector, target_label: target_output})
+            l2 = ss.run(tf.reduce_mean(tf.squared_difference(output2, target_output)),
+                        feed_dict={id_input: ri_indexes, target_label: target_output})
 
-            grads2 = ss.run(var2_grad, feed_dict={id_input: ri_indexes})
-            print(grads2)
+            self.assertEqual(l1,l2)
 
-            # check if gradient updates are the same
+            # the gradient updates should be the same but the first produces dense gradient updates
+            grads1 = ss.run(var1_grad, feed_dict={full_input: ri_vector, target_label: target_output})
+            grads2 = ss.run(var2_grad, feed_dict={id_input: ri_indexes, target_label: target_output})
+
+            all_grads1 = grads1[0][np.all(grads1[0],axis=1)]
+            all_grads2 = grads2[0].values
+
+            # gradient updates should be the same
+            np.testing.assert_array_equal(all_grads1,all_grads2)
+
 
 

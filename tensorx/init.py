@@ -15,9 +15,10 @@
 
 import numpy as np
 import tensorflow as tf
+from functools import partial
 
 
-def glorot(shape, dtype=tf.float32):
+def glorot_init(shape, dtype=tf.float32):
     """Normalised Weight Initialisation ("Xavier Init").
 
             Keeps the scale of the gradients roughly the same in all layers:
@@ -54,7 +55,7 @@ def glorot(shape, dtype=tf.float32):
                              dtype=dtype)
 
 
-def relu_weight_init(shape,dtype=tf.float32):
+def relu_weight_init(shape, dtype=tf.float32):
     """Initialises the weights with a Gaussian distribution with:
         mu: 0
         sigma: sqrt(2/fan_in)
@@ -69,12 +70,23 @@ def relu_weight_init(shape,dtype=tf.float32):
 
     Args:
         shape: [fan_in, fan_out]
+        :param shape: shape of the tensor to be generated
         :param dtype: tensorflow data type
     """
     [fan_in, fan_out] = shape
     mu = 0
-    sigma = np.sqrt(2.0/fan_in)
+    sigma = np.sqrt(2.0 / fan_in)
     return tf.random_normal((fan_in, fan_out),
                             mean=mu,
                             stddev=sigma,
                             dtype=dtype)
+
+
+def random_uniform_init(shape, dtype=tf.float32):
+    """
+    
+    :param shape: shape of the tensor to be generated 
+    :param dtype: tensorflow data type
+    :return: a new tensor with the given shape with entries initalised to random uniform values between -1 and 1
+    """
+    return tf.random_uniform(shape, minval=-1, maxval=1, dtype=dtype)

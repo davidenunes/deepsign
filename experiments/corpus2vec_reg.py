@@ -15,7 +15,7 @@ from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
 
 import numpy as np
 import tensorflow as tf
-from tensorx.models.nrp import NRPRegression
+from tensorx.models.nrp2 import NRPRegression
 from tensorx.layers import Input
 from functools import partial
 

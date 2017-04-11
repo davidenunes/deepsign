@@ -15,7 +15,7 @@ from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
 
 import numpy as np
 import tensorflow as tf
-from tensorx.models.nrp import NRP
+from tensorx.models.nrp2 import NRP
 from tensorx.layers import Input
 
 from itertools import repeat

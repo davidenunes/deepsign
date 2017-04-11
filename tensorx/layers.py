@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorx.init import glorot
+from tensorx.init import random_uniform_init
 
 
 class Act:
@@ -27,11 +27,52 @@ class Input:
         return self.output
 
 
+class Embeddings:
+    def __init__(self,
+                 input_ids,
+                 n_units,
+                 init=random_uniform_init,
+                 act=None,
+                 bias=False,
+                 weights=None,
+                 name="dense"):
+        self.init = init
+        self.n_units = n_units
+        self.name = name
+        self.weights = weights
+
+        if weights is not None:
+            (_, s) = weights.get_shape()
+            if s != n_units:
+                raise ValueError("shape mismatch: layer expects (,{}), weights have (,{})".format(n_units, s))
+
+        with tf.variable_scope(name):
+            if weights is None:
+                self.weights = tf.get_variable("w", initializer=init(shape=[input_ids.n_units, self.n_units]))
+
+            w = self.weights
+
+            lookup = tf.nn.embedding_lookup(params=w, ids=input_ids(), name="Embeddings")
+            y = tf.reduce_sum(lookup, axis=1)
+
+            if bias:
+                b = tf.get_variable("b", initializer=tf.zeros([n_units]))
+                y = tf.nn.bias_add(y, b, name="output")
+
+            if act is not None:
+                y = act(y, name="y")
+
+            self.output = y
+
+    def __call__(self):
+        return self.output
+
+
 class Dense:
     def __init__(self,
                  input_layer,
                  n_units,
-                 init=None,
+                 init=random_uniform_init,
                  act=None,
                  bias=False,
                  weights=None,
