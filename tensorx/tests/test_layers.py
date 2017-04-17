@@ -3,7 +3,7 @@ import tensorflow as tf
 from typing import re
 from deepsign.rp.ri import Generator
 
-from tensorx.layers import Input, FeatureInput, Dense, Act, Embeddings
+from tensorx.layers import Input, FeatureInput, Dense, Act, Embeddings, Merge
 from tensorx.init import glorot_init
 import numpy as np
 
@@ -82,3 +82,59 @@ class TestLayers(TestCase):
             result2 = ss.run(embeddings(), feed_dict={input_ids(): ri_indexes})
 
             np.testing.assert_array_equal(result1, result2)
+
+    def test_merge(self):
+        n_active = 2
+        dim = 4
+        h = 2
+
+        # create a random input to simulate a RI
+        gen = Generator(active=n_active, dim=dim)
+        ri = gen.generate()
+        ri_indexes = ri.positive + ri.negative
+        ri_indexes = np.asmatrix(ri_indexes)
+
+        ri_vector = np.zeros(dim)
+        ri_vector[ri_indexes] = 1
+        ri_vector = np.asmatrix(ri_vector)
+
+        # network
+        pos_input = FeatureInput(n_units=dim, n_active=len(ri.positive), dtype=tf.int32)
+        neg_input = FeatureInput(n_units=dim, n_active=len(ri.negative), dtype=tf.int32)
+
+
+        pos_features = Embeddings(pos_input,h,bias=False)
+        neg_features = Embeddings(neg_input,h,weights=pos_features.weights,bias=False)
+        out1 = Merge([pos_features,neg_features],weights=[1,-1],bias=True)
+
+        init = tf.global_variables_initializer()
+        feed = {pos_input(): [ri.positive], neg_input(): [ri.negative]}
+
+        #saver = tf.train.Saver()
+        writer = tf.summary.FileWriter("/home/davex32/tmp/")
+
+        with tf.Session() as ss:
+            ss.run(init)
+
+            print("pos: ",ri.positive)
+            print("neg: ",ri.negative)
+
+            w = ss.run(pos_features.weights,feed_dict=feed)
+            print("w:\n", w)
+
+
+            out = ss.run(out1(),feed_dict=feed)
+            print("selected: \n", out)
+            writer.add_graph(ss.graph)
+            writer.flush()
+
+        
+
+
+
+
+
+
+
+
+
