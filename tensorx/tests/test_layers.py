@@ -3,7 +3,7 @@ import tensorflow as tf
 from typing import re
 from deepsign.rp.ri import Generator
 
-from tensorx.layers import Input, Dense, Act, Embeddings
+from tensorx.layers import Input, FeatureInput, Dense, Act, Embeddings
 from tensorx.init import glorot_init
 import numpy as np
 
@@ -61,7 +61,7 @@ class TestLayers(TestCase):
         ri_vector[ri_indexes] = 1
         ri_vector = np.asmatrix(ri_vector)
 
-        input_ids = Input(n_active, dtype=tf.int32)
+        input_ids = FeatureInput(n_units=dim,n_active=n_active, dtype=tf.int32)
         input_full = Input(dim, dtype=tf.float32)
 
         dense = Dense(input_full, 2, act=Act.sigmoid, bias=True, name="dense")
