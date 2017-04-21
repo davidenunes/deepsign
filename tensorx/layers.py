@@ -100,6 +100,13 @@ class Merge:
         return self.output
 
 
+class FeatureNoise:
+    """
+    Creates a noise layer that activates or deactivates entries in a Feature Input Layer
+    """
+
+
+
 class Embeddings:
     def __init__(self,
                  features,
