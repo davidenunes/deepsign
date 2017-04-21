@@ -65,7 +65,11 @@ class TestLayers(TestCase):
         input_full = Input(dim, dtype=tf.float32)
 
         dense = Dense(input_full, 2, act=Act.sigmoid, bias=True, name="dense")
-        embeddings = Embeddings(input_ids, 2, weights=dense.weights, act=Act.sigmoid, bias=True, name="embed")
+        embeddings = Embeddings(input_ids, 2,
+                                weights=dense.weights,
+                                act=Act.sigmoid,
+                                bias=True,
+                                name="embed")
 
         init = tf.global_variables_initializer()
 

@@ -30,8 +30,11 @@ class Input:
 class FeatureInput:
     """
     Feature input creates a placeholder to receive n_active of n_units 
-    active binary features
+    active binary features. Essentially it is like a sparse binary vector
+    which only receives the ids of the active entries but where we need to 
+    know the original number of dimensions (n_units)
     """
+
     def __init__(self,
                  n_units,
                  n_active,
@@ -53,9 +56,19 @@ class FeatureInput:
 
 
 class Merge:
+    """
+    Merges a list of given layers using the provided merging function. Each layer can also be weighted and its outputs 
+    will be the result of multiplying the layer output by the respective weight. 
+    
+    This is just a container that for convenience takes the output of each given layer (which is generaly a tensor), 
+    and applies a merging function. 
+    
+    This layer also encapsulates a bias variable along with a possible activation function to be applied to the result
+    of the merge.
+    """
     def __init__(self,
                  layers,
-                 weights = None,
+                 weights=None,
                  merge_fn=tf.add_n,
                  act=None,
                  bias=False,
@@ -83,7 +96,7 @@ class Merge:
         with tf.variable_scope(name):
             if weights is not None:
                 for i in range(len(layers)):
-                    layers[i] = tf.scalar_mul(weights[i],layers[i].output)
+                    layers[i] = tf.scalar_mul(weights[i], layers[i].output)
 
             y = merge_fn(layers)
 
@@ -101,6 +114,10 @@ class Merge:
 
 
 class Embeddings:
+    """
+    The embeddings layer works like a dense layer and produces a "weights" variable 
+    but takes a FeatureInput layer as input instead of an Input layer
+    """
     def __init__(self,
                  features,
                  n_units,

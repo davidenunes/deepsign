@@ -144,5 +144,3 @@ class TestRIEmbeddings(TestCase):
             # gradient updates should be the same
             np.testing.assert_array_equal(all_grads1,all_grads2)
 
-
-
