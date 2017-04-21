@@ -6,6 +6,7 @@ from deepsign.rp.ri import Generator
 from tensorx.layers import Input, FeatureInput, Dense, Act, Embeddings, Merge
 from tensorx.init import glorot_init
 import numpy as np
+import tensorx.utils.io as txio
 
 
 class TestLayers(TestCase):
@@ -115,7 +116,7 @@ class TestLayers(TestCase):
         feed = {pos_input(): [ri.positive], neg_input(): [ri.negative]}
 
         #saver = tf.train.Saver()
-        writer = tf.summary.FileWriter("/home/davex32/tmp/")
+
 
         with tf.Session() as ss:
             ss.run(init)
@@ -129,10 +130,9 @@ class TestLayers(TestCase):
 
             out = ss.run(out1(),feed_dict=feed)
             print("selected: \n", out)
-            writer.add_graph(ss.graph)
-            writer.flush()
 
-        
+            txio.save_graph(ss,"/home/davex32/tmp")
+
 
 
 

@@ -113,6 +113,13 @@ class Merge:
         return self.output
 
 
+class FeatureNoise:
+    """
+    Creates a noise layer that activates or deactivates entries in a Feature Input Layer
+    """
+
+
+
 class Embeddings:
     """
     The embeddings layer works like a dense layer and produces a "weights" variable 
