@@ -13,5 +13,9 @@ class TestCreateNoise(TestCase):
         drop = tf.nn.dropout(tf.ones([10]),keep_prob=0.5)
 
         with tf.Session() as ss:
-            r = ss.run(sample)
-            print(r)
+
+            perm = tf.map_fn(lambda i: tf.random_uniform([1],minval=i,maxval=10,dtype=tf.int64),tf.cast(tf.range(0,4),tf.int64))
+            perm = tf.reshape(perm,[-1])
+
+
+            print(ss.run(perm))
