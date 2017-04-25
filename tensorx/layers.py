@@ -29,7 +29,42 @@ class Input:
 
 class FeatureInput:
     """
-    Feature input creates a placeholder to receive n_active of n_units 
+       FeatureInput input creates a placeholder to receive n_active of n_units 
+       active binary features. Essentially it is like a sparse binary vector
+       which only receives the ids of the active entries but where we need to 
+       know the original number of dimensions (n_units)
+    """
+
+    def __init__(self,
+                 n_units,
+                 n_active,
+                 dtype=tf.int32,
+                 name="input"):
+        """
+
+        :param n_units: total number of output units (dense shape cols) 
+        :param n_active: number of input indexes 
+        :param dtype: 
+        :param name: 
+        """
+        self.name = name
+        self.dtype = dtype
+        self.n_units = n_units
+        self.n_active = n_active
+        self.shape = [None, n_active]
+        self.dense_shape = [None, n_units]
+
+        self.output = tf.placeholder(dtype=dtype,
+                                     shape=self.shape,
+                                     name=self.name)
+
+    def __call__(self):
+        return self.output
+
+
+class SparseInput:
+    """
+    SparseInput input creates a placeholder to receive n_active of n_units 
     active binary features. Essentially it is like a sparse binary vector
     which only receives the ids of the active entries but where we need to 
     know the original number of dimensions (n_units)
@@ -37,22 +72,39 @@ class FeatureInput:
 
     def __init__(self,
                  n_units,
-                 n_active,
+                 values=False,
                  dtype=tf.float32,
                  name="input"):
-        self.feed_key = name + ":0"
-        self.n_units = n_units
-        self.n_active = n_active
-
-        self.dtype = dtype
+        """
+        
+        :param n_units: total number of output units (dense shape cols) 
+        :param values: if True creates a placeholder to receive values
+        :param dtype: tensorflow data type
+        :param name: name of this layer which is used to assign a name to the input placeholder
+        """
         self.name = name
+        self.dtype = dtype
+        self.n_units = n_units
+        self.shape = [None, self.n_units]
 
-        self.output = tf.placeholder(dtype=self.dtype,
-                                     shape=[None, self.n_active],
-                                     name=self.name)
+        self.indices = tf.sparse_placeholder(dtype=tf.int64,
+                                             shape=[None, n_units],
+                                             name=name + "_indices")
 
+        if values:
+            self.values = tf.sparse_placeholder(dtype=dtype,
+                                                shape=[None, n_units],
+                                                name=name + "_indices")
+        else:
+            self.values = None
+
+    # TODO review the api for this, perhaps we can have a method .tensors() that returns an iterable
+    # otherwise the semantics for the output of each layer have to be organised differently
     def __call__(self):
-        return self.output
+        if not self.values:
+            return self.indices
+        else:
+            return self.indices, self.values
 
 
 class Merge:
@@ -66,6 +118,7 @@ class Merge:
     This layer also encapsulates a bias variable along with a possible activation function to be applied to the result
     of the merge.
     """
+
     def __init__(self,
                  layers,
                  weights=None,
@@ -113,18 +166,12 @@ class Merge:
         return self.output
 
 
-class FeatureNoise:
-    """
-    Creates a noise layer that activates or deactivates entries in a Feature Input Layer
-    """
-
-
-
 class Embeddings:
     """
     The embeddings layer works like a dense layer and produces a "weights" variable 
     but takes a FeatureInput layer as input instead of an Input layer
     """
+
     def __init__(self,
                  features,
                  n_units,

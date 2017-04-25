@@ -1,12 +1,21 @@
 from unittest import TestCase
 import tensorflow as tf
-from typing import re
-from deepsign.rp.ri import Generator
 
-from tensorx.layers import Input, FeatureInput, Dense, Act, Embeddings, Merge
+from tensorx.layers import Input, SparseInput, Dense, Act, Embeddings, Merge, FeatureInput
 from tensorx.init import glorot_init
 import numpy as np
 import tensorx.utils.io as txio
+import random
+from tensorx.utils import views
+
+def generate(dim, num_active):
+    active_indexes = random.sample(range(dim), num_active)
+
+    num_positive = num_active // 2
+    positive = active_indexes[0:num_positive]
+    negative = active_indexes[num_positive:len(active_indexes)]
+
+    return (positive, negative)
 
 
 class TestLayers(TestCase):
@@ -53,16 +62,16 @@ class TestLayers(TestCase):
         dim = 8
 
         # create a random input to simulate a RI
-        gen = Generator(active=n_active, dim=dim)
-        ri = gen.generate()
-        ri_indexes = ri.positive + ri.negative
+
+        (positive, negative) = generate(dim, n_active)
+        ri_indexes = positive + negative
         ri_indexes = np.asmatrix(ri_indexes)
 
         ri_vector = np.zeros(dim)
         ri_vector[ri_indexes] = 1
         ri_vector = np.asmatrix(ri_vector)
 
-        input_ids = FeatureInput(n_units=dim,n_active=n_active, dtype=tf.int32)
+        input_ids = SparseInput(n_units=dim, n_active=n_active, dtype=tf.int32)
         input_full = Input(dim, dtype=tf.float32)
 
         dense = Dense(input_full, 2, act=Act.sigmoid, bias=True, name="dense")
@@ -94,9 +103,8 @@ class TestLayers(TestCase):
         h = 2
 
         # create a random input to simulate a RI
-        gen = Generator(active=n_active, dim=dim)
-        ri = gen.generate()
-        ri_indexes = ri.positive + ri.negative
+        (positive, negative) = generate(dim, n_active)
+        ri_indexes = positive, negative
         ri_indexes = np.asmatrix(ri_indexes)
 
         ri_vector = np.zeros(dim)
@@ -104,41 +112,50 @@ class TestLayers(TestCase):
         ri_vector = np.asmatrix(ri_vector)
 
         # network
-        pos_input = FeatureInput(n_units=dim, n_active=len(ri.positive), dtype=tf.int32)
-        neg_input = FeatureInput(n_units=dim, n_active=len(ri.negative), dtype=tf.int32)
+        pos_input = FeatureInput(n_units=dim, n_active=len(positive), dtype=tf.int32)
+        neg_input = FeatureInput(n_units=dim, n_active=len(negative), dtype=tf.int32)
 
-
-        pos_features = Embeddings(pos_input,h,bias=False)
-        neg_features = Embeddings(neg_input,h,weights=pos_features.weights,bias=False)
-        out1 = Merge([pos_features,neg_features],weights=[1,-1],bias=True)
+        pos_features = Embeddings(pos_input, h, bias=False)
+        neg_features = Embeddings(neg_input, h, weights=pos_features.weights, bias=False)
+        out1 = Merge([pos_features, neg_features], weights=[1, -1], bias=True)
 
         init = tf.global_variables_initializer()
-        feed = {pos_input(): [ri.positive], neg_input(): [ri.negative]}
+        feed = {pos_input(): [positive], neg_input(): [negative]}
 
-        #saver = tf.train.Saver()
+        # saver = tf.train.Saver()
 
 
         with tf.Session() as ss:
             ss.run(init)
 
-            print("pos: ",ri.positive)
-            print("neg: ",ri.negative)
+            print("pos: ", positive)
+            print("neg: ", negative)
 
-            w = ss.run(pos_features.weights,feed_dict=feed)
+            w = ss.run(pos_features.weights, feed_dict=feed)
             print("w:\n", w)
 
-
-            out = ss.run(out1(),feed_dict=feed)
+            out = ss.run(out1(), feed_dict=feed)
             print("selected: \n", out)
 
-            txio.save_graph(ss,"/home/davex32/tmp")
+            txio.save_graph(ss, "/home/davex32/tmp")
 
+    def test_sparse_input(self):
+        dim = 10
+        active = 4
 
+        (positive, negative) = generate(dim, active)
+        indices = positive + negative
+        values = np.random.rand(active)
 
+        indices = [indices]
 
+        shape = np.array([1, dim], dtype=np.int64)
+        indices = views.indices_to_sparse(indices,shape)
+        values = views.values_to_sparse(values,indices.indices,shape)
 
+        sp_input = SparseInput(n_units=dim,values=True)
+        with tf.Session() as ss:
+            result = ss.run(tf.scalar_mul(2,sp_input()[0]), feed_dict={sp_input.indices: indices,
+                                                   sp_input.values: values})
 
-
-
-
-
+            print(result)
