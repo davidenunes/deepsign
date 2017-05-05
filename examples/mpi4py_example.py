@@ -2,8 +2,6 @@
 
 """ Run with
     mpirun -n 10 python -m scripts.parallel.word_frequency
-
-    Using mpi4py to train tensorflow models in parallel Asynchronously
 """
 from mpi4py import MPI
 
@@ -28,8 +26,6 @@ class Tags():
     FINISHED = 0
     RESULT = 1
 
-
-comm = MPI.COMM_WORLD
 
 
 size = comm.size

@@ -6,7 +6,7 @@ from tensorx.init import glorot_init
 import numpy as np
 import tensorx.utils.io as txio
 import random
-from tensorx.utils import views
+from tensorx.utils import transform
 
 def generate(dim, num_active):
     active_indexes = random.sample(range(dim), num_active)
@@ -150,8 +150,8 @@ class TestLayers(TestCase):
         indices = [indices]
 
         shape = np.array([1, dim], dtype=np.int64)
-        indices = views.indices_to_sparse(indices,shape)
-        values = views.values_to_sparse(values,indices.indices,shape)
+        indices = transform.indices_to_sparse(indices, shape)
+        values = transform.values_to_sparse(values, indices.indices, shape)
 
         sp_input = SparseInput(n_units=dim,values=True)
         with tf.Session() as ss:
