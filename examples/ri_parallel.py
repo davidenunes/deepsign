@@ -1,15 +1,16 @@
-import h5py
-from deepsign.utils.views import subset_chunk_it
-from deepsign.nlp.tokenization import Tokenizer
-from experiments.pipe.wacky_pipe import WaCKyPipe
-from deepsign.utils.views import sliding_windows, np_to_sparse, divide_slice
-from deepsign.rp.encode import to_bow
-from deepsign.rp.ri import Generator
-from deepsign.rp.index import TrieSignIndex
-from tqdm import tqdm
 import os
+from multiprocessing import Pool
 
-from multiprocessing import Pool,Lock
+import h5py
+from tqdm import tqdm
+
+from deepsign.io.corpora.pipe import WaCKyPipe
+from deepsign.nlp.tokenization import Tokenizer
+from deepsign.rp.encode import to_bow
+from deepsign.rp.index import TrieSignIndex
+from deepsign.rp.ri import Generator
+from deepsign.utils.views import sliding_windows, np_to_sparse, divide_slice
+from deepsign.utils.views import subset_chunk_it
 
 # global for sign index
 sign_index = None

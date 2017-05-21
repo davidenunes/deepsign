@@ -1,23 +1,21 @@
 import os
 import sys
+from functools import partial
+
 import h5py
-from tqdm import tqdm
-
-from experiments.pipe.bnc_pipe import BNCPipe
-from deepsign.utils.views import chunk_it
-from deepsign.rp.index import TrieSignIndex
-from deepsign.rp.ri import Generator
-
-from deepsign.utils.views import sliding_windows
-
-from deepsign.rp.encode import to_bow
-from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
-
 import numpy as np
 import tensorflow as tf
-from tensorx.models.nrp2 import NRPRegression
+from tqdm import tqdm
+
+from deepsign.io.corpora.pipe import BNCPipe
+from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
+from deepsign.rp.encode import to_bow
+from deepsign.rp.index import TrieSignIndex
+from deepsign.rp.ri import Generator
+from deepsign.utils.views import chunk_it
+from deepsign.utils.views import sliding_windows
 from tensorx.layers import Input
-from functools import partial
+from tensorx.models.nrp2 import NRPRegression
 
 # ======================================================================================
 # util fn

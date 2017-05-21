@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
-import h5py
+import argparse
 import os.path
+from collections import Counter
+from multiprocessing import Pool
+
+import h5py
 import numpy as np
 from tqdm import tqdm
-from collections import Counter
 
-from deepsign.nlp.tokenization import Tokenizer
+from deepsign.io.corpora.pipe import BNCPipe
 from deepsign.utils.views import subset_chunk_it, divide_slice
-from experiments.pipe.bnc_pipe import BNCPipe
-from multiprocessing import Pool
-import argparse
+
 
 def word_frequencies(args):
     """

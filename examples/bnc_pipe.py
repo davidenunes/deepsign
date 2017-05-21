@@ -1,10 +1,12 @@
-import h5py
 import os
-from experiments.pipe.bnc_pipe import BNCPipe
-from deepsign.utils.views import chunk_it, sliding_windows
-from deepsign.rp.encode import to_bow
+
+import h5py
 from tqdm import tqdm
-from deepsign.rp.index import SignIndex,Generator
+
+from deepsign.io.corpora.pipe import BNCPipe
+from deepsign.rp.encode import to_bow
+from deepsign.rp.index import SignIndex, Generator
+from deepsign.utils.views import chunk_it, sliding_windows
 
 home = os.getenv("HOME")
 

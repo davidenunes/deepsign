@@ -3,15 +3,16 @@
 """ Run with
     mpirun -n 10 python -m scripts.parallel.word_frequency
 """
-from mpi4py import MPI
-
-import time
-from deepsign.utils.views import divide_slice, subset_chunk_it
-import numpy as np
-import h5py
 import os
+import time
+
+import h5py
+import numpy as np
+from mpi4py import MPI
 from tqdm import tqdm
-from experiments.pipe.bnc_pipe import BNCPipe
+
+from deepsign.io.corpora.pipe import BNCPipe
+from deepsign.utils.views import divide_slice, subset_chunk_it
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()

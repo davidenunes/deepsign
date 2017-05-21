@@ -38,6 +38,7 @@ class FeatureInput:
     def __init__(self,
                  n_units,
                  n_active,
+                 batch_size=None,
                  dtype=tf.int32,
                  name="input"):
         """
@@ -51,8 +52,8 @@ class FeatureInput:
         self.dtype = dtype
         self.n_units = n_units
         self.n_active = n_active
-        self.shape = [None, n_active]
-        self.dense_shape = [None, n_units]
+        self.shape = [batch_size, n_active]
+        self.dense_shape = [batch_size, n_units]
 
         self.output = tf.placeholder(dtype=dtype,
                                      shape=self.shape,
@@ -60,6 +61,13 @@ class FeatureInput:
 
     def __call__(self):
         return self.output
+
+    def one_hot(self):
+        """
+        Converts an index or a list of indexes along with a dimension 
+        to a vector or list of one-hot-encoding vectors
+        """
+        return tf.one_hot(self.output, self.n_units)
 
 
 class SparseInput:
@@ -201,8 +209,9 @@ class Embeddings:
 
             w = self.weights
 
-            lookup = tf.nn.embedding_lookup(params=w, ids=features(), name="Embeddings")
-            y = tf.reduce_sum(lookup, axis=1)
+            self.lookup = tf.nn.embedding_lookup(params=w, ids=features(), name="Embeddings")
+
+            y = tf.reduce_sum(self.lookup, axis=1)
 
             if bias:
                 b = tf.get_variable("b", initializer=tf.zeros([n_units]))
@@ -215,6 +224,9 @@ class Embeddings:
 
     def __call__(self):
         return self.output
+
+    def lookup(self):
+        return self.lookup
 
 
 class Dense:
@@ -230,6 +242,7 @@ class Dense:
         self.n_units = n_units
         self.name = name
         self.weights = weights
+        self.bias = None
 
         if weights is not None:
             (_, s) = weights.get_shape()
@@ -244,8 +257,8 @@ class Dense:
             y = tf.matmul(input_layer(), w)
 
             if bias:
-                b = tf.get_variable("b", initializer=tf.zeros([n_units]))
-                y = tf.nn.bias_add(y, b, name="o")
+                self.bias = tf.get_variable("b", initializer=tf.zeros([n_units]))
+                y = tf.nn.bias_add(y, self.bias, name="o")
 
             if act is not None:
                 y = act(y, name="y")

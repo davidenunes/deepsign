@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
-import h5py
 import os.path
-import numpy as np
-from tqdm import tqdm
 from collections import Counter
 
+import h5py
+import numpy as np
+from tqdm import tqdm
+
+from deepsign.io.corpora.pipe import WaCKyPipe
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.utils.views import chunk_it
-from experiments.pipe.wacky_pipe import WaCKyPipe
 
 
 def build_vocabulary(corpus_file, output_file=None, max_sentences=0):

@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import h5py
 import os.path
+from collections import Counter
+from multiprocessing import Pool
+
+import h5py
 import numpy as np
 from tqdm import tqdm
-from collections import Counter
 
-from deepsign.nlp.tokenization import Tokenizer
+from deepsign.io.corpora.pipe import WaCKyPipe
 from deepsign.utils.views import subset_chunk_it, divide_slice
-from experiments.pipe.wacky_pipe import WaCKyPipe
-from multiprocessing import Pool
 
 
 def word_frequencies(args):
