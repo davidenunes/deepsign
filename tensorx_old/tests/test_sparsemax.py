@@ -1,4 +1,4 @@
-from tensorx.sparsemax import sparsemax, sparsemax_loss
+from tensorx_old.sparsemax import sparsemax, sparsemax_loss
 import tensorflow as tf
 import numpy as np
 

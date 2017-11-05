@@ -21,7 +21,7 @@ from tensorflow.python.ops import gradient_checker
 from tensorflow.python.ops import gradients_impl
 from tensorflow.python.platform import test
 
-from tensorx.sparsemax import sparsemax
+from tensorx_old.sparsemax import sparsemax
 
 test_obs = 10
 

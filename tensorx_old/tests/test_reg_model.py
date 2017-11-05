@@ -1,5 +1,5 @@
-from tensorx.layers import Input
-from tensorx.models.nrp2 import NRPRegression
+from tensorx_old.layers import Input
+from tensorx_old.models.nrp2 import NRPRegression
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 

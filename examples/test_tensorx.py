@@ -1,6 +1,6 @@
-from tensorx.layers import Input
-from tensorx.models.nrp2 import NRP
-from tensorx.init import glorot_init
+from tensorx_old.layers import Input
+from tensorx_old.models.nrp2 import NRP
+from tensorx_old.init import glorot_init
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 

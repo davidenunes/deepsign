@@ -1,7 +1,7 @@
 from unittest import TestCase
 import tensorflow as tf
 import numpy as np
-from tensorx.layers import Dense, Embeddings
+from tensorx_old.layers import Dense, Embeddings
 from deepsign.rp.ri import Generator, RandomIndex
 
 

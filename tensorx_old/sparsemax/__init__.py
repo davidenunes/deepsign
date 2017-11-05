@@ -24,8 +24,8 @@
 
 from tensorflow.python.util.all_util import remove_undocumented
 
-from tensorx.sparsemax.sparsemax_loss import sparsemax_loss
-from tensorx.sparsemax.sparsemax import sparsemax
+from tensorx_old.sparsemax.sparsemax_loss import sparsemax_loss
+from tensorx_old.sparsemax.sparsemax import sparsemax
 
 _allowed_symbols = ['sparsemax', 'sparsemax_loss']
 

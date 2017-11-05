@@ -1,4 +1,4 @@
-from tensorx.models.word2vec import SkipGram
+from tensorx_old.models.word2vec import SkipGram
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
 from deepsign.utils.views import sliding_windows

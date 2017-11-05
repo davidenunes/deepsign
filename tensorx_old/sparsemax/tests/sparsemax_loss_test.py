@@ -20,8 +20,8 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gradient_checker
 from tensorflow.python.ops import gradients_impl
 from tensorflow.python.platform import test
-from tensorx.sparsemax import sparsemax
-from tensorx.sparsemax import sparsemax_loss
+from tensorx_old.sparsemax import sparsemax
+from tensorx_old.sparsemax import sparsemax_loss
 
 test_obs = 10
 

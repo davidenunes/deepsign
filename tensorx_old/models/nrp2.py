@@ -4,10 +4,10 @@ from functools import partial
 import numpy as np
 import tensorflow as tf
 
-from tensorx.init import glorot_init, random_uniform_init
-from tensorx.layers import Input, Dense, Act
-from tensorx.sparsemax.sparsemax import sparsemax
-from tensorx.sparsemax.sparsemax_loss import sparsemax_loss
+from tensorx_old.init import glorot_init, random_uniform_init
+from tensorx_old.layers import Input, Dense, Act
+from tensorx_old.sparsemax.sparsemax import sparsemax
+from tensorx_old.sparsemax.sparsemax_loss import sparsemax_loss
 
 
 class ANN:
@@ -78,7 +78,7 @@ class NRPSigmoid(ANN):
         :return:
         """
         if not (isinstance(labels_p, Input) and isinstance(labels_n, Input)):
-            raise ValueError("labels need to be tensorx.layers.Input instances")
+            raise ValueError("labels need to be tensorx_old.layers.Input instances")
 
         loss_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_p(), logits=self.yp()))
         loss_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_n(), logits=self.yn()))
@@ -133,7 +133,7 @@ class NRPRegression(ANN):
         :return:
         """
         if not isinstance(labels_out, Input):
-            raise ValueError("labels need to be tensorx.layers.Input instances")
+            raise ValueError("labels need to be tensorx_old.layers.Input instances")
 
         loss_reg = tf.reduce_mean(tf.squared_difference(labels_out(), self.y()))
 
@@ -250,12 +250,12 @@ class NRP(ANN):
 
     def get_loss(self,labels_out):
         if not isinstance(labels_out, Input):
-            raise ValueError("labels need to be tensorx.layers.Input instances")
+            raise ValueError("labels need to be tensorx_old.layers.Input instances")
         return tf.reduce_mean(sparsemax_loss(self.logits(), self.y, labels_out()))
 
     def get_softmax_loss(self, labels_out):
         if not isinstance(labels_out, Input):
-            raise ValueError("labels need to be tensorx.layers.Input instances")
+            raise ValueError("labels need to be tensorx_old.layers.Input instances")
         return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels_out(),logits=self.logits()))
 
 

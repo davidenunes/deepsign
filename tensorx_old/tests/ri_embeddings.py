@@ -1,10 +1,10 @@
 from unittest import TestCase
 from deepsign.rp.ri import Generator
 import tensorflow as tf
-from tensorx.models.nrp2 import NRP
+from tensorx_old.models.nrp2 import NRP
 from functools import partial
 from deepsign.utils.views import sliding_windows
-from tensorx.layers import Input
+from tensorx_old.layers import Input
 import numpy as np
 
 

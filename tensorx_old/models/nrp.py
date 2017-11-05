@@ -1,7 +1,7 @@
 
 import tensorflow as tf
-from tensorx.init import glorot_init, random_uniform_init
-from tensorx.layers import Input, Dense, Act, Embeddings, SparseInput
+from tensorx_old.init import glorot_init, random_uniform_init
+from tensorx_old.layers import Input, Dense, Act, Embeddings, SparseInput
 
 
 class NRPDAE:

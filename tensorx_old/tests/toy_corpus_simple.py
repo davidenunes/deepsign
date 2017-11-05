@@ -1,5 +1,5 @@
-from tensorx.layers import Input
-from tensorx.models.nrp2 import NRPRegression, NRP
+from tensorx_old.layers import Input
+from tensorx_old.models.nrp2 import NRPRegression, NRP
 from deepsign.rp.ri import Generator as RIGen
 import numpy as np
 from deepsign.utils.views import sliding_windows

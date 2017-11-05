@@ -1,12 +1,12 @@
 from unittest import TestCase
 import tensorflow as tf
 
-from tensorx.layers import Input, SparseInput, Dense, Act, Embeddings, Merge, FeatureInput
-from tensorx.init import glorot_init
+from tensorx_old.layers import Input, SparseInput, Dense, Act, Embeddings, Merge, FeatureInput
+from tensorx_old.init import glorot_init
 import numpy as np
-import tensorx.utils.io as txio
+import tensorx_old.utils.io as txio
 import random
-from tensorx.utils import transform
+from tensorx_old.utils import transform
 
 def generate(dim, num_active):
     active_indexes = random.sample(range(dim), num_active)

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorx.init import random_uniform_init
+from tensorx_old.init import random_uniform_init
 
 
 class Act:

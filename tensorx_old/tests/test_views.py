@@ -1,5 +1,5 @@
 from unittest import TestCase
-from tensorx.utils import transform
+from tensorx_old.utils import transform
 import numpy as np
 
 class TestViews(TestCase):

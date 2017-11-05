@@ -1,6 +1,6 @@
 import os
 import tensorflow as tf
-from tensorx.models.nrp2 import NRP
+from tensorx_old.models.nrp2 import NRP
 import numpy as np
 
 

@@ -14,8 +14,8 @@ from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
 from deepsign.utils.views import chunk_it
 from deepsign.utils.views import sliding_windows
-from tensorx.layers import Input
-from tensorx.models.nrp2 import NRPRegression
+from tensorx_old.layers import Input
+from tensorx_old.models.nrp2 import NRPRegression
 
 # ======================================================================================
 # util fn

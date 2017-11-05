@@ -1,5 +1,5 @@
-from tensorx.layers import FeatureInput, Embeddings, Dense
-from tensorx.init import glorot_init,random_uniform_init
+from tensorx_old.layers import FeatureInput, Embeddings, Dense
+from tensorx_old.init import glorot_init,random_uniform_init
 import tensorflow as tf
 import math
 

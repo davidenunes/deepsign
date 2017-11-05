@@ -1,7 +1,7 @@
 from unittest import TestCase
 import tensorflow as tf
 import numpy as np
-from tensorx.models.nrp2 import NRP
+from tensorx_old.models.nrp2 import NRP
 import os
 
 
