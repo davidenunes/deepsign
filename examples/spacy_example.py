@@ -1,63 +1,65 @@
-from spacy.en import English
-import spacy.parts_of_speech as POS
-from spacy.strings import StringStore
-from spacy.tokens import Doc
+import spacy
+import time
 
-from spacy.en import Tokenizer
+from spacy import parts_of_speech as PoS
+from spacy.vocab import Vocab
 
+print("loading spacy")
+t0 = time.time()
+nlp = spacy.load('en', vocab=Vocab(lex_attr_getters=None))
+t1 = time.time()
+print("model loaded in {t:.4f} seconds".format(t=t1 - t0))
 
-print("Loading English Model...")
-nlp =  English()
-print("Done!")
+print("Vocab. Size: ", len(nlp.vocab.strings))
 
-print("Vocab. Size: ",len(nlp.vocab.strings))
-print("hello" in nlp.vocab.strings)
+print("PoS Tagging:")
+print("tags \n")
+for tag in PoS.NAMES:
+    print(nlp.vocab.strings[tag])
 
+print("==========================================")
+sentence = "Mr Anderson welcome back, we missed you!"
+doc = nlp.tokenizer(sentence)
 
-print("Available Parts-Of-Speech:")
-print(POS.NAMES)
+print(doc)
+doc = nlp.tagger(doc)
+for word in doc:
+    print("({w},{t})".format(w=word.orth_, t=word.tag_))
 
-VERB = nlp.vocab.strings['VERB']
-print(VERB)
+print("Vocab. Size: ", len(nlp.vocab.strings))
 
-#loads the entire nlp pipeline with parser, named-entity recognition, pos tagger
-tokens = nlp(u'Mr Anderson, welcome back, we missed you.')
-print(tokens)
-
-
-
+doc = nlp(sentence)
 
 
 def print_subtree(token):
     print("token in head")
-    print("(" + token.orth_ + "(" + token.pos_ + ")--->" + token.dep_ + "--->" + token.head.orth_ + ")")
-    if token.dep_ =="pobj":
+    print("(" + token.orth_ + "(" + token.pos_ + ")->" + token.dep_ + "->" + token.head.orth_ + ")")
+    if token.dep_ == "pobj":
         print("following preposition path")
         for c in token.head.head.children:
-            print("(" + c.orth_ + "(" + c.pos_ + ")--->" + c.dep_ + "--->" + c.head.orth_ + ")")
+            print("(" + c.orth_ + "(" + c.pos_ + ")->" + c.dep_ + "->" + c.head.orth_ + ")")
 
     print("tokens in children")
     for c in token.children:
-        print("(" + c.orth_ + "(" + c.pos_ + ")--->" + c.dep_ + "--->" + c.head.orth_ + ")")
+        print("(" + c.orth_ + "(" + c.pos_ + ")->" + c.dep_ + "->" + c.head.orth_ + ")")
 
     print("siblings")
     for c in token.head.children:
-        print("(" + c.orth_ + "(" + c.pos_ + ")--->" + c.dep_ + "--->" + c.head.orth_ + ")")
+        print("(" + c.orth_ + "(" + c.pos_ + ")->" + c.dep_ + "->" + c.head.orth_ + ")")
 
 
-token = tokens[3]
-print_subtree(token)
-
+#token = doc[3]
+print_subtree(doc[2])
 
 # for more examples https://spacy.io/docs#token
 
-token = tokens[0]
+token = doc[0]
 
-print(token.dep_+"("+token.head.orth_+","+token.orth_+")")
+print(token.dep_ + "(" + token.head.orth_ + "," + token.orth_ + ")")
 
-#print(tokens[0].nbor(1).orth_)
-#print(tokens[0].nbor(2).orth_)
-#print(tokens[0].nbor(3).orth_)
+# print(tokens[0].nbor(1).orth_)
+# print(tokens[0].nbor(2).orth_)
+# print(tokens[0].nbor(3).orth_)
 
 # testing determinant dependencies
 tokens = nlp(u'The cat eats the mouse and carrots.')
@@ -79,7 +81,6 @@ print(tokens)
 token = tokens[6]
 print_subtree(token)
 
-
 tokens = nlp(u'The mouse has legs')
 print(tokens)
 
@@ -91,6 +92,3 @@ print(tokens)
 
 token = tokens[1]
 print_subtree(token)
-
-
-

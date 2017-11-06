@@ -8,7 +8,6 @@ import deepsign.utils.regex
 from deepsign.nlp import patterns as pm
 import re
 
-
 RE = {
     'SPACES': re.compile(pm.SPACES, re.UNICODE),
     'CONTRACTION': re.compile(pm.CONTRACTION, re.UNICODE),
@@ -18,8 +17,8 @@ RE = {
     'CONTRACTION_W4': re.compile(pm.CONTRACTION_WORD_4, re.UNICODE),
     'CONTRACTION_WE': re.compile(pm.CONTRACTION_WORD_EXTRA, re.UNICODE),
     'CONTRACTION_WO': re.compile(pm.CONTRACTION_WORD_OTHER, re.UNICODE),
-    'URL': re.compile(pm.URL, re.UNICODE|re.VERBOSE),
-    'EMAIL': re.compile(pm.EMAIL, re.UNICODE|re.VERBOSE),
+    'URL': re.compile(pm.URL, re.UNICODE | re.VERBOSE),
+    'EMAIL': re.compile(pm.EMAIL, re.UNICODE | re.VERBOSE),
     'CENSORED_WORD': re.compile(pm.WORD_CENSORED, re.UNICODE),
     'ABBREVIATION': re.compile(pm.ABBREV, re.UNICODE),
     'SOFT_HYPHEN': re.compile(pm.SOFT_HYPHEN, re.UNICODE),
@@ -33,9 +32,7 @@ RE = {
     'PUNCT': re.compile(pm.PUNCT, re.UNICODE)
 }
 
-
 class Tokenization:
-
     def __init__(self, text):
         self.text = text
 
@@ -130,7 +127,6 @@ class Tokenization:
                 self.text = self.text[1:]
         else:
             self.text = matcher.skip(match_group)
-
 
         return token
 
