@@ -18,7 +18,7 @@ for tag in PoS.NAMES:
     print(nlp.vocab.strings[tag])
 
 print("==========================================")
-sentence = "Mr Anderson welcome back, we missed you!"
+sentence = "Mr Jabbas welcome back, we missed you!"
 doc = nlp.tokenizer(sentence)
 
 print(doc)
