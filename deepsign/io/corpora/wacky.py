@@ -123,7 +123,8 @@ if __name__ == "__main__":
     pr = cProfile.Profile()
     pr.enable()
     # iterate over n sentences of the corpus
-    for i in range(100):
+    n = 100
+    for i in range(n):
         sentence = next(corpus_reader)
         # word count example
         for w in filter(regex_word.search,sentence):
