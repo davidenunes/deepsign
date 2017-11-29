@@ -1,15 +1,18 @@
 import os
-
+import itertools
 
 class PTBIterator:
     """
     Simple iterator, the file since the file has one sentence per line
     """
-    def __init__(self, path):
+    def __init__(self, path, max_samples=None):
         assert os.path.exists(path)
         self.path = path
         self.current_sentence = None
         self.source = open(path,'r')
+
+        self.max_samples = max_samples
+        self.num_samples = 0
 
     def close(self):
         self.file.close()
@@ -18,12 +21,17 @@ class PTBIterator:
         return self
 
     def __next__(self):
+        if self.max_samples is not None and self.num_samples>=self.max_samples:
+            self.source.close()
+            raise StopIteration
+
         self.current_sentence = self.source.readline()
         if not self.current_sentence:
             self.source.close()
             raise StopIteration
 
-        return self.current_sentence
+        self.num_samples+=1
+        return self.current_sentence.split()
 
 
 class PTBReader:
@@ -62,12 +70,21 @@ class PTBReader:
         assert os.path.exists(self.valid_fn)
         assert os.path.exists(self.test_fn)
 
-    def training_set(self):
-        return PTBIterator(path=self.train_fn)
+    def training_set(self,n_samples=None):
+        """
+        :param n_samples: max number of sentences
+        """
+        return PTBIterator(path=self.train_fn,max_samples=n_samples)
 
     def validation_set(self):
         return PTBIterator(path=self.valid_fn)
 
     def test_set(self):
         return PTBIterator(path=self.test_fn)
+
+    def full(self):
+        return itertools.chain(self.training_set(),
+                               self.validation_set(),
+                               self.test_set())
+
 

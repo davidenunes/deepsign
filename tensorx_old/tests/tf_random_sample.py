@@ -21,7 +21,7 @@ class TestRandomSample(TestCase):
 
 
     def test_tf_impl(self):
-        # 1 generate n random indexes
+        # 1 generate ngram_size random indexes
         # 2 gather range from generated indexes
 
 

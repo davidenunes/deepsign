@@ -224,7 +224,7 @@ class NRP(ANN):
 
     We use 2 output layers one for positive features and one for negative features of the random index.
 
-    I'm testing to see if negative sampling can be avoided since I can't use softmax because my outputs are not in the
+    I'embed_size testing to see if negative sampling can be avoided since I can't use softmax because my outputs are not in the
     one-hot-encoding.
     """
 

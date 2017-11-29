@@ -38,7 +38,7 @@ class TestRISVD(unittest.TestCase):
         print("Low-Rank Approximation Shape: ", lr_matrix.shape)
         self.assertEqual(lr_matrix.shape, c_matrix.shape)
 
-        # dimensional reduction (just take u and s, since v is used to convert back to the original matrix)
+        # dimensional reduction (just take u and s, since vocab_size is used to convert back to the original matrix)
         ld_matrix = np.dot(ru,rs)
         print("Lower-Dimensional Matrix: ", ld_matrix.shape)
 

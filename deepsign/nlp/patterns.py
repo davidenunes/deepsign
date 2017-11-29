@@ -48,7 +48,7 @@ QUOTE = re_or([
 ])
 
 # Stanford PTBLexer includes caracters for armenian arabic, etc
-# I'm trying to tokenize regular english perhaps I can include such
+# I'embed_size trying to tokenize regular english perhaps I can include such
 # chars in the future but not now. I removed ideographic, arabic, armenian
 # etc, commas, question marks and so on
 #
@@ -191,19 +191,19 @@ PROGRAMMING_LANGUAGES = r'[CF][\-\+#]{1,2}'
 
 # TODO contractions can perhaps be handled more elegantly
 # Contractions
-CONTRACTION_1 = "(?:n{apo}t)".format(apo=APOSTROPHE)                          # n't
+CONTRACTION_1 = "(?:ngram_size{apo}t)".format(apo=APOSTROPHE)                          # ngram_size't
 CONTRACTION_2 = "(?:{apo}(?:[msd]|re|ve|ll))".format(apo=APOSTROPHE)           # 've 'd 'll 're
 CONTRACTION = re_or([CONTRACTION_1, CONTRACTION_2])
 
-# same as 2 without 'm
+# same as 2 without 'embed_size
 _CONTRACTION_2 = "(?:{apo}(?:[sd]|re|ve|ll))".format(apo=APOSTROPHE)           # 've 'd 'll 're
 _CONTRACTION = re_or([CONTRACTION_1, _CONTRACTION_2])
 
 # We have to catch this separately because of the O'Malley's of this world
-CONTRACTION_WORD_1 = '(?i)(I)({apo}m)'.format(apo=APOSTROPHE)
+CONTRACTION_WORD_1 = '(?i)(I)({apo}embed_size)'.format(apo=APOSTROPHE)
 CONTRACTION_WORD_2 = '(?i)(y'+APOSTROPHE+')('+LETTER+'{3,})'               # y'all y'know
 
-CONTRACTION_WORD_3 = '(?i)([a-z]+)' + "({c}+)".format(c=_CONTRACTION)          # Don't I'm You're He'll He's
+CONTRACTION_WORD_3 = '(?i)([a-z]+)' + "({c}+)".format(c=_CONTRACTION)          # Don't I'embed_size You're He'll He's
 CONTRACTION_WORD_4 = "(?i)({apo}t)(is|was)".format(apo=APOSTROPHE)            #'tis 'twas
 
 SUBJECT_CONTRACTION = '(?i)([a-z]+)' + "({c}+)".format(c=CONTRACTION)
@@ -218,7 +218,7 @@ SUBJECT_CONTRACTION = '(?i)([a-z]+)' + "({c}+)".format(c=CONTRACTION)
 
 # Extra words not to be separated ---some from Stanford PTBLexer
 _CONTRACTION_WORD_EXTRA = [
-    r'{apo}n{apo}?'.format(apo=APOSTROPHE),
+    r'{apo}ngram_size{apo}?'.format(apo=APOSTROPHE),
     APOSTROPHE+'k',
     APOSTROPHE+'em',
     APOSTROPHE+'im',
@@ -240,7 +240,7 @@ _CONTRACTION_WORD_EXTRA = [
     's'+APOSTROPHE+'mores',
     'ev'+APOSTROPHE+'ry',
     'li'+APOSTROPHE+'l',
-    'cap'+APOSTROPHE+'n'
+    'cap'+APOSTROPHE+'ngram_size'
 ]
 CONTRACTION_WORD_EXTRA = r'(?i)'+re_or(_CONTRACTION_WORD_EXTRA)
 

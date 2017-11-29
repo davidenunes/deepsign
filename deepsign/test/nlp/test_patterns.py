@@ -195,22 +195,22 @@ class TestPatterns(unittest.TestCase):
         s = "Doesn't've"
         c_found = cw.match(s)
 
-        s = "n't've"
+        s = "ngram_size't've"
         c_found = c.match(s)
 
         s = "He'dn't've done that"
         c_found = cw.match(s)
 
     def test_contractions_split(self):
-        s1 = "Don't do that again I'm serious, I'll be right there."
+        s1 = "Don't do that again I'embed_size serious, I'll be right there."
         c_split = re.compile(pm.SUBJECT_CONTRACTION, re.UNICODE)
 
         r1 = c_split.findall(s1)
-        self.assertListEqual([("Do", "n't"), ("I", "'m"), ("I", "'ll")], r1)
+        self.assertListEqual([("Do", "ngram_size't"), ("I", "'embed_size"), ("I", "'ll")], r1)
 
         s2 = "I'dn't've what you want though and He wouldn't've that either"
         r2 = c_split.findall(s2)
-        self.assertListEqual([("I", "'dn't've"), ("would", "n't've")], r2)
+        self.assertListEqual([("I", "'dn't've"), ("would", "ngram_size't've")], r2)
 
     def test_contraction_word(self):
         s1 = "Don't"
@@ -223,11 +223,11 @@ class TestPatterns(unittest.TestCase):
 
         r1 = re.match(pm.CONTRACTION_WORD_3, s1)
         self.assertEqual(len(r1.groups()), 2)
-        self.assertTupleEqual(r1.groups(), ("Do", "n't"))
+        self.assertTupleEqual(r1.groups(), ("Do", "ngram_size't"))
 
         r2 = re.match(pm.CONTRACTION_WORD_3, s2)
         self.assertEqual(len(r2.groups()), 2)
-        self.assertTupleEqual(r2.groups(), ("Should", "n't've"))
+        self.assertTupleEqual(r2.groups(), ("Should", "ngram_size't've"))
 
         r3 = re.match(pm.CONTRACTION_WORD_3, s3)
         self.assertEqual(len(r3.groups()), 2)
@@ -373,7 +373,7 @@ class TestPatterns(unittest.TestCase):
         simple_abbrev = [
             "U.S.",
             "a.k.a.",
-            "a.m.",
+            "a.embed_size.",
             "e.g.",
             "U.S.A.",
             "etc.",
@@ -382,7 +382,7 @@ class TestPatterns(unittest.TestCase):
             "MRS.",
             "mrs.",
             "Ph.D",
-            "a.m",
+            "a.embed_size",
             "A.M",
             "Brit."
         ]
@@ -692,5 +692,5 @@ class TestPatterns(unittest.TestCase):
             "(･ω<)☆"
         ]
 
-        emoticons_apologizing = ["m(_ _)m", "(シ_ _)シ", "m(. .)m", "<(_ _)>\n人(_ _*)", "(*_ _)人", "m(_ _;m)",
-                                 "(m;_ _)m\n(シ. .)シ"]
+        emoticons_apologizing = ["embed_size(_ _)embed_size", "(シ_ _)シ", "embed_size(. .)embed_size", "<(_ _)>\n人(_ _*)", "(*_ _)人", "embed_size(_ _;embed_size)",
+                                 "(embed_size;_ _)embed_size\n(シ. .)シ"]

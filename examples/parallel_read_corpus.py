@@ -68,7 +68,7 @@ def is_invalid_token(token):
 
     w = token.orth_
 
-    # some words are tokenised with 's and n't, apply this before filtering stop words
+    # some words are tokenised with 's and ngram_size't, apply this before filtering stop words
     custom_stop = ["'s",
                    "@card@",
                    "@ord@",

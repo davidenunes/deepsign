@@ -1,7 +1,8 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.utils.views import chunk_it, subset_chunk_it
-from deepsign.utils.views import divide_slice
+from deepsign.utils.views import divide_slice, ngram_windows
+
 
 
 class TestViews(TestCase):
@@ -36,3 +37,20 @@ class TestViews(TestCase):
         divide_sub = divide_slice(subsize,3,subset.start)
 
         self.assertEqual(3, len(divide_sub))
+
+    def test_ngrams(self):
+        sentence = "hello there mr smith welcome back to the world"
+        tokens = sentence.split()
+        windows = ngram_windows(tokens,3)
+        for window in windows:
+            print(window)
+
+        print("fewer than ngram_size sequences")
+        sentence = "hello there"
+
+        tokens = sentence.split()
+        windows = ngram_windows(tokens, 3)
+        self.assertEqual(len(windows),0)
+
+        for window in windows:
+            print(window)

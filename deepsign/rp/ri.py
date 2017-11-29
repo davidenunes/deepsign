@@ -10,6 +10,15 @@ class RandomIndex:
         self.dim = dim
         self.s = len(positive) + len(negative)
 
+    def sorted_indices_values(self):
+        """Returns two lists indices, values with the indices
+        and respective positive and negative values ordered by index"""
+        indices = self.positive + self.negative
+        values = [1] * len(self.positive) + [-1] * len(self.negative)
+        indices, values = zip(*[(i, v) for i, v in sorted(zip(indices, values), key=lambda pair: pair[0])])
+
+        return list(indices), list(values)
+
     def to_vector(self):
         v = np.zeros(self.dim)
         v[self.positive] = 1
@@ -22,9 +31,9 @@ class RandomIndex:
         and negative labels concatenated [pos dist][neg dist]
         :return:
         """
-        v = np.zeros(self.dim*2)
+        v = np.zeros(self.dim * 2)
         v[self.positive] = 1 / self.s
-        negative = np.array(self.negative)+self.dim
+        negative = np.array(self.negative) + self.dim
         v[negative] = 1 / self.s
         return v
 
@@ -47,8 +56,7 @@ class RandomIndex:
         return v
 
     def __str__(self):
-        return "RI"+str((self.dim,self.s))+":\n\t+1 = "+str(self.positive)+"\n\t-1 = "+str(self.negative)
-
+        return "RI" + str((self.dim, self.s)) + ":\n\t+1 = " + str(self.positive) + "\n\t-1 = " + str(self.negative)
 
 
 def ri_from_indexes(dim, active_indexes):
@@ -91,7 +99,7 @@ class Generator:
 
     def generate(self):
         # ensure that you can make other calls to random
-        #random.setstate(self.random_state)
+        # random.setstate(self.random_state)
 
         active_indexes = random.sample(range(self.dim), self.num_active)
 
@@ -100,6 +108,6 @@ class Generator:
         negative = active_indexes[num_positive:len(active_indexes)]
 
         # ensure that you can make other calls to random
-        #self.random_state = random.getstate()
+        # self.random_state = random.getstate()
 
         return RandomIndex(self.dim, positive, negative)

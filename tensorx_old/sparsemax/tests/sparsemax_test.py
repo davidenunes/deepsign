@@ -59,10 +59,10 @@ class SparsemaxTest(test.TestCase):
     probability = self._np_sparsemax(z)
     support = probability > 0
 
-    # Calculate \hat{v}, which will be a vector (scalar for each z)
+    # Calculate \hat{vocab_size}, which will be a vector (scalar for each z)
     v_hat = np.sum(grad * support, axis=1) / np.sum(support, axis=1)
 
-    # Calculates J(z) * v
+    # Calculates J(z) * vocab_size
     return support * (grad - v_hat[:, np.newaxis])
 
   def _tf_sparsemax(self, z, dtype, use_gpu):

@@ -62,17 +62,17 @@ class Tokenization:
         elif matcher.match(RE['EMAIL'], text):
             match_group = 0
         elif matcher.match(RE['ABBREVIATION'], text):
-            # etc. Ph.D p.m. A.M.
+            # etc. Ph.D p.embed_size. A.M.
             match_group = 0
         elif matcher.match(RE['NUMERIC'], text):
             match_group = 0
             rm_soft_hyphen = True
         elif matcher.match(RE['CONTRACTION'], text):
-            # (do)(n't) -> return (do) ->  skip to (n't)
+            # (do)(ngram_size't) -> return (do) ->  skip to (ngram_size't)
             match_group = 0
             rm_soft_hyphen = True
         elif matcher.match(RE['CONTRACTION_W1'], text):
-            # I'm
+            # I'embed_size
             match_group = 1
         elif matcher.match(RE['CONTRACTION_W2'], text):
             # y'all y'know

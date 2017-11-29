@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """ Run with
-    mpirun -n 10 python -m scripts.parallel.word_frequency
+    mpirun -ngram_size 10 python -embed_size scripts.parallel.word_frequency
 """
 import os
 import time
