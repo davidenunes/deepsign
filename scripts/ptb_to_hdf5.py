@@ -8,16 +8,15 @@ import marisa_trie
 from collections import Counter
 
 from deepsign.io.corpora.ptb import PTBReader
+from deepsign.utils.views import ngram_windows
+from deepsign.utils import h5utils
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
-parser.add_argument('-n', dest="n", type=int, default=100)
-parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME")+"/data/datasets/ptb")
-parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME")+"/data/datasets")
-parser.add_argument('-out_filename', dest="out_filename", type=str, default="ptb_hdf5")
+parser.add_argument('-n', dest="n", type=int, default=4)
+parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/datasets/ptb")
+parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME") + "/data/datasets")
+parser.add_argument('-out_filename', dest="out_filename", type=str, default="ptb.hdf5")
 args = parser.parse_args()
-
-
-hdf5_file = os.path.join(args.data_dir, args.out_filename)
 
 # ======================================================================================
 # Build Vocabulary
@@ -32,86 +31,51 @@ for words in ptb_reader.full():
     word_counter.update(words)
 
 vocab = marisa_trie.Trie(word_counter.keys())
-
-
 sorted_counts = word_counter.most_common()
-word_list, word_freq= zip(*sorted_counts)
+word_list, word_freq = zip(*sorted_counts)
 
-#vocabulary = np.array([freq[i][0].encode("utf8") for word in word_list])
-vocabulary = np.array(word_list)
+# vocabulary = np.array([freq[i][0].encode("utf8") for word in word_list])
+# encode strings in array 0 terminated bytes
+vocabulary = np.array(word_list, dtype="S")
+ids = np.array([vocab[word] for word in word_list])
 frequencies = np.array(word_freq)
 
+hdf5_path = os.path.join(args.data_dir, args.out_filename)
+hdf5_file = h5py.File(hdf5_path, "a")
 
-dt = h5py.special_dtype(vlen=str)
-output_hdf5.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="gzip")
+# write words (needs str type)
+h5str_dtype = h5py.special_dtype(vlen=str)
+hdf5_file.create_dataset("vocabulary", data=vocabulary, dtype=h5str_dtype, compression="gzip")
+hdf5_file.create_dataset("frequencies", data=frequencies, compression="gzip")
+hdf5_file.create_dataset("ids", data=ids, compression="gzip")
+print("vocabulary and frequencies written")
+print("processing n-grams...")
 
-
-"""
-# create vocab in hdf5
-
-
-        dt = h5py.special_dtype(vlen=str)
-        output_hdf5.create_dataset("vocabulary", data=vocabulary, dtype=dt, compression="gzip")
-        print("vocabulary written")
-
-        freq = np.array([freq[i][1] for i in range(len(freq))])
-        output_hdf5.create_dataset("frequencies", data=freq, compression="gzip")
-        print("frequencies written")
-
-        output_hdf5.close()
-        print("done")
-
-"""
-
-"""
-if not os.path.isdir(bnc_dir):
-    sys.exit("No such directory: {}".format(bnc_dir))
+# ======================================================================================
+#   Write n-grams
+# ======================================================================================
 
 
-def hdf5_append(sentence):
-    #Appends to an hdf5 dataset, duplicates size if full
-    global num_rows
-    dataset[num_rows] = sentence
-    num_rows += 1
-
-    if num_rows == len(dataset):
-        dataset.resize(len(dataset) + EXPAND_HDF5_BY, 0)
-
-
-def hdf5_clean():
-    dataset.resize(num_rows, 0)
-    h5f.close()
+def store_ngrams(corpus_stream, name):
+    sentence_ngrams = (ngram_windows(sentence, args.n) for sentence in corpus_stream)
+    ngrams = (ngram for ngrams in sentence_ngrams for ngram in ngrams)
+    n_gram_ids = [list(map(lambda w: vocab[w], ngram)) for ngram in ngrams]
+    ngrams = np.array(n_gram_ids)
+    # sample = hdf5_file["ngrams/training"][100:110]
+    # sample = [list(map(lambda id: vocab.restore_key(id), ngram)) for ngram in sample]
+    dataset = hdf5_file.create_dataset(name, data=ngrams, compression="gzip")
+    dataset.attrs['n'] = args.n
 
 
-def convert_file(filename):
-    reader = BNCReader(filename)
+training_dataset = ptb_reader.training_set()
+store_ngrams(training_dataset, "training")
 
-    global max_sentences
-    global num_sentences
+test_dataset = ptb_reader.test_set()
+store_ngrams(test_dataset, "test")
 
-
-    for sentence in reader:
-        if max_sentences is not None and num_sentences >= max_sentences:
-                break
-        if len(sentence) > 1:
-            s = " ".join(sentence)
-            hdf5_append(s)
-            num_sentences +=1
-
-    reader.source.close()
+validation_dataset = ptb_reader.validation_set()
+store_ngrams(validation_dataset, "validation")
 
 
-
-print("Processing BNC corpus files in ",bnc_dir)
-files = file_walker(bnc_dir)
-
-for file in tqdm(sorted(files)):
-        convert_file(file)
-        if max_sentences is not None and num_sentences >= max_sentences:
-            break
-hdf5_clean()
-
-"""
-
-
-
+hdf5_file.close()
+print("done")
