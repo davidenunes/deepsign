@@ -35,7 +35,7 @@ parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=1)
+parser.add_argument('-batch_size', dest="batch_size", type=int, default=50)
 args = parser.parse_args()
 
 out_dir = home + args.out_dir
@@ -78,7 +78,8 @@ train_step = optimizer.minimize(loss)
 # ======================================================================================
 print("starting TF")
 tf_var_init = tf.global_variables_initializer()
-sess = tf.Session()
+sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
+sess = tf.Session(config=sess_config)
 sess.run(tf_var_init)
 
 ngrams_processed = 0
@@ -90,7 +91,7 @@ for epoch in range(args.epochs):
     # ngram_stream = (ngram_windows(sentence, args.window_size) for sentence in train_dataset)
     training_dataset = corpus_hdf5["training"]
     print(training_dataset[0:10])
-    ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size)
+    ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size * 100)
     # load batches
     x_batch = []
     y_batch = []
@@ -99,8 +100,8 @@ for epoch in range(args.epochs):
     # stream of ngrams for each sentence
     for ngram in ngram_stream:
         # wi hi already come as indices of the words they represent
-        print("ngram: ", ngram)
-        print(list(map(vocab.restore_key,ngram)))
+        # print("ngram: ", ngram)
+        # print(list(map(vocab.restore_key,ngram)))
         wi = ngram[-1]
         hi = ngram[:-1]
         # x_batch.append(list(map(vocab.get, hi)))
@@ -123,7 +124,7 @@ for epoch in range(args.epochs):
                 model.inputs.tensor: x_batch,
                 labels.tensor: y_batch,
             })
-            print("loss before: ", current_loss)
+            # print("loss before: ", current_loss)
             # train step
             sess.run(train_step, {
                 model.inputs.tensor: x_batch,
@@ -133,7 +134,7 @@ for epoch in range(args.epochs):
                 model.inputs.tensor: x_batch,
                 labels.tensor: y_batch,
             })
-            print("loss after: ", current_loss)
+            # print("loss after: ", current_loss)
 
             x_batch = []
             y_batch = []
