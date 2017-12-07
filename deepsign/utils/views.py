@@ -122,7 +122,7 @@ def ri_to_sparse(random_index):
 
 def chunk_it(dataset, n_rows=None, chunk_size=1):
     """
-    Allos to iterate over dataset by loading chunks at a time using slices
+    Allows to iterate over dataset by loading chunks at a time using slices
     up until a given nrows
 
     :param dataset: the dataset we wish to iterate over

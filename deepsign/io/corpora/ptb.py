@@ -1,15 +1,17 @@
 import os
 import itertools
 
+
 class PTBIterator:
     """
     Simple iterator, the file since the file has one sentence per line
     """
+
     def __init__(self, path, max_samples=None):
         assert os.path.exists(path)
         self.path = path
         self.current_sentence = None
-        self.source = open(path,'r')
+        self.source = open(path, 'r')
 
         self.max_samples = max_samples
         self.num_samples = 0
@@ -21,7 +23,7 @@ class PTBIterator:
         return self
 
     def __next__(self):
-        if self.max_samples is not None and self.num_samples>=self.max_samples:
+        if self.max_samples is not None and self.num_samples >= self.max_samples:
             self.source.close()
             raise StopIteration
 
@@ -30,7 +32,7 @@ class PTBIterator:
             self.source.close()
             raise StopIteration
 
-        self.num_samples+=1
+        self.num_samples += 1
         return self.current_sentence.split()
 
 
@@ -62,29 +64,30 @@ class PTBReader:
     """
 
     def __init__(self, path):
-        self.train_fn = os.path.join(path, 'train.txt')
-        self.valid_fn = os.path.join(path, 'valid.txt')
-        self.test_fn = os.path.join(path, 'test.txt')
+        self.train_file = os.path.join(path, 'train.txt')
+        self.valid_file = os.path.join(path, 'valid.txt')
+        self.test_file = os.path.join(path, 'test.txt')
 
-        assert os.path.exists(self.train_fn)
-        assert os.path.exists(self.valid_fn)
-        assert os.path.exists(self.test_fn)
+        if not os.path.exists(self.train_file):
+            raise FileNotFoundError("could find train set in {path}".format(path=self.train_file))
+        if not os.path.exists(self.valid_file):
+            raise FileNotFoundError("could find validation set in {path}".format(path=self.valid_file))
+        if not os.path.exists(self.test_file):
+            raise FileNotFoundError("could find test set in {path}".format(path=self.test_file))
 
-    def training_set(self,n_samples=None):
+    def training_set(self, n_samples=None):
         """
         :param n_samples: max number of sentences
         """
-        return PTBIterator(path=self.train_fn,max_samples=n_samples)
+        return PTBIterator(path=self.train_file, max_samples=n_samples)
 
     def validation_set(self):
-        return PTBIterator(path=self.valid_fn)
+        return PTBIterator(path=self.valid_file)
 
     def test_set(self):
-        return PTBIterator(path=self.test_fn)
+        return PTBIterator(path=self.test_file)
 
     def full(self):
         return itertools.chain(self.training_set(),
                                self.validation_set(),
                                self.test_set())
-
-

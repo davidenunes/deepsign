@@ -13,8 +13,8 @@ from deepsign.utils import h5utils
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
 parser.add_argument('-n', dest="n", type=int, default=4)
-parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/gold_standards/ptb")
-parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME") + "/data/gold_standards")
+parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/datasets/ptb")
+parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME") + "/data/results/")
 parser.add_argument('-out_filename', dest="out_filename", type=str, default="ptb.hdf5")
 args = parser.parse_args()
 

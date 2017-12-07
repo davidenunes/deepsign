@@ -1,6 +1,6 @@
 import tensorx as tx
 import tensorflow as tf
-import functools
+from configobj import ConfigObj
 
 
 class NNLM:
@@ -23,18 +23,18 @@ class NNLM:
         self.h_dim = h_dim
         self.h_init = tx.relu_init
 
-        self.inputs = tx.Input(self.ngram_size, dtype=tf.int32)
-        self.lookup = tx.Lookup(self.inputs, self.ngram_size, self.embed_shape, self.batch_size)
+        self.inputs = tx.Input(ngram_size, dtype=tf.int32)
+        print("embed shape: ", self.embed_shape)
+        self.lookup = tx.Lookup(self.inputs, ngram_size, self.embed_shape, self.batch_size)
 
         self.w_h = tx.Linear(self.lookup, self.h_dim, self.h_init, bias=True)
         self.h = tx.Activation(self.w_h, tx.relu)
 
         self.logits = tx.Linear(self.h, vocab_size, bias=True)
-        self.output = tx.Activation(self.logits,tx.softmax)
+        self.output = tx.Activation(self.logits, tx.softmax)
 
-
-    def loss(self,one_hot_labels):
+    def loss(self, one_hot_labels):
         """ Creates the loss function for this model
         :param one_hot_labels: [batch_size, vocab_size] target one-hot-encoded labels.
         """
-        return tx.categorical_cross_entropy(one_hot_labels,self.logits.tensor)
+        return tx.categorical_cross_entropy(one_hot_labels, self.logits.tensor)

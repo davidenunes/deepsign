@@ -1,6 +1,7 @@
 import argparse
 import os
 import csv
+import h5py
 import marisa_trie
 from deepsign.models.nnlm import NNLM
 
@@ -8,9 +9,9 @@ import numpy as np
 import tensorflow as tf
 
 from deepsign.utils.views import ngram_windows
+from deepsign.utils.views import chunk_it
 from tensorx.layers import Input
 from deepsign.io.corpora.ptb import PTBReader
-
 
 # ======================================================================================
 # Argument parse configuration
@@ -24,57 +25,44 @@ home = os.getenv("HOME")
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 parser.add_argument('-conf', dest="conf", type=str)
 parser.add_argument('-name', dest="name", type=str, default="nnlm")
-parser.add_argument('-corpus', dest="corpus", type=str)
-parser.add_argument('-output', dest="output", type=str, default=home+"/data/results/")
-
-
+parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
+parser.add_argument('-output', dest="output", type=str, default=home + "/data/results/")
 
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=100)
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=100)
 parser.add_argument('-epochs', dest="epochs", type=int, default=1)
-parser.add_argument('-window_size', dest="window_size", type=int, default=3)
+parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=1)
 args = parser.parse_args()
 
-
 out_dir = home + args.out_dir
+# ======================================================================================
+# Load Params
+# ======================================================================================
+
 
 # ======================================================================================
-# Write Parameters
+# Load Corpus & Vocab
 # ======================================================================================
-args_filename = out_dir + "config.csv"
-arg_dict = vars(args)
-with open(args_filename, 'w') as csv_file:
-    writer = csv.writer(csv_file)
-    for key, value in arg_dict.items():
-        writer.writerow([key, value])
+corpus_file = args.corpus + "ptb.hdf5"
 
-        data_dir = home
+corpus_hdf5 = h5py.File(corpus_file, mode='r')
 
-# ======================================================================================
-# Corpus
-# ======================================================================================
-corpus_dir = home + args.data_dir + "ptb"
-ptb_reader = PTBReader(corpus_dir)
-
-# load vocabulary
-vocab_words = set()
-for sentence in ptb_reader.full():
-    vocab_words |= set(sentence)
-
-# returns ids for words and words for ids with restore_key
-# print(vocab.restore_key(9992))
-vocab = marisa_trie.Trie(vocab_words)
-print("Vocabulary loaded: {} words".format(len(vocab)))
+vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
+vocab_size = len(vocab)
+print("Vocabulary loaded: {} words".format(vocab_size))
 
 # ======================================================================================
 # Build Model
 # ======================================================================================
-model = NNLM(ngram_size=args.window_size - 1,
-             vocab_size=len(vocab),
+print(args)
+
+# N-Gram size should also be verified against dataset attributes
+model = NNLM(ngram_size=args.ngram_size - 1,
+             vocab_size=vocab_size,
              embed_dim=args.embed_dim,
              batch_size=args.batch_size,
              h_dim=args.h_dim)
@@ -98,49 +86,56 @@ ngrams_processed = 0
 for epoch in range(args.epochs):
     # restart training dataset
     # TODO shuffle the data ?
-    train_dataset = ptb_reader.training_set(n_samples=50)
-    ngram_stream = (ngram_windows(sentence, args.window_size) for sentence in train_dataset)
+    # train_dataset = ptb_reader.training_set(n_samples=50)
+    # ngram_stream = (ngram_windows(sentence, args.window_size) for sentence in train_dataset)
+    training_dataset = corpus_hdf5["training"]
+    print(training_dataset[0:10])
+    ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size)
     # load batches
     x_batch = []
     y_batch = []
     b = 0
 
     # stream of ngrams for each sentence
-    for ngrams in ngram_stream:
-        for ngram in ngrams:
-            wi = ngram[-1]
-            hi = ngram[:-1]
-            x_batch.append(list(map(vocab.get, hi)))
-            # one hot
-            y = np.zeros([len(vocab)])
-            y[vocab[wi]] = 1
-            y_batch.append(y)
+    for ngram in ngram_stream:
+        # wi hi already come as indices of the words they represent
+        print("ngram: ", ngram)
+        print(list(map(vocab.restore_key,ngram)))
+        wi = ngram[-1]
+        hi = ngram[:-1]
+        # x_batch.append(list(map(vocab.get, hi)))
+        x_batch.append(hi)
+        # one hot
+        y = np.zeros([vocab_size])
+        # y[vocab[wi]] = 1
+        y[wi] = 1
+        y_batch.append(y)
 
-            b += 1
-            ngrams_processed += 1
+        b += 1
+        ngrams_processed += 1
 
-            if b % args.batch_size == 0:
-                x_batch = np.array(x_batch)
-                y_batch = np.array(y_batch)
-                # train the model
+        if b % args.batch_size == 0:
+            x_batch = np.array(x_batch)
+            y_batch = np.array(y_batch)
+            # train the model
 
-                current_loss = sess.run(loss, {
-                    model.inputs.tensor: x_batch,
-                    labels.tensor: y_batch,
-                })
-                print("loss before: ", current_loss)
-                # train step
-                sess.run(train_step, {
-                    model.inputs.tensor: x_batch,
-                    labels.tensor: y_batch,
-                })
-                current_loss = sess.run(loss, {
-                    model.inputs.tensor: x_batch,
-                    labels.tensor: y_batch,
-                })
-                print("loss after: ", current_loss)
+            current_loss = sess.run(loss, {
+                model.inputs.tensor: x_batch,
+                labels.tensor: y_batch,
+            })
+            print("loss before: ", current_loss)
+            # train step
+            sess.run(train_step, {
+                model.inputs.tensor: x_batch,
+                labels.tensor: y_batch,
+            })
+            current_loss = sess.run(loss, {
+                model.inputs.tensor: x_batch,
+                labels.tensor: y_batch,
+            })
+            print("loss after: ", current_loss)
 
-                x_batch = []
-                y_batch = []
+            x_batch = []
+            y_batch = []
 
     print("Processed {} ngrams".format(ngrams_processed))
