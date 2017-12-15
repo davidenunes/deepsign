@@ -48,7 +48,6 @@ out_dir = home + args.out_dir
 # Load Corpus & Vocab
 # ======================================================================================
 corpus_file = args.corpus + "ptb.hdf5"
-
 corpus_hdf5 = h5py.File(corpus_file, mode='r')
 
 vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])

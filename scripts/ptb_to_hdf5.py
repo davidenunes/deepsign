@@ -51,6 +51,7 @@ hdf5_file.create_dataset("ids", data=ids, compression="gzip")
 print("vocabulary and frequencies written")
 print("processing n-grams...")
 
+
 # ======================================================================================
 #   Write n-grams
 # ======================================================================================
@@ -75,7 +76,6 @@ store_ngrams(test_dataset, "test")
 
 validation_dataset = ptb_reader.validation_set()
 store_ngrams(validation_dataset, "validation")
-
 
 hdf5_file.close()
 print("done")
