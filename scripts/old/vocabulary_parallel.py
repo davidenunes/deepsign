@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 
-from deepsign.io.corpora.pipe import WaCKyPipe
+from deepsign.data.corpora.pipe import WaCKyPipe
 from deepsign.utils.views import subset_chunk_it, divide_slice
 
 

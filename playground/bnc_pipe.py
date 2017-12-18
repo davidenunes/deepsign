@@ -3,10 +3,10 @@ import os
 import h5py
 from tqdm import tqdm
 
-from deepsign.io.corpora.pipe import BNCPipe
+from deepsign.data.corpora.pipe import BNCPipe
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import SignIndex, Generator
-from deepsign.utils.views import chunk_it, sliding_windows
+from deepsign.utils.views import chunk_it, windows
 
 home = os.getenv("HOME")
 
@@ -30,7 +30,7 @@ for s in tqdm(pipeline,total=n_rows):
     index.add_all(s)
 
 
-    windows = sliding_windows(s,window_size=2)
+    windows = windows(s, window_size=2)
 
     for window in windows:
         pass

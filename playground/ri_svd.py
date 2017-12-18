@@ -5,7 +5,7 @@ import h5py
 import os.path
 from spacy.en import English
 
-from deepsign.utils.views import sliding_windows as sliding
+from deepsign.utils.views import windows as sliding
 from deepsign.rp.index import SignIndex
 from deepsign.rp.ri import Generator
 from deepsign.rp.encode import to_bow

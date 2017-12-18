@@ -23,7 +23,7 @@ import fnmatch
 import re
 from tqdm import tqdm
 import h5py
-from deepsign.io.corpora.bnc import BNCReader,file_walker
+from deepsign.data.corpora.bnc import BNCReader,file_walker
 
 home = os.getenv("HOME")
 data_dir = home+"/data/gold_standards"

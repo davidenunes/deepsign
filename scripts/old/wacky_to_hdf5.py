@@ -23,7 +23,7 @@ import fnmatch
 import re
 from tqdm import tqdm
 import h5py
-from deepsign.io.corpora.wacky import WaCKyCorpus
+from deepsign.data.corpora.wacky import WaCKyCorpus
 
 
 dir="/home/davex32/data/gold_standards/wacky"

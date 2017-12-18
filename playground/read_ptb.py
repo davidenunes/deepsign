@@ -1,7 +1,7 @@
 import os
-from deepsign.io.corpora.ptb import PTBReader
+from deepsign.data.corpora.ptb import PTBReader
 from collections import Counter
-from deepsign.utils.views import ngram_windows
+from deepsign.utils.views import n_grams
 
 home = os.getenv("HOME")
 ptb_dir = home+"/data/gold_standards/ptb"
@@ -14,7 +14,7 @@ vocab = Counter()
 
 for sentence in training_set:
     words = sentence
-    ngrams = ngram_windows(words,4)
+    ngrams = n_grams(words, 4)
     for ngram in ngrams:
         print(ngram)
     vocab.update(words)

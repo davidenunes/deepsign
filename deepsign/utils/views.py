@@ -4,7 +4,13 @@ from deepsign.rp.ri import RandomIndex
 
 
 def _pairwise(iterable):
-    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    """
+    Example:
+        s -> (s0,s1), (s1,s2), (s2, s3), ...
+
+    Returns:
+        an iterable of tuples with each element paired with the next.
+    """
     a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
@@ -15,12 +21,15 @@ def divide_slice(n, n_slices=1, offset=0):
     returning a list of index ranges for that vector, each range corresponds
     to a slice.
 
-    :param n: number of elements in the vector
-    :param n_slices: number of slices the vector is to be split into
-    :return: a list of slices for the vector
+    Args:
+        n: number of elements in the vector
+        offset: an offset for the slices
+        n_slices: number of slices the vector is to be split into
+
+    Returns:
+        a list of slices for the vector
     """
     len_split = int(n / n_slices)
-    num_indexes = n_slices - 1
 
     ss = [0]
     for s in range(len_split, len_split * n_slices, len_split):
@@ -33,7 +42,10 @@ def divide_slice(n, n_slices=1, offset=0):
 
 
 class Window:
-    """ A window contains:
+    """ A Window used as utility to return windows around certain elements surrounded by
+    other elements.
+
+    A window contains:
         a left []
         a target which is in the center of the window
         a right []
@@ -48,8 +60,8 @@ class Window:
         return "(" + str(self.left) + "," + self.target + "," + str(self.right) + ")"
 
 
-def sliding_windows(seq, window_size=1):
-    """ converts a sequence of strings to a sequence of windows
+def windows(seq, window_size=1):
+    """ Transforms a sequence of strings to a sequence of windows
 
     :param seq: a sequence to be sliced into windows
     :param window_size: the size of the window around each element
@@ -152,28 +164,24 @@ def subset_chunk_it(dataset, data_range, chunk_size=1):
     chunk_size: length of each chunk to be loaded, this determines the number of chunks
 
     """
-    nrows = len(data_range)
+    n_rows = len(data_range)
 
-    if chunk_size > nrows:
-        chunk_size = nrows
+    if chunk_size > n_rows:
+        chunk_size = n_rows
 
-    n_chunks = nrows // chunk_size
-    chunk_slices = divide_slice(nrows, n_chunks, data_range.start)
+    n_chunks = n_rows // chunk_size
+    chunk_slices = divide_slice(n_rows, n_chunks, data_range.start)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
     row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
     return row_gen
 
 
-
-def ngram_windows(seq, window_size=1):
-    """ converts a list of strings to a list of lists of strings each with
-    a given window size.
+def n_grams(seq, n=1):
+    """ Creates a list of n-grams from a list of strings
 
     :param seq: list of strings
-    :param window_size: size for the ngram windows
+    :param n: size for the n-gram
     :return:
     """
-    grams = [seq[i:i + window_size] for i in range(len(seq) - window_size + 1)]
-    result = [ngram for ngram in grams]
-    return result
+    return [seq[i:i + n] for i in range(len(seq) - n + 1)]

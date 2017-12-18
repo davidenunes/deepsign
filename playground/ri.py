@@ -7,14 +7,14 @@ import numpy as np
 from tqdm import tqdm
 
 import deepsign.utils.views as views
-from deepsign.io.corpora.pipe import WaCKyPipe
+from deepsign.data.corpora.pipe import WaCKyPipe
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
 from deepsign.utils import h5utils
 from deepsign.utils.views import chunk_it
-from deepsign.utils.views import sliding_windows as sliding
+from deepsign.utils.views import windows as sliding
 
 
 def update_ri(dataset_ri, current_ri):

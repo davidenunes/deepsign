@@ -7,8 +7,8 @@ import argparse
 import marisa_trie
 from collections import Counter
 
-from deepsign.io.corpora.ptb import PTBReader
-from deepsign.utils.views import ngram_windows
+from deepsign.data.corpora.ptb import PTBReader
+from deepsign.utils.views import n_grams
 from deepsign.utils import h5utils
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
@@ -58,7 +58,7 @@ print("processing n-grams...")
 
 
 def store_ngrams(corpus_stream, name):
-    sentence_ngrams = (ngram_windows(sentence, args.n) for sentence in corpus_stream)
+    sentence_ngrams = (n_grams(sentence, args.n) for sentence in corpus_stream)
     ngrams = (ngram for ngrams in sentence_ngrams for ngram in ngrams)
     n_gram_ids = [list(map(lambda w: vocab[w], ngram)) for ngram in ngrams]
     ngrams = np.array(n_gram_ids)

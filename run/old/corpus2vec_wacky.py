@@ -6,13 +6,13 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from deepsign.io.corpora.pipe import WaCKyPipe
+from deepsign.data.corpora.pipe import WaCKyPipe
 from deepsign.nlp.utils import subsamplig_prob_cut as ss_prob
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
 from deepsign.utils.views import chunk_it
-from deepsign.utils.views import sliding_windows
+from deepsign.utils.views import windows
 from tensorx_old.layers import Input
 from tensorx_old.models.nrp2 import NRP
 
@@ -129,9 +129,9 @@ try:
 
 
     if subsampling:
-        windows_stream = (sliding_windows(list(filter(keep_token, tokens)), window_size) for tokens in pipeline)
+        windows_stream = (windows(list(filter(keep_token, tokens)), window_size) for tokens in pipeline)
     else:
-        windows_stream = (sliding_windows(tokens, window_size) for tokens in pipeline)
+        windows_stream = (windows(tokens, window_size) for tokens in pipeline)
 
     i = 0
     x_samples = []

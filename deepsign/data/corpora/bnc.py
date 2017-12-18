@@ -28,6 +28,7 @@ class BNCReader:
 
         return sentence
 
+
 def file_walker(source_dir):
     """Iterates over xml files given a source directory (/Texts)
     doesn't do it by file name order

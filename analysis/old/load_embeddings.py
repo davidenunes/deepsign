@@ -1,9 +1,8 @@
 import os
 import numpy as np
 from deepsign.rp.index import TrieSignIndex as Index
-from deepsign.io.gold_standards.toefl import TOEFLReader
+from deepsign.data.corpora.toefl import TOEFLReader
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 # model dir
 home = os.getenv("HOME")

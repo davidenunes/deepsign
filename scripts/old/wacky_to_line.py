@@ -21,7 +21,7 @@ import sys
 import os
 import fnmatch
 import gzip
-from deepsign.io.corpora.wacky import WaCKyCorpus
+from deepsign.data.corpora.wacky import WaCKyCorpus
 import re
 import multiprocessing
 

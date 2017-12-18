@@ -1,6 +1,6 @@
 import unittest
 
-from deepsign.utils.views import sliding_windows
+from deepsign.utils.views import windows
 
 
 class TestSlidingWindow(unittest.TestCase):
@@ -9,7 +9,7 @@ class TestSlidingWindow(unittest.TestCase):
         print(sentence)
         tokens = sentence.split(" ")
 
-        windows = sliding_windows(tokens, window_size=3)
+        windows = windows(tokens, window_size=3)
 
         for w in windows:
             print(w)

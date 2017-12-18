@@ -1,7 +1,7 @@
 from tensorx_old.models.word2vec import SkipGram
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.utils.views import sliding_windows
+from deepsign.utils.views import windows
 from sklearn.preprocessing import normalize
 
 import gensim
@@ -65,7 +65,7 @@ with tf.Session() as ss:
     #print(ss.run(normalized_embeddings))
     for i,epoch in enumerate(repeat(sentences,epochs)):
         for sentence in epoch:
-            windows = sliding_windows(sentence,window_size=1)
+            windows = windows(sentence, window_size=1)
             for window in windows:
                 labels = window.left + window.right
                 target = window.target

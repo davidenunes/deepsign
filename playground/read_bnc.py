@@ -1,6 +1,6 @@
 import os
-from deepsign.io.corpora.bnc import BNCReader
-from deepsign.io.corpora.bnc import file_walker as luke
+from deepsign.data.corpora.bnc import BNCReader
+from deepsign.data.corpora.bnc import file_walker as luke
 
 home = os.getenv("HOME")
 bnc_dir = home+"/data/gold_standards/bnc"

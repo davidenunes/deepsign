@@ -8,10 +8,10 @@ from deepsign.models.nnlm import NNLM
 import numpy as np
 import tensorflow as tf
 
-from deepsign.utils.views import ngram_windows
+from deepsign.utils.views import n_grams
 from deepsign.utils.views import chunk_it
 from tensorx.layers import Input
-from deepsign.io.corpora.ptb import PTBReader
+from deepsign.data.corpora.ptb import PTBReader
 
 # ======================================================================================
 # Argument parse configuration

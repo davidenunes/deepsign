@@ -6,6 +6,7 @@ from deepsign.utils.views import chunk_it
 from tqdm import tqdm
 
 import logging
+
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 home = os.getenv("HOME")
@@ -22,8 +23,8 @@ print("reading from hdf5 dataset")
 
 # ngram generator
 def get_ngrams():
-    for ngram in chunk_it(data, chunk_size=batch_size * 200):
-        yield ngram
+    for n_gram in chunk_it(data, chunk_size=batch_size * 200):
+        yield n_gram
 
 
 print("Reading Line by line")
@@ -42,10 +43,9 @@ duration = time.time() - start
 print("took {s} seconds to read with chunk it".format(s=duration))
 time.sleep(0.02)
 
-
 print("Reading with Tensorflow dataset API")
 ds = tf.data.Dataset.from_generator(get_ngrams, tf.int64)
-ds = ds.prefetch(batch_size*50)
+ds = ds.prefetch(batch_size * 50)
 # we call get next until we run out of next
 ngram = ds.make_one_shot_iterator().get_next()
 progress = tqdm(total=len(data))

@@ -4,12 +4,12 @@ from multiprocessing import Pool
 import h5py
 from tqdm import tqdm
 
-from deepsign.io.corpora.pipe import WaCKyPipe
+from deepsign.data.corpora.pipe import WaCKyPipe
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.utils.views import sliding_windows, np_to_sparse, divide_slice
+from deepsign.utils.views import windows, np_to_sparse, divide_slice
 from deepsign.utils.views import subset_chunk_it
 
 # global for sign index
@@ -38,7 +38,7 @@ def text_to_ri(args):
 
     for tokens in pipe:
         # get sliding windows of given size
-        s_windows = sliding_windows(tokens, window_size)
+        s_windows = windows(tokens, window_size)
 
         # encode each window as a bag-of-words and add to occurrencies
         for window in s_windows:

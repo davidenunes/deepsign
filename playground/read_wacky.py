@@ -2,7 +2,7 @@ import sys
 import os
 import fnmatch
 import re
-from deepsign.io.corpora.wacky import WaCKyCorpus
+from deepsign.data.corpora.wacky import WaCKyCorpus
 
 
 home = os.getenv("HOME")

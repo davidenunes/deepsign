@@ -6,7 +6,7 @@ import deepsign.rp.encode as enc
 from deepsign.rp.index import SignIndex
 from deepsign.rp.permutations import PermutationGenerator
 from deepsign.rp.ri import Generator
-from deepsign.utils.views import sliding_windows
+from deepsign.utils.views import windows
 import numpy as np
 
 
@@ -27,7 +27,7 @@ class TestEncode(unittest.TestCase):
         unique_str = set(data)
         self.assertEqual(len(self.sign_index), len(unique_str))
 
-        windows = sliding_windows(data, window_size=1)
+        windows = windows(data, window_size=1)
         vectors = [enc.to_bow(w, self.sign_index) for w in windows]
         self.assertEqual(len(vectors), len(windows))
 
@@ -40,7 +40,7 @@ class TestEncode(unittest.TestCase):
         unique_str = set(data)
         self.assertEqual(len(self.sign_index), len(unique_str))
 
-        windows = sliding_windows(data, window_size=1)
+        windows = windows(data, window_size=1)
         norm_bow = enc.to_bow(windows[0], self.sign_index,normalise=True,include_target=True)
         self.assertEqual(np.max(norm_bow),1)
 
@@ -57,8 +57,8 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(s1)
             self.sign_index.add(s2)
 
-        windows1 = sliding_windows(data1, window_size=1)
-        windows2 = sliding_windows(data2, window_size=1)
+        windows1 = windows(data1, window_size=1)
+        windows2 = windows(data2, window_size=1)
 
         v1 = enc.to_bow(windows1[0], self.sign_index)
         v2 = enc.to_bow(windows2[0], self.sign_index)
@@ -80,8 +80,8 @@ class TestEncode(unittest.TestCase):
             self.sign_index.add(data1[i])
             self.sign_index.add(data2[i])
 
-        w1 = sliding_windows(data1, window_size=2)
-        w2 = sliding_windows(data2, window_size=2)
+        w1 = windows(data1, window_size=2)
+        w2 = windows(data2, window_size=2)
 
         perm = self.perm_generator.matrix()
         v1 = enc.to_bow_dir(w1[0], sign_index=self.sign_index, perm_matrix=perm)

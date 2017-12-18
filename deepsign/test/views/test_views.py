@@ -1,8 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.utils.views import chunk_it, subset_chunk_it
-from deepsign.utils.views import divide_slice, ngram_windows
-
+from deepsign.utils.views import divide_slice, n_grams
 
 
 class TestViews(TestCase):
@@ -21,7 +20,7 @@ class TestViews(TestCase):
         nrows = 100
 
         data = np.arange(nrows)
-        subset = range(50,100)
+        subset = range(50, 100)
 
         it = subset_chunk_it(data, subset, 4)
 
@@ -30,18 +29,17 @@ class TestViews(TestCase):
             self.assertEqual(data[i], data_j)
 
     def test_divide_slice(self):
-        data = range(100)
-        subset = range(51,100)
+        subset = range(51, 100)
 
-        subsize = len(subset)
-        divide_sub = divide_slice(subsize,3,subset.start)
+        sub_size = len(subset)
+        divide_sub = divide_slice(sub_size, 3, subset.start)
 
         self.assertEqual(3, len(divide_sub))
 
     def test_ngrams(self):
         sentence = "hello there mr smith welcome back to the world"
         tokens = sentence.split()
-        windows = ngram_windows(tokens,3)
+        windows = n_grams(tokens, 3)
         for window in windows:
             print(window)
 
@@ -49,8 +47,8 @@ class TestViews(TestCase):
         sentence = "hello there"
 
         tokens = sentence.split()
-        windows = ngram_windows(tokens, 3)
-        self.assertEqual(len(windows),0)
+        windows = n_grams(tokens, 3)
+        self.assertEqual(len(windows), 0)
 
         for window in windows:
             print(window)

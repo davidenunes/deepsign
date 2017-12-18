@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import os.path
-from deepsign.io.gold_standards.wordsim import WordSim353Reader as WS
+from deepsign.data.corpora.wordsim import WordSim353Reader as WS
 
 
 home = os.getenv("HOME")

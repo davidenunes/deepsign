@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import os.path
-from deepsign.io.gold_standards.toefl import TOEFLReader as TOEFL
+from deepsign.data.corpora.toefl import TOEFLReader as TOEFL
 
 
 home = os.getenv("HOME")
