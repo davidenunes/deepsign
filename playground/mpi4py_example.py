@@ -12,7 +12,7 @@ from mpi4py import MPI
 from tqdm import tqdm
 
 from deepsign.data.corpora.pipe import BNCPipe
-from deepsign.utils.views import divide_slice, subset_chunk_it
+from deepsign.data.views import divide_slice, subset_chunk_it
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()

@@ -1,5 +1,5 @@
 def re_not(pattern):
-    return r'(?!'+pattern+')'
+    return r'(?!' + pattern + ')'
 
 
 def re_or(patterns):
@@ -7,18 +7,22 @@ def re_or(patterns):
 
 
 def re_group(pattern):
-    return "("+pattern+")"
+    return "(" + pattern + ")"
 
 
 def re_boundary_s(pattern):
-    return r'(?:(?<=(?:'+pattern+')) | (?<=(?:^)))'
+    return r'(?:(?<=(?:' + pattern + ')) | (?<=(?:^)))'
 
 
 def re_boundary_e(pattern):
-    return r'(?='+pattern+'|$)'
+    return r'(?=' + pattern + '|$)'
 
 
 class REMatcher:
+    def __init__(self):
+        self.input = None
+        self.matched = None
+
     """
     RegEx Matcher utility class that applies match to a string
     and saves the state of that match so that we can re-use it
@@ -40,7 +44,6 @@ class REMatcher:
             return True
         return False
 
-    def skip(self,group=0):
+    def skip(self, group=0):
         (_, i) = self.matched.span(group)
         return self.input[i:]
-

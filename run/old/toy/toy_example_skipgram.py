@@ -1,8 +1,5 @@
 from tensorx_old.models.word2vec import SkipGram
-from deepsign.rp.index import TrieSignIndex
-from deepsign.rp.ri import Generator
-from deepsign.utils.views import windows
-from sklearn.preprocessing import normalize
+from deepsign.data.views import windows
 
 import gensim
 

@@ -1,11 +1,9 @@
 import unittest
-from deepsign.nlp import patterns
 from deepsign.nlp import is_token
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.nlp.tokenization import RE as tokenizer_p
 
-from deepsign.utils.regex import REMatcher
-import re
+from deepsign.nlp.regex_utils import REMatcher
 
 
 def test_pattern_sequence(pattern_seq, text):

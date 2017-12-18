@@ -1,6 +1,6 @@
 import unittest
 from deepsign.rp import ri
-from deepsign.utils.views import ri_to_sparse
+from deepsign.data.views import ri_to_sparse
 import numpy as np
 import numpy.testing as npt
 import time

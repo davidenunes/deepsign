@@ -1,6 +1,5 @@
 import numpy as np
 from itertools import chain, tee
-from deepsign.rp.ri import RandomIndex
 
 
 def _pairwise(iterable):

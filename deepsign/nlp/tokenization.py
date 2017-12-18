@@ -4,7 +4,7 @@ RexEx Tokenizer
 
 NOTE: A space or a sequence of spaces is returned as a token
 """
-import deepsign.utils.regex
+import deepsign.nlp.regex_utils
 from deepsign.nlp import patterns as pm
 import re
 
@@ -32,6 +32,7 @@ RE = {
     'PUNCT': re.compile(pm.PUNCT, re.UNICODE)
 }
 
+
 class Tokenization:
     def __init__(self, text):
         self.text = text
@@ -46,7 +47,7 @@ class Tokenization:
             return self._next_token()
 
     def _next_token(self):
-        matcher = deepsign.utils.regex.REMatcher()
+        matcher = deepsign.nlp.regex_utils.REMatcher()
         text = self.text
         token = None
         match_group = -1
@@ -78,7 +79,7 @@ class Tokenization:
             # y'all y'know
             match_group = 1
         elif matcher.match(RE['CONTRACTION_W3'], text):
-            # He's He'd woudn't've Mary's
+            # He's He'd wouldn't've Mary's
             match_group = 1
         elif matcher.match(RE['CONTRACTION_W4'], text):
             # 'tis 'twas

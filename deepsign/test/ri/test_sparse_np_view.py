@@ -1,10 +1,9 @@
 import unittest
-from deepsign.rp import ri
 from deepsign.rp.ri import Generator
 import numpy as np
 import numpy.testing as npt
 
-import deepsign.utils.views as view
+import deepsign.data.views as view
 
 
 class TestSparseNPView(unittest.TestCase):

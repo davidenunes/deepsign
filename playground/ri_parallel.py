@@ -4,13 +4,13 @@ from multiprocessing import Pool
 import h5py
 from tqdm import tqdm
 
-from deepsign.data.corpora.pipe import WaCKyPipe
+from deepsign.data.corpora.wacky_pipe import WaCKyPipe
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.utils.views import windows, np_to_sparse, divide_slice
-from deepsign.utils.views import subset_chunk_it
+from deepsign.data.views import windows, np_to_sparse, divide_slice
+from deepsign.data.views import subset_chunk_it
 
 # global for sign index
 sign_index = None
@@ -19,6 +19,7 @@ sign_index = None
 def init_lock(l):
     global lock
     lock = l
+
 
 def text_to_ri(args):
     (fname, data_slice, window_size) = args
@@ -42,10 +43,10 @@ def text_to_ri(args):
 
         # encode each window as a bag-of-words and add to occurrencies
         for window in s_windows:
-            #pbar.write(str(window))
-            #lock.acquire()
+            # pbar.write(str(window))
+            # lock.acquire()
             bow_vector = to_bow(window, sign_index)
-            #lock.release()
+            # lock.release()
             bow_vector = np_to_sparse(bow_vector)
             sign_id = sign_index.get_id(window.target)
 
@@ -76,8 +77,8 @@ def parallel_ri(corpus_file, max_rows=None, window_size=3, n_processes=8):
     args = [(corpus_file, data_slice, window_size) for data_slice in data_slices]
 
     # share a global lock to avoid messing sign index on lookups
-    #l = Lock()
-    #pool = Pool(initializer=init_lock(l), initargs=(l,), processes=n_processes)
+    # l = Lock()
+    # pool = Pool(initializer=init_lock(l), initargs=(l,), processes=n_processes)
     pool = Pool(processes=n_processes)
 
     result = pool.map(func=text_to_ri, iterable=args)
@@ -109,4 +110,3 @@ if __name__ == '__main__':
 
     # index_filename = None
     parallel_ri(corpus_file, max_sentences, window_size=3, n_processes=16)
-

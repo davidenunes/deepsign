@@ -1,8 +1,7 @@
 import unittest
 
-import deepsign.utils.regex
+import deepsign.nlp.regex_utils
 from deepsign.nlp import patterns as pm
-from deepsign.nlp import is_token
 import re
 
 
@@ -157,7 +156,7 @@ class TestPatterns(unittest.TestCase):
         space = re.compile(pm.SPACES)
         nSpace = re.compile(pm.NOT_SPACE)
 
-        rem = deepsign.utils.regex.REMatcher()
+        rem = deepsign.nlp.regex_utils.REMatcher()
 
         self.assertTrue(rem.match(nSpace, s))
         s = rem.skip()
@@ -172,10 +171,10 @@ class TestPatterns(unittest.TestCase):
         re1 = 'A'
         re2 = 'B'
 
-        re_1or2 = deepsign.utils.regex.re_or([re1, re2])
+        re_1or2 = deepsign.nlp.regex_utils.re_or([re1, re2])
         self.assertEqual(re_1or2, r'(?:A|B)')
 
-        re_1 = deepsign.utils.regex.re_or([re1])
+        re_1 = deepsign.nlp.regex_utils.re_or([re1])
         self.assertEqual(re_1, r'(?:A)')
 
     def test_apostrophes(self):
@@ -187,7 +186,7 @@ class TestPatterns(unittest.TestCase):
     def test_contractions_common(self):
         s = "Don't"
 
-        c = re.compile(deepsign.utils.regex.re_group(pm.CONTRACTION), re.UNICODE)
+        c = re.compile(deepsign.nlp.regex_utils.re_group(pm.CONTRACTION), re.UNICODE)
 
         cw = re.compile(pm.CONTRACTION_WORD_1, re.UNICODE)
         c_found = cw.match(s)

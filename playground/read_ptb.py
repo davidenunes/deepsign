@@ -1,7 +1,7 @@
 import os
 from deepsign.data.corpora.ptb import PTBReader
 from collections import Counter
-from deepsign.utils.views import n_grams
+from deepsign.data.views import n_grams
 
 home = os.getenv("HOME")
 ptb_dir = home+"/data/gold_standards/ptb"

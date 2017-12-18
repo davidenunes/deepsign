@@ -1,6 +1,4 @@
-import sys
 import os
-from tqdm import tqdm
 import numpy as np
 import h5py
 import argparse
@@ -8,8 +6,7 @@ import marisa_trie
 from collections import Counter
 
 from deepsign.data.corpora.ptb import PTBReader
-from deepsign.utils.views import n_grams
-from deepsign.utils import h5utils
+from deepsign.data.views import n_grams
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
 parser.add_argument('-n', dest="n", type=int, default=4)

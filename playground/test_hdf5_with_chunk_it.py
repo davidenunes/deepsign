@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 import h5py
 import time
-from deepsign.utils.views import chunk_it
+from deepsign.data.views import chunk_it
 from tqdm import tqdm
 
 import logging

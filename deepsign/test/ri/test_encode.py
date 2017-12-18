@@ -6,7 +6,7 @@ import deepsign.rp.encode as enc
 from deepsign.rp.index import SignIndex
 from deepsign.rp.permutations import PermutationGenerator
 from deepsign.rp.ri import Generator
-from deepsign.utils.views import windows
+from deepsign.data.views import windows
 import numpy as np
 
 

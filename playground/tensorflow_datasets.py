@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 import h5py
-from deepsign.utils.views import chunk_it
+from deepsign.data.views import chunk_it
 
 home = os.getenv("HOME")
 corpus_file = home + "/data/datasets/ptb/ptb.hdf5"

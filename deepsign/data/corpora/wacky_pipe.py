@@ -1,6 +1,26 @@
 from deepsign.nlp import is_token as itk
-from deepsign.utils.listx import match_replace
 import spacy
+
+
+def match_replace(elem, replacement_map):
+    """ Expects an element and a set of rules that we can match
+    the element against
+
+    :param elem: the element to be match against
+    :param replacement_map: an iterable set of rules in the form (bool_fn,elem_r) where
+        - fn: elem -> bool
+        - elem_r is the replacement of the given elem
+
+    :return: elem if nothing matches
+             the first replacement found if something matches
+    """
+    for replace_rule in replacement_map:
+        (bool_fn, replacement) = replace_rule
+        if bool_fn(elem):
+            return replacement
+    return elem
+
+
 
 # token replacement rules
 replacements = (
@@ -8,7 +28,6 @@ replacements = (
     (itk.is_email, "T_EMAIL"),
     (itk.is_currency, "T_CURRENCY")
 )
-
 
 # invalid token functions
 # TODO check what other tokens appear in wacky
@@ -30,25 +49,21 @@ class WaCKyPipe:
         self.reaload()
         print("done")
 
-
     def __iter__(self):
         return self
 
     def __next__(self):
         sentence = next(self.token_gen)
         tokens = [token.orth_ for token in sentence]
-        tokens = [match_replace(token,replacements) for token in tokens if not invalid_token(token)]
+        tokens = [match_replace(token, replacements) for token in tokens if not invalid_token(token)]
         tokens = [token.lower() for token in tokens]
 
-        #sentence = next(self.datagen)
-        #tokens = self.tokenizer.tokenize(sentence)
+        # sentence = next(self.datagen)
+        # tokens = self.tokenizer.tokenize(sentence)
 
         return tokens
-
 
     def reaload(self):
         self.nlp = spacy.load("en", entity=False, parser=False, vectors=False)
         self.token_gen = self.nlp.pipe(self.datagen, batch_size=10000, n_threads=4)
-        #self.token_gen = (self.nlp(sentence) for sentence in self.datagen)
-
-
+        # self.token_gen = (self.nlp(sentence) for sentence in self.datagen)

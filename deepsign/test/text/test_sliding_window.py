@@ -1,7 +1,5 @@
 import unittest
 
-from deepsign.utils.views import windows
-
 
 class TestSlidingWindow(unittest.TestCase):
     def test_window(self):

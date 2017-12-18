@@ -1,25 +1,25 @@
 from unittest import TestCase
 import numpy as np
-from deepsign.utils.views import chunk_it, subset_chunk_it
-from deepsign.utils.views import divide_slice, n_grams
+from deepsign.data.views import chunk_it, subset_chunk_it
+from deepsign.data.views import divide_slice, n_grams
 
 
 class TestViews(TestCase):
 
     def test_chunk_it(self):
-        nrows = 100
+        n_rows = 100
 
-        data = np.arange(nrows)
-        it = chunk_it(data, nrows, 3)
+        data = np.arange(n_rows)
+        it = chunk_it(data, n_rows, 3)
 
         for i in range(len(data)):
             data_j = next(it)
             self.assertEqual(data[i], data_j)
 
     def test_subset_chunk_it(self):
-        nrows = 100
+        n_rows = 100
 
-        data = np.arange(nrows)
+        data = np.arange(n_rows)
         subset = range(50, 100)
 
         it = subset_chunk_it(data, subset, 4)
