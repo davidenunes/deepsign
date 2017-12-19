@@ -213,7 +213,7 @@ try:
     print("saving model")
     # save random indexes and model
     index.save(index_file)
-    model.save(sess, model_filename=model_file, embeddings_name=model_suffix)
+    model.save_model(sess, model_filename=model_file, embeddings_name=model_suffix)
 
     print("done")
 

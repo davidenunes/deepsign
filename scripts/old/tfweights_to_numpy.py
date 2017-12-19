@@ -22,7 +22,7 @@ model = NRP(k_dim=k, h_dim=h_dim)
 
 tf_session = tf.Session()
 
-model.load(tf_session,model_file)
+model.load_model(tf_session, model_file)
 
 w = tf_session.run(model.h.weights)
 

@@ -195,7 +195,7 @@ try:
     print("saving model")
     # save random indexes and model
     sign_index.save(index_file)
-    model.save(tf_session, model_filename=model_file)
+    model.save_model(tf_session, model_filename=model_file)
 
     print("done")
 

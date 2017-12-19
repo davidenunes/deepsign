@@ -29,9 +29,10 @@ ds = ds.repeat(2)
 # ds = ds.shuffle(10)
 ds = ds.batch(2)
 value = ds.make_one_shot_iterator().get_next()
+ctx_tensor, w_tensor = tf.split(value, [3, 1], axis=-1)
 
 with tf.Session() as sess:
-    ctx, w = sess.run(tf.split(value, [3, 1], axis=-1))
+    ctx, w = sess.run([ctx_tensor, w_tensor])
     # w = sess.run(value[:-1])
 
     print(ctx)
