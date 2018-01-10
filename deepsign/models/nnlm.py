@@ -1,40 +1,45 @@
 import tensorx as tx
 import tensorflow as tf
-from configobj import ConfigObj
 
 
-class NNLM:
-    """
-    Args:
-        ngram_size: size of input ngram_size-gram (if 4-grams are being used ngram_size=3 usually)
-        vocab_size: vocab size
-        embed_size: embedding dimension size
-        batch_size: how many ngram_size-grams per batch
-        h_dim: number of hidden units
-        dropout_prob: probability for dropout
-    """
-
-    def __init__(self, ngram_size, vocab_size, embed_dim, batch_size, h_dim):
-        self.ngram_size = ngram_size
-        self.vocab_size = vocab_size
-        self.embed_size = embed_dim
-        self.embed_shape = [vocab_size, embed_dim]
-        self.batch_size = batch_size
+class NNLM(tx.Model):
+    def __init__(self, n_gram_size, vocab_size, embed_dim, batch_size, h_dim,
+                 h_activation=tx.relu,
+                 h_init=tx.relu_init,
+                 inputs=None, loss_inputs=None):
+        # NNLM PARAMS
+        self.loss_inputs = loss_inputs
+        self.h_init = h_init
+        self.h_activation = h_activation
         self.h_dim = h_dim
-        self.h_init = tx.relu_init
+        self.batch_size = batch_size
+        self.embed_dim = embed_dim
+        self.vocab_size = vocab_size
+        self.n_gram_size = n_gram_size
 
-        self.inputs = tx.Input(ngram_size, dtype=tf.int32)
-        print("embed shape: ", self.embed_shape)
-        self.lookup = tx.Lookup(self.inputs, ngram_size, self.embed_shape, self.batch_size)
+        """ ***************************************************************
+        NNLM MODEL DEFINITION          
+        *************************************************************** """
+        if inputs is None:
+            inputs = tx.Input(n_gram_size, dtype=tf.int32)
 
-        self.w_h = tx.Linear(self.lookup, self.h_dim, self.h_init, bias=True)
-        self.h = tx.Activation(self.w_h, tx.relu)
+        # lookup layer
+        embed_shape = [vocab_size, embed_dim]
+        lookup = tx.Lookup(inputs, n_gram_size, embed_shape, batch_size)
 
-        self.logits = tx.Linear(self.h, vocab_size, bias=True)
-        self.output = tx.Activation(self.logits, tx.softmax)
+        # hidden layer
+        h_linear = tx.Linear(lookup, h_dim, h_init, bias=True)
+        h_layer = tx.Activation(h_linear, h_activation)
 
-    def loss(self, one_hot_labels):
-        """ Creates the loss function for this model
-        :param one_hot_labels: [batch_size, vocab_size] target one-hot-encoded labels.
-        """
-        return tx.categorical_cross_entropy(one_hot_labels, self.logits.tensor)
+        # output
+        logits = tx.Linear(h_layer, vocab_size, bias=True)
+        output = tx.Activation(logits, tx.softmax)
+
+        """ ***************************************************************
+        NNLM MODEL LOSS FUNCTION          
+        *************************************************************** """
+        if loss_inputs is None:
+            loss_inputs = tx.Input(n_units=vocab_size, name="one_hot_words")
+        loss = tx.categorical_cross_entropy(loss_inputs.tensor, logits.tensor)
+
+        super().__init__(inputs=inputs, outputs=output, loss_tensors=loss, loss_inputs=loss_inputs)
