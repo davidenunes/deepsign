@@ -63,11 +63,32 @@ model = NNLM(ngram_size=args.ngram_size - 1,
              batch_size=args.batch_size,
              h_dim=args.h_dim)
 
-labels = Input(n_units=len(vocab), name="word_classes")
+labels =
 loss = model.loss(labels.tensor)
 
 optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
 train_step = optimizer.minimize(loss)
+
+
+# N-Gram size should also be verified against dataset attributes
+inputs =  Input(n_units=len(vocab), name="word_classes")
+loss_inputs = tx.TensorLayer(training_word_one_hot, n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
+
+model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
+             n_gram_size=args.ngram_size - 1,
+             vocab_size=vocab_size,
+             embed_dim=args.embed_dim,
+             batch_size=args.batch_size,
+             h_dim=args.h_dim)
+
+model_runner = tx.ModelRunner(model)
+
+optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+model_runner.config_training(optimizer)
+
+sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
+sess = tf.Session(config=sess_config)
+model_runner.set_session(sess)
 
 # ======================================================================================
 # Training
