@@ -1,5 +1,5 @@
 import numpy as np
-from itertools import chain, tee
+import itertools
 
 
 def _pairwise(iterable):
@@ -10,7 +10,7 @@ def _pairwise(iterable):
     Returns:
         an iterable of tuples with each element paired with the next.
     """
-    a, b = tee(iterable)
+    a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
 
@@ -131,6 +131,16 @@ def ri_to_sparse(random_index):
     return SparseArray(dim=random_index.dim, active=active, values=values)
 
 
+def flatten_it(iterable):
+    """Flatten one level of nesting in an iterator"""
+    return itertools.chain.from_iterable(iterable)
+
+
+def take(n, iterable):
+    """Return first n items of the iterable as a list"""
+    return itertools.islice(iterable, n)
+
+
 def chunk_it(dataset, n_rows=None, chunk_size=1):
     """
     Allows to iterate over dataset by loading chunks at a time using slices
@@ -151,7 +161,7 @@ def chunk_it(dataset, n_rows=None, chunk_size=1):
     chunk_slices = divide_slice(n_rows, n_chunks)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
-    row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
     return row_gen
 
 
@@ -172,7 +182,7 @@ def subset_chunk_it(dataset, data_range, chunk_size=1):
     chunk_slices = divide_slice(n_rows, n_chunks, data_range.start)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
-    row_gen = chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
     return row_gen
 
 
@@ -184,3 +194,49 @@ def n_grams(seq, n=1):
     :return:
     """
     return [seq[i:i + n] for i in range(len(seq) - n + 1)]
+
+
+def batch_it(data_it, size, padding=False, padding_elem=None):
+    """
+
+    Args:
+        padding_elem: the element to be used to pad the batches
+        padding: if True, pads the last batch to be of at least the given size
+        data_it: an iterable over data to be batched
+        size: size of the batch to be returned
+
+    Returns:
+        a generator over batches with a given size, these can be smaller
+
+
+    """
+    source_iter = iter(data_it)
+    try:
+        while True:
+            batch_iter = take(size, source_iter)
+            next_batch = list(itertools.chain([next(batch_iter)], batch_iter))
+            if padding and len(next_batch) < size:
+                padding_size = size - len(next_batch)
+                next_batch.extend([padding_elem] * padding_size)
+            yield next_batch
+    except StopIteration:
+        return
+
+
+def shuffle_it(data_it, buffer_size):
+    """ Shuffle iterator based on a buffer size
+
+    Shuffling requires a finite list so we can use a buffer to build a list
+
+    Args:
+        data_it: an iterable over data
+        buffer_size: the size of
+
+    Returns:
+
+    """
+    buffer_it = batch_it(data_it, size=buffer_size)
+    result = map(np.random.permutation, buffer_it)
+    shuffled = itertools.chain.from_iterable((elem for elem in result))
+
+    return shuffled

@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from deepsign.data.views import chunk_it
 from tensorx.layers import Input
+import tensorx as tx
 
 # ======================================================================================
 # Argument parse configuration
@@ -51,28 +52,18 @@ vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
 vocab_size = len(vocab)
 print("Vocabulary loaded: {} words".format(vocab_size))
 
+# corpus
+training_dataset = corpus_hdf5["training"]
+ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size * 100)
+
 # ======================================================================================
 # Build Model
 # ======================================================================================
 print(args)
 
 # N-Gram size should also be verified against dataset attributes
-model = NNLM(ngram_size=args.ngram_size - 1,
-             vocab_size=vocab_size,
-             embed_dim=args.embed_dim,
-             batch_size=args.batch_size,
-             h_dim=args.h_dim)
-
-labels =
-loss = model.loss(labels.tensor)
-
-optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
-train_step = optimizer.minimize(loss)
-
-
-# N-Gram size should also be verified against dataset attributes
-inputs =  Input(n_units=len(vocab), name="word_classes")
-loss_inputs = tx.TensorLayer(training_word_one_hot, n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
+inputs = Input(n_units=args.ngram_size - 1, batch_size=args.bathch_size, name="context_indices", dtype=tf.int64)
+loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
 
 model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
              n_gram_size=args.ngram_size - 1,
@@ -86,18 +77,15 @@ model_runner = tx.ModelRunner(model)
 optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
 model_runner.config_training(optimizer)
 
-sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
-sess = tf.Session(config=sess_config)
+# sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
+# sess = tf.Session(config=sess_config)
+sess = tf.Session()
 model_runner.set_session(sess)
 
 # ======================================================================================
 # Training
 # ======================================================================================
 print("starting TF")
-tf_var_init = tf.global_variables_initializer()
-sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
-sess = tf.Session(config=sess_config)
-sess.run(tf_var_init)
 
 ngrams_processed = 0
 
@@ -106,9 +94,7 @@ for epoch in range(args.epochs):
     # TODO shuffle the data ?
     # train_dataset = ptb_reader.training_set(n_samples=50)
     # ngram_stream = (ngram_windows(sentence, args.window_size) for sentence in train_dataset)
-    training_dataset = corpus_hdf5["training"]
-    print(training_dataset[0:10])
-    ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size * 100)
+
     # load batches
     x_batch = []
     y_batch = []

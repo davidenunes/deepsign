@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, n_grams
+from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it
 
 
 class TestViews(TestCase):
@@ -52,3 +52,38 @@ class TestViews(TestCase):
 
         for window in windows:
             print(window)
+
+    def test_batch_it(self):
+        num_samples = 6
+        v = np.random.uniform(-1, 1, [num_samples, 2])
+        padding = np.zeros([2])
+
+        c_it = chunk_it(v, 6, chunk_size=3)
+        print(v)
+
+        batch_size = 4
+        b_it = batch_it(c_it, batch_size, padding=True, padding_elem=padding)
+
+        for b in b_it:
+            self.assertEqual(len(b), batch_size)
+            print(np.array(b))
+
+        b_it = batch_it(v, batch_size)
+        last_batch = None
+        try:
+            for b in b_it:
+                last_batch = b
+                self.assertEqual(len(b), batch_size)
+
+        except AssertionError:
+            self.assertEqual(len(last_batch), num_samples % batch_size)
+
+    def test_shuffle_it(self):
+        v = list(range(10))
+        padding = -1
+
+        b_it = batch_it(v, size=4, padding=True, padding_elem=padding)
+
+        s_it = shuffle_it(b_it, 3)
+        for elem in s_it:
+            print(elem)

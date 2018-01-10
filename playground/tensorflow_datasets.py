@@ -2,6 +2,9 @@ import tensorflow as tf
 import os
 import h5py
 from deepsign.data.views import chunk_it
+import marisa_trie
+import tensorx as tx
+import numpy as np
 
 home = os.getenv("HOME")
 corpus_file = home + "/data/datasets/ptb/ptb.hdf5"
@@ -11,6 +14,9 @@ num_workers = 8
 
 corpus_hdf5 = h5py.File(corpus_file, mode='r')
 data = corpus_hdf5["validation"]
+
+vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
+vocab_size = len(vocab)
 
 print("reading from hdf5 dataset")
 print(data[:2])
@@ -29,11 +35,29 @@ ds = ds.repeat(2)
 # ds = ds.shuffle(10)
 ds = ds.batch(2)
 value = ds.make_one_shot_iterator().get_next()
-ctx_tensor, w_tensor = tf.split(value, [3, 1], axis=-1)
+ctx_tensor, w = tf.split(value, [3, 1], axis=-1)
+w = tf.reshape(w, shape=[-1])
 
+one_hot = tf.one_hot(w, vocab_size)
+where_one = tf.where(tf.equal(one_hot, 1))
+
+"""
+Have to be careful with multiple calls to run
+if we call run multiple times it takes values from the dataset iterator
+"""
 with tf.Session() as sess:
-    ctx, w = sess.run([ctx_tensor, w_tensor])
+    ctx, w_i, one_hot, where_one = sess.run([ctx_tensor, w, one_hot, where_one])
     # w = sess.run(value[:-1])
 
+    print("ctx")
     print(ctx)
-    print(w)
+
+    print("w_i")
+    print(w_i)
+
+    print("one hot")
+
+    print(np.nonzero(one_hot))
+
+    print("indices")
+    print(where_one)
