@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_it
 from tensorx.layers import Input
 import tensorx as tx
 
@@ -58,9 +58,11 @@ training_dataset = corpus_hdf5["training"]
 chunk_size = args.batch_size * 100
 ngram_stream = chunk_it(training_dataset, chunk_size=chunk_size)
 
-#padding = np.zeros([args.ngram_size])
+ngram_stream = repeat_it(ngram_stream, args.epochs)
+
+padding = np.zeros([args.ngram_size])
 # batch n-grams
-#ngram_stream = batch_it(ngram_stream, size=args.batch_size, padding=True, padding_elem=padding)
+ngram_stream = batch_it(ngram_stream, size=args.batch_size, padding=True, padding_elem=padding)
 
 # ======================================================================================
 # Build Model
@@ -93,25 +95,10 @@ model_runner.set_session(sess)
 print("starting TF")
 
 ngrams_processed = 0
-
-for epoch in range(args.epochs):
-    # restart training dataset
-    # TODO shuffle the data ?
-    # train_dataset = ptb_reader.training_set(n_samples=50)
-    # ngram_stream = (ngram_windows(sentence, args.window_size) for sentence in train_dataset)
-
-    # load batches
-    x_batch = []
-    y_batch = []
-    b = 0
-
-    # stream of ngrams for each sentence
-    for ngram in tqdm(ngram_stream, total=len(training_dataset)):
-        # wi hi already come as indices of the words they represent
-        # print("ngram: ", ngram)
-        # print(list(map(vocab.restore_key,ngram)))
-        wi = ngram[-1]
-        hi = ngram[:-1]
+progress = tqdm(total=len(training_dataset)*args.epochs)
+for n_gram_batch in ngram_stream:
+        wi = n_gram_batch[-1]
+        hi = n_gram_batch[:-1]
         # x_batch.append(list(map(vocab.get, hi)))
         x_batch.append(hi)
         # one hot

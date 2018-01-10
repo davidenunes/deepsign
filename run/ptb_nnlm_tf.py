@@ -33,7 +33,7 @@ parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=1)
+parser.add_argument('-batch_size', dest="batch_size", type=int, default=50)
 parser.add_argument('-n_rows', dest="n_rows", type=int, default=10)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=1)
 args = parser.parse_args()
@@ -107,22 +107,22 @@ model_runner = tx.ModelRunner(model)
 optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
 model_runner.config_training(optimizer)
 
-sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
-sess = tf.Session(config=sess_config)
+#sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
+#sess = tf.Session(config=sess_config)
+sess = tf.Session()
 model_runner.set_session(sess)
 
 # ======================================================================================
 # Training
 # ======================================================================================
-print("starting TF")
-
 batches_processed = 0
 
 total_n_grams = len(hdf5_training) * args.epochs
+print(total_n_grams)
 if args.n_rows != -1:
     total_n_grams = args.n_rows * args.epochs
 
-progress = tqdm(total=total_n_grams)
+progress = tqdm(total=total_n_grams/args.batch_size)
 while True:
     try:
         ctx, one_hot_w = sess.run([training_ctx, training_word_one_hot])
@@ -132,7 +132,10 @@ while True:
         model_runner.train()
 
         batches_processed += 1
-        progress.update(n=args.batch_size)
+
+        progress.update(args.batch_size)
+        # print(batches_processed)
+
     except tf.errors.OutOfRangeError:
         print(np.shape(ctx))
         print(np.shape(one_hot_w))

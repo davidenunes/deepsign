@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it
+from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_it
 
 
 class TestViews(TestCase):
@@ -87,3 +87,19 @@ class TestViews(TestCase):
         s_it = shuffle_it(b_it, 3)
         for elem in s_it:
             print(elem)
+
+    def test_repeat_it(self):
+        num_samples = 6
+        v = list(range(num_samples))
+        padding = -1
+
+        epochs = 2
+        epoch_it = repeat_it(v, epochs)
+        self.assertEqual(len(list(epoch_it)), num_samples * epochs)
+
+        epoch_it = repeat_it(v, epochs)
+        s_it = shuffle_it(epoch_it, 2)
+        b_it = batch_it(s_it, size=5, padding=True, padding_elem=padding)
+
+        for b in b_it:
+            print(b)

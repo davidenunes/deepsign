@@ -240,3 +240,16 @@ def shuffle_it(data_it, buffer_size):
     shuffled = itertools.chain.from_iterable((elem for elem in result))
 
     return shuffled
+
+
+def repeat_it(iterable, n):
+    """ Returns an iterator that takes an iterable and repeats an iteration though it n times
+
+    Args:
+        iterable: an iterable object
+        n: number of times we iterate over iterable
+
+    Returns:
+
+    """
+    return itertools.chain.from_iterable(itertools.repeat(iterable, n))
