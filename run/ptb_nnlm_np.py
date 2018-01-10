@@ -6,8 +6,9 @@ from deepsign.models.nnlm import NNLM
 
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
-from deepsign.data.views import chunk_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it
 from tensorx.layers import Input
 import tensorx as tx
 
@@ -54,15 +55,19 @@ print("Vocabulary loaded: {} words".format(vocab_size))
 
 # corpus
 training_dataset = corpus_hdf5["training"]
-ngram_stream = chunk_it(training_dataset, chunk_size=args.batch_size * 100)
+chunk_size = args.batch_size * 100
+ngram_stream = chunk_it(training_dataset, chunk_size=chunk_size)
+
+#padding = np.zeros([args.ngram_size])
+# batch n-grams
+#ngram_stream = batch_it(ngram_stream, size=args.batch_size, padding=True, padding_elem=padding)
 
 # ======================================================================================
 # Build Model
 # ======================================================================================
-print(args)
 
 # N-Gram size should also be verified against dataset attributes
-inputs = Input(n_units=args.ngram_size - 1, batch_size=args.bathch_size, name="context_indices", dtype=tf.int64)
+inputs = Input(n_units=args.ngram_size - 1, name="context_indices", dtype=tf.int64)
 loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
 
 model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
@@ -101,7 +106,7 @@ for epoch in range(args.epochs):
     b = 0
 
     # stream of ngrams for each sentence
-    for ngram in ngram_stream:
+    for ngram in tqdm(ngram_stream, total=len(training_dataset)):
         # wi hi already come as indices of the words they represent
         # print("ngram: ", ngram)
         # print(list(map(vocab.restore_key,ngram)))
@@ -123,21 +128,9 @@ for epoch in range(args.epochs):
             y_batch = np.array(y_batch)
             # train the model
 
-            current_loss = sess.run(loss, {
-                model.inputs.tensor: x_batch,
-                labels.tensor: y_batch,
-            })
-            # print("loss before: ", current_loss)
-            # train step
-            sess.run(train_step, {
-                model.inputs.tensor: x_batch,
-                labels.tensor: y_batch,
-            })
-            current_loss = sess.run(loss, {
-                model.inputs.tensor: x_batch,
-                labels.tensor: y_batch,
-            })
-            # print("loss after: ", current_loss)
+            model_runner.train(data=x_batch, loss_input_data=y_batch)
+            result = model_runner.run(x_batch)
+            # print(result)
 
             x_batch = []
             y_batch = []
