@@ -8,9 +8,11 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_it, take_it
 from tensorx.layers import Input
 import tensorx as tx
+
+from deepsign.data import transform
 
 # ======================================================================================
 # Argument parse configuration
@@ -34,14 +36,13 @@ parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=50)
+parser.add_argument('-batch_size', dest="batch_size", type=int, default=512)
 args = parser.parse_args()
 
 out_dir = home + args.out_dir
 # ======================================================================================
 # Load Params
 # ======================================================================================
-
 
 # ======================================================================================
 # Load Corpus & Vocab
@@ -60,7 +61,7 @@ ngram_stream = chunk_it(training_dataset, chunk_size=chunk_size)
 
 ngram_stream = repeat_it(ngram_stream, args.epochs)
 
-padding = np.zeros([args.ngram_size])
+padding = np.zeros([args.ngram_size],dtype=np.int64)
 # batch n-grams
 ngram_stream = batch_it(ngram_stream, size=args.batch_size, padding=True, padding_elem=padding)
 
@@ -95,31 +96,36 @@ model_runner.set_session(sess)
 print("starting TF")
 
 ngrams_processed = 0
-progress = tqdm(total=len(training_dataset)*args.epochs)
-for n_gram_batch in ngram_stream:
-        wi = n_gram_batch[-1]
-        hi = n_gram_batch[:-1]
-        # x_batch.append(list(map(vocab.get, hi)))
-        x_batch.append(hi)
-        # one hot
-        y = np.zeros([vocab_size])
-        # y[vocab[wi]] = 1
-        y[wi] = 1
-        y_batch.append(y)
+progress = tqdm(total=len(training_dataset) * args.epochs)
+#ngram_stream = take_it(1, ngram_stream)
+for ngram_batch in ngram_stream:
+    ngram_batch = np.array(ngram_batch,dtype=np.int64)
+    ctx_ids = ngram_batch[:, :-1]
+    word_ids = ngram_batch[:, -1]
+    one_hot = transform.batch_one_hot(word_ids, vocab_size)
 
-        b += 1
-        ngrams_processed += 1
+    model_runner.run(ctx_ids)
+    progress.update(args.batch_size)
+    """
+    y = np.zeros([vocab_size])
+    # y[vocab[wi]] = 1
+    y[wi] = 1
+    y_batch.append(y)
 
-        if b % args.batch_size == 0:
-            x_batch = np.array(x_batch)
-            y_batch = np.array(y_batch)
-            # train the model
+    b += 1
+    ngrams_processed += 1
 
-            model_runner.train(data=x_batch, loss_input_data=y_batch)
-            result = model_runner.run(x_batch)
-            # print(result)
+    if b % args.batch_size == 0:
+        x_batch = np.array(x_batch)
+        y_batch = np.array(y_batch)
+        # train the model
 
-            x_batch = []
-            y_batch = []
+        model_runner.train(data=x_batch, loss_input_data=y_batch)
+        result = model_runner.run(x_batch)
+        # print(result)
 
-    print("Processed {} ngrams".format(ngrams_processed))
+        x_batch = []
+        y_batch = []
+    """
+progress.close()
+print("Processed {} ngrams".format(ngrams_processed))

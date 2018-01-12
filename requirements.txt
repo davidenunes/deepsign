@@ -5,8 +5,7 @@ scipy>=0.18.1
 scikit-learn>=0.18.1
 tqdm>=4.19.5
 bidict>=0.14.2
-marisa-trie>=0.7.2
-seaborn<=0.7.1
+marisa-trie>=0.7.4
 tensorflow>=1.4.1
 matplotlib
 

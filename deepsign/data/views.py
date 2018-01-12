@@ -136,7 +136,7 @@ def flatten_it(iterable):
     return itertools.chain.from_iterable(iterable)
 
 
-def take(n, iterable):
+def take_it(n, iterable):
     """Return first n items of the iterable as a list"""
     return itertools.islice(iterable, n)
 
@@ -213,7 +213,7 @@ def batch_it(data_it, size, padding=False, padding_elem=None):
     source_iter = iter(data_it)
     try:
         while True:
-            batch_iter = take(size, source_iter)
+            batch_iter = take_it(size, source_iter)
             next_batch = list(itertools.chain([next(batch_iter)], batch_iter))
             if padding and len(next_batch) < size:
                 padding_size = size - len(next_batch)

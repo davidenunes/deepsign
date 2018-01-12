@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from deepsign.data.views import chunk_it
 import tensorx as tx
+
 from tqdm import tqdm
 
 # ======================================================================================
