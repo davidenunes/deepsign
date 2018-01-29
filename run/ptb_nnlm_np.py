@@ -3,6 +3,7 @@ import os
 import h5py
 import marisa_trie
 from deepsign.models.nnlm import NNLM
+import csv
 
 import numpy as np
 import tensorflow as tf
@@ -24,12 +25,14 @@ from deepsign.data import transform
 home = os.getenv("HOME")
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
+# prefix used to identify result files
+parser.add_argument('-id', dest="id", type=int, default=0)
 parser.add_argument('-conf', dest="conf", type=str)
 parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
 parser.add_argument('-output_dir', dest="output_dir", type=str, default=home + "/data/results/")
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=100)
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=200)
-parser.add_argument('-epochs', dest="epochs", type=int, default=2)
+parser.add_argument('-epochs', dest="epochs", type=int, default=1)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
@@ -42,6 +45,24 @@ out_dir = home + args.out_dir
 # ======================================================================================
 # Load Params
 # ======================================================================================
+arg_dict = vars(args)
+
+# result file name
+print(arg_dict)
+res_param_filename = "{id}_params.csv".format(id=arg_dict["id"])
+with open(res_param_filename, "w") as param_file:
+    writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
+    writer.writeheader()
+    writer.writerow(arg_dict)
+
+res_eval_filename = "{id}_eval.csv".format(id=arg_dict["id"])
+eval_header = ["epoch", "step",
+               "validation_avg_ppl",
+               "test_avg_ppl"]
+
+res_eval_file = open(res_eval_filename, "w")
+res_eval_writer = csv.DictWriter(f=res_eval_file, fieldnames=eval_header)
+res_eval_writer.writeheader()
 
 # ======================================================================================
 # Load Corpus & Vocab
@@ -86,7 +107,8 @@ model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
 
 model_runner = tx.ModelRunner(model)
 
-optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+# optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
 # optimizer = tf.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
 
 model_runner.config_optimizer(optimizer)
@@ -148,12 +170,24 @@ for ngram_batch in training_data:
 
     steps += 1
     if steps % 100 == 0:
-        print("evaluating")
-        ppl = evaluation(model_runner, get_data_it(test_dataset), len(test_dataset))
-        print("perplexity = {}".format(ppl))
+        print("evaluating validation dataset")
+        ppl_validation = evaluation(model_runner, get_data_it(validation_dataset), len(validation_dataset))
+
+        print("evaluating test dataset")
+        ppl_test = evaluation(model_runner, get_data_it(test_dataset), len(test_dataset))
+        print("valid. perplexity = {} \n test perplexity {}".format(ppl_validation, ppl_test))
+
+        res = {"epoch": epoch, "step": steps, "validation_avg_ppl": ppl_validation, "test_avg_ppl": ppl_test}
+        res_eval_writer.writerow(res)
+        res_eval_file.flush()
+
+        print("results written")
 
     # print(epoch)
 
 model_runner.close_session()
 print("Processed {} ngrams".format(progress.n))
 progress.close()
+
+# close result files
+res_eval_file.close()
