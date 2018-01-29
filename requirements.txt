@@ -9,3 +9,5 @@ marisa-trie>=0.7.4
 tensorflow>=1.4.1
 matplotlib
 
+# tensorx requirement
+#git+git://github.com/davidenunes/tensorx@dev#egg=tensorx

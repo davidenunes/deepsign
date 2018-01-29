@@ -36,7 +36,7 @@ parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=50)
 parser.add_argument('-n_rows', dest="n_rows", type=int, default=10)
-parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=1)
+parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100)
 args = parser.parse_args()
 
 out_dir = home + args.out_dir
@@ -56,7 +56,7 @@ vocab_size = len(vocab)
 print("Vocabulary loaded: {} words".format(vocab_size))
 
 # load dataset into TF Dataset API
-hdf5_training = corpus_hdf5["training"]
+training_dataset = corpus_hdf5["training"]
 chunk_size = args.batch_size * args.shuffle_buffer_size
 
 
@@ -64,7 +64,7 @@ chunk_size = args.batch_size * args.shuffle_buffer_size
 def n_gram_gen():
     """ Callable returning iterable over n-grams
     """
-    for n_gram in chunk_it(hdf5_training, chunk_size=chunk_size):
+    for n_gram in chunk_it(training_dataset, chunk_size=chunk_size):
         yield n_gram
 
 
@@ -73,7 +73,6 @@ if args.n_rows != -1:
     training_Data = training_data.take(args.n_rows)
 
 training_data = training_data.repeat(args.epochs)
-# training_data = training_data.prefetch(chunk_size*100)
 training_data = training_data.shuffle(chunk_size)
 training_data = training_data.batch(args.batch_size)
 
@@ -90,7 +89,6 @@ training_word_one_hot = tf.one_hot(training_word, depth=vocab_size)
 # ======================================================================================
 # Build Model
 # ======================================================================================
-print(args)
 
 # N-Gram size should also be verified against dataset attributes
 inputs = tx.TensorLayer(training_ctx, n_units=args.ngram_size - 1, batch_size=args.batch_size, dtype=tf.int64)
@@ -106,7 +104,7 @@ model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
 model_runner = tx.ModelRunner(model)
 
 optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
-model_runner.config_training(optimizer)
+model_runner.config_optimizer(optimizer)
 
 #sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
 #sess = tf.Session(config=sess_config)
@@ -118,12 +116,12 @@ model_runner.set_session(sess)
 # ======================================================================================
 batches_processed = 0
 
-total_n_grams = len(hdf5_training) * args.epochs
+total_n_grams = len(training_dataset) * args.epochs
 print(total_n_grams)
 if args.n_rows != -1:
     total_n_grams = args.n_rows * args.epochs
 
-progress = tqdm(total=total_n_grams/args.batch_size)
+progress = tqdm(total=len(training_dataset) * args.epochs)
 while True:
     try:
         ctx, one_hot_w = sess.run([training_ctx, training_word_one_hot])

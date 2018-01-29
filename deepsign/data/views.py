@@ -1,5 +1,6 @@
 import numpy as np
 import itertools
+from functools import partial
 
 
 def _pairwise(iterable):
@@ -152,7 +153,10 @@ def chunk_it(dataset, n_rows=None, chunk_size=1):
     :return: and iterator over the elements of dataset with buffered slicing
     """
     if n_rows is None:
-        n_rows = len(dataset)
+        try:
+            n_rows = len(dataset)
+        except TypeError:
+            raise TypeError("n_rows is None but dataset has no len()")
 
     if chunk_size > n_rows:
         chunk_size = n_rows
@@ -161,7 +165,8 @@ def chunk_it(dataset, n_rows=None, chunk_size=1):
     chunk_slices = divide_slice(n_rows, n_chunks)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
-    row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    # row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
+    row_gen = itertools.chain.from_iterable(chunk_gen)
     return row_gen
 
 
@@ -242,14 +247,25 @@ def shuffle_it(data_it, buffer_size):
     return shuffled
 
 
-def repeat_it(iterable, n):
-    """ Returns an iterator that takes an iterable and repeats an iteration though it n times
+def repeat_fn(fn, data, n):
+    """ Repeats the iter_fn on the given data, n times
+
+    Warning: this intended to create iterators that cycle multiple times though
+    data without having to copy the elements to cycle through them. If the
+    fn returns a generator that iterates in a certain manner, this re-applies
+    that same generator to the data. If however, data is an iterable that gets
+    exhausted the first time it runs, this will return all the elements in the iterable
+    just once.
 
     Args:
-        iterable: an iterable object
+        data: the data to which the iter fn is to be applied
+        fn : a function to be applied to the data
         n: number of times we iterate over iterable
 
     Returns:
+        a generator on elems in data given by the iter_fn it
 
     """
-    return itertools.chain.from_iterable(itertools.repeat(iterable, n))
+    iter_it = (fn(data) for fn in itertools.repeat(fn, n))
+
+    return itertools.chain.from_iterable(iter_it)

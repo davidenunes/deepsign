@@ -1,7 +1,8 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_it
+from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_fn
+import itertools
 
 
 class TestViews(TestCase):
@@ -88,18 +89,33 @@ class TestViews(TestCase):
         for elem in s_it:
             print(elem)
 
-    def test_repeat_it(self):
-        num_samples = 6
-        v = list(range(num_samples))
-        padding = -1
+    def test_reat_chunk_it(self):
+        n_samples = 4
+        repeat = 2
+        v = np.random.uniform(0, 1, [n_samples, 1])
+        data_it = chunk_it(v, chunk_size=2)
 
-        epochs = 2
-        epoch_it = repeat_it(v, epochs)
-        self.assertEqual(len(list(epoch_it)), num_samples * epochs)
+        def chunk_fn(x): return chunk_it(x, chunk_size=2)
 
-        epoch_it = repeat_it(v, epochs)
-        s_it = shuffle_it(epoch_it, 2)
-        b_it = batch_it(s_it, size=5, padding=True, padding_elem=padding)
+        # for chunk in data_it:
+        #    print(chunk)
+        # print(data_it)
+        data_it = repeat_fn(chunk_fn, v, repeat)
 
-        for b in b_it:
-            print(b)
+        self.assertEqual(len(list(data_it)), n_samples * repeat)
+
+    def test_repeat_fn_exhaust(self):
+        n_samples = 4
+        repeat = 2
+        v = np.random.uniform(0, 1, [n_samples, 1])
+        data_it = chunk_it(v, chunk_size=2)
+
+        def it_fn(x): return iter(x)
+
+        # data it will get exhausted so it will not repeat
+        data_it = repeat_fn(it_fn, data_it, repeat)
+
+        # only return 4 items
+        self.assertEqual(len(list(data_it)), n_samples)
+
+

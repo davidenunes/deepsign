@@ -8,35 +8,34 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_it, take_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
 from tensorx.layers import Input
 import tensorx as tx
 
 from deepsign.data import transform
 
 # ======================================================================================
-# Argument parse configuration
-# -name : model name to be used with result files as a prefix (defaults to nnlm)
+# ARGUMENTS
+#
 # -conf : configuration file path
 # -corpus : dataset file path (uses the hdf5 format defined by convert to hdf5 script)
-# -output : output dir where results are written, defaults to ~/data/results/
+# -output_dir : output_dir dir where results are written, defaults to ~/data/results/
 # ======================================================================================
 home = os.getenv("HOME")
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 parser.add_argument('-conf', dest="conf", type=str)
-parser.add_argument('-name', dest="name", type=str, default="nnlm")
 parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
-parser.add_argument('-output', dest="output", type=str, default=home + "/data/results/")
-
+parser.add_argument('-output_dir', dest="output_dir", type=str, default=home + "/data/results/")
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=100)
-parser.add_argument('-h_dim', dest="h_dim", type=int, default=100)
-parser.add_argument('-epochs', dest="epochs", type=int, default=1)
+parser.add_argument('-h_dim', dest="h_dim", type=int, default=200)
+parser.add_argument('-epochs', dest="epochs", type=int, default=2)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default="/data/results/")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default="/data/gold_standards/")
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=512)
+parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
+parser.add_argument('-eval_per_epoch', dest='eval_per_epoch', type=int, default=1)
 args = parser.parse_args()
 
 out_dir = home + args.out_dir
@@ -56,17 +55,22 @@ print("Vocabulary loaded: {} words".format(vocab_size))
 
 # corpus
 training_dataset = corpus_hdf5["training"]
-chunk_size = args.batch_size * 100
-ngram_stream = chunk_it(training_dataset, chunk_size=chunk_size)
+test_dataset = corpus_hdf5["test"]
+validation_dataset = corpus_hdf5["validation"]
 
-ngram_stream = repeat_it(ngram_stream, args.epochs)
 
-padding = np.zeros([args.ngram_size],dtype=np.int64)
-# batch n-grams
-ngram_stream = batch_it(ngram_stream, size=args.batch_size, padding=True, padding_elem=padding)
+# data pipeline
+def get_data_it(hdf5_dataset):
+    def chunk_fn(x): return chunk_it(x, chunk_size=args.batch_size * 100)
+
+    dataset = repeat_fn(chunk_fn, hdf5_dataset, args.epochs)
+    padding = np.zeros([args.ngram_size], dtype=np.int64)
+    dataset = batch_it(dataset, size=args.batch_size, padding=True, padding_elem=padding)
+    return dataset
+
 
 # ======================================================================================
-# Build Model
+# MODEL
 # ======================================================================================
 
 # N-Gram size should also be verified against dataset attributes
@@ -83,49 +87,73 @@ model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
 model_runner = tx.ModelRunner(model)
 
 optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
-model_runner.config_training(optimizer)
+# optimizer = tf.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
+
+model_runner.config_optimizer(optimizer)
 
 # sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
 # sess = tf.Session(config=sess_config)
 sess = tf.Session()
 model_runner.set_session(sess)
 
+
+# ======================================================================================
+# EVAL
+# ======================================================================================
+def evaluation(model_runner, dataset_it, len_dataset):
+    progress = tqdm(total=len_dataset)
+    ngrams_processed = 0
+    sum_loss = 0
+    for ngram_batch in dataset_it:
+        ngram_batch = np.array(ngram_batch, dtype=np.int64)
+        ctx_ids = ngram_batch[:, :-1]
+        word_ids = ngram_batch[:, -1]
+        one_hot = transform.batch_one_hot(word_ids, vocab_size)
+
+        mean_loss = model_runner.eval(ctx_ids, one_hot)
+        sum_loss += mean_loss
+
+        progress.update(args.batch_size)
+        ngrams_processed += 1
+
+    progress.close()
+    return np.exp(sum_loss / ngrams_processed)
+
+
 # ======================================================================================
 # Training
 # ======================================================================================
 print("starting TF")
 
-ngrams_processed = 0
+eval_points = np.linspace(0, 1, args.eval_per_epoch)
+print("eval points", eval_points)
+steps = 0
+current_epoch = 0
 progress = tqdm(total=len(training_dataset) * args.epochs)
-#ngram_stream = take_it(1, ngram_stream)
-for ngram_batch in ngram_stream:
-    ngram_batch = np.array(ngram_batch,dtype=np.int64)
+# ngram_stream = take_it(1, ngram_stream)
+training_data = get_data_it(training_dataset)
+for ngram_batch in training_data:
+    epoch = progress.n // len(training_dataset) + 1
+    if epoch != current_epoch:
+        current_epoch = epoch
+        print("epoch: ", current_epoch)
+
+    ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1]
     one_hot = transform.batch_one_hot(word_ids, vocab_size)
 
-    model_runner.run(ctx_ids)
+    model_runner.train(ctx_ids, one_hot)
     progress.update(args.batch_size)
-    """
-    y = np.zeros([vocab_size])
-    # y[vocab[wi]] = 1
-    y[wi] = 1
-    y_batch.append(y)
 
-    b += 1
-    ngrams_processed += 1
+    steps += 1
+    if steps % 100 == 0:
+        print("evaluating")
+        ppl = evaluation(model_runner, get_data_it(test_dataset), len(test_dataset))
+        print("perplexity = {}".format(ppl))
 
-    if b % args.batch_size == 0:
-        x_batch = np.array(x_batch)
-        y_batch = np.array(y_batch)
-        # train the model
+    # print(epoch)
 
-        model_runner.train(data=x_batch, loss_input_data=y_batch)
-        result = model_runner.run(x_batch)
-        # print(result)
-
-        x_batch = []
-        y_batch = []
-    """
+model_runner.close_session()
+print("Processed {} ngrams".format(progress.n))
 progress.close()
-print("Processed {} ngrams".format(ngrams_processed))

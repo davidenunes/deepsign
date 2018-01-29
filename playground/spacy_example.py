@@ -18,7 +18,7 @@ for tag in PoS.NAMES:
     print(nlp.vocab.strings[tag])
 
 print("==========================================")
-sentence = "Mr Jabbas welcome back, we missed you!"
+sentence = "Mr Anderson welcome back, we missed you!"
 doc = nlp.tokenizer(sentence)
 
 print(doc)
@@ -32,14 +32,14 @@ doc = nlp(sentence)
 
 
 def print_subtree(token):
-    print("token in head")
+    #print("token in head")
     print("(" + token.orth_ + "(" + token.pos_ + ")->" + token.dep_ + "->" + token.head.orth_ + ")")
     if token.dep_ == "pobj":
         print("following preposition path")
         for c in token.head.head.children:
             print("(" + c.orth_ + "(" + c.pos_ + ")->" + c.dep_ + "->" + c.head.orth_ + ")")
 
-    print("tokens in children")
+    #print("tokens in children")
     for c in token.children:
         print("(" + c.orth_ + "(" + c.pos_ + ")->" + c.dep_ + "->" + c.head.orth_ + ")")
 
@@ -62,7 +62,7 @@ print(token.dep_ + "(" + token.head.orth_ + "," + token.orth_ + ")")
 # print(tokens[0].nbor(3).orth_)
 
 # testing determinant dependencies
-tokens = nlp(u'The cat eats the mouse and carrots.')
+tokens = nlp(u'The cat eats the mouse.')
 print(tokens)
 
 token = tokens[1]
