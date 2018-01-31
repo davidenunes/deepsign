@@ -1,4 +1,8 @@
 import argparse
+import os
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+print(dir_path)
 
 parser = argparse.ArgumentParser(description="testing argparse")
 parser.add_argument('-ri_k', type=int, default=1000)

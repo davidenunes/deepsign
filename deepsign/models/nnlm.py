@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class NNLM(tx.Model):
-    def __init__(self, n_gram_size, vocab_size, embed_dim, batch_size, h_dim,
+    def __init__(self, n_gram_size, vocab_size, embed_dim, batch_size, h_dim, num_hidden=1,
                  h_activation=tx.relu,
                  h_init=tx.relu_init,
                  inputs=None, eval_inputs=None, loss_inputs=None):
@@ -13,6 +13,7 @@ class NNLM(tx.Model):
         self.h_init = h_init
         self.h_activation = h_activation
         self.h_dim = h_dim
+        self.num_hidden = num_hidden
         self.batch_size = batch_size
         self.embed_dim = embed_dim
         self.vocab_size = vocab_size
@@ -29,11 +30,17 @@ class NNLM(tx.Model):
         lookup = tx.Lookup(inputs, n_gram_size, embed_shape, batch_size, init=tx.random_normal(0, 0.05))
 
         # hidden layer
-        h_linear = tx.Linear(lookup, h_dim, h_init, bias=True)
-        h_layer = tx.Activation(h_linear, h_activation)
+        if num_hidden < 1:
+            raise ValueError("num hidden should be >= 1")
+
+        last_layer = lookup
+        for _ in range(num_hidden):
+            h_linear = tx.Linear(last_layer, h_dim, h_init, bias=True)
+            h_layer = tx.Activation(h_linear, h_activation)
+            last_layer = h_layer
 
         # output
-        logits = tx.Linear(h_layer, vocab_size, bias=True)
+        logits = tx.Linear(last_layer, vocab_size, bias=True)
         output = tx.Activation(logits, tx.softmax)
 
         """ ===============================================================

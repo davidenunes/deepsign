@@ -247,6 +247,22 @@ def shuffle_it(data_it, buffer_size):
     return shuffled
 
 
+def chain_it(*data_it):
+    """ Forward method for itertools chain
+
+    To avoid unnecessary imports when using the "recipes" in views
+
+    Args:
+        *data_it: the iterables to be chained
+
+    Returns:
+        returns elements from the first iterable until exhausted, proceeds to the following iterables untill all are
+        exhausted.
+
+    """
+    return itertools.chain(*data_it)
+
+
 def repeat_fn(fn, data, n):
     """ Repeats the iter_fn on the given data, n times
 

@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_fn
+from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_fn, chain_it
 import itertools
 
 
@@ -104,6 +104,28 @@ class TestViews(TestCase):
 
         self.assertEqual(len(list(data_it)), n_samples * repeat)
 
+    def test_chain_shuffle(self):
+        n_samples = 4
+        repeat = 2
+        v = np.arange(0, n_samples, 1)
+        data_it = chunk_it(v, chunk_size=2)
+
+        def chunk_fn(x): return chunk_it(x, chunk_size=2)
+
+        # first chain is normal, second is shuffled from the two repetitions
+        data_it = repeat_fn(chunk_fn, v, repeat)
+
+        data_it = chain_it(data_it, shuffle_it(repeat_fn(chunk_fn, v, repeat), buffer_size=8))
+
+        data = list(data_it)
+
+        unique_data = np.unique(data)
+        counts = np.unique(np.bincount(data))
+
+        self.assertEqual(len(unique_data), 4)
+        self.assertEqual(len(counts), 1)
+        self.assertEqual(counts[0], 4)
+
     def test_repeat_fn_exhaust(self):
         n_samples = 4
         repeat = 2
@@ -117,5 +139,3 @@ class TestViews(TestCase):
 
         # only return 4 items
         self.assertEqual(len(list(data_it)), n_samples)
-
-
