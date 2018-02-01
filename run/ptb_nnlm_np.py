@@ -123,7 +123,7 @@ model_runner.set_session(sess)
 
 
 # ======================================================================================
-# EVAL
+# EVALUATION UTIL FUNCTIONS
 # ======================================================================================
 def eval_model(model_runner, dataset_it, len_dataset):
     # progress = tqdm(total=len_dataset)
@@ -163,7 +163,7 @@ def evaluation(model_runner, progress, epoch, step):
 
 
 # ======================================================================================
-# Training
+# TRAINING LOOP
 # ======================================================================================
 print("starting TF")
 
