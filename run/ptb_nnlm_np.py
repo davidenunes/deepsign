@@ -26,7 +26,7 @@ default_out_dir = os.path.dirname(os.path.realpath(__file__))
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 # prefix used to identify result files
-parser.add_argument('-id', dest="id", type=int, default=0)
+parser.add_argument('-id', dest="id", type=int, default=-1)
 parser.add_argument('-conf', dest="conf", type=str)
 parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
@@ -44,19 +44,20 @@ args = parser.parse_args()
 # ======================================================================================
 # Load Params
 # ======================================================================================
-arg_dict = vars(args)
+
 
 # result file name
 # print(arg_dict)
 
-out_dir = arg_dict["out_dir"]
-res_param_filename = os.path.join(out_dir, "{id}_params.csv".format(id=arg_dict["id"]))
+
+res_param_filename = os.path.join(args.out_dir, "{id}_params.csv".format(id=args.id))
 with open(res_param_filename, "w") as param_file:
+    arg_dict = vars(args)
     writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
     writer.writeheader()
     writer.writerow(arg_dict)
 
-res_eval_filename = os.path.join(out_dir, "{id}_perplexity.csv".format(id=arg_dict["id"]))
+res_eval_filename = os.path.join(args.out_dir, "{id}_perplexity.csv".format(id=arg_dict["id"]))
 eval_header = ["epoch", "step", "dataset", "perplexity"]
 
 res_eval_file = open(res_eval_filename, "w")
@@ -106,7 +107,9 @@ model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
              vocab_size=vocab_size,
              embed_dim=args.embed_dim,
              batch_size=args.batch_size,
-             h_dim=args.h_dim)
+             h_dim=args.h_dim,
+             use_dropout=True,
+             keep_prob=0.7)
 
 model_runner = tx.ModelRunner(model)
 
