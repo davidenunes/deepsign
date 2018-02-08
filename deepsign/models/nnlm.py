@@ -27,7 +27,7 @@ class NNLM(tx.Model):
 
         # lookup layer
         embed_shape = [vocab_size, embed_dim]
-        lookup = tx.Lookup(inputs, n_gram_size, embed_shape, batch_size, init=tx.random_normal(0, 0.05))
+        lookup = tx.Lookup(inputs, n_gram_size, embed_shape, batch_size, weight_init=tx.random_normal(0, 0.05))
 
         # hidden layer
         if num_hidden < 1:

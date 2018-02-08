@@ -110,11 +110,21 @@ model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
 
 model_runner = tx.ModelRunner(model)
 
-optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+# optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+lr_param = tx.InputParam()
+optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
+
 # optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
 # optimizer = tf.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
 
-model_runner.config_optimizer(optimizer)
+# model_runner.config_optimizer(optimizer)
+# def global_grad_clip(grads):
+#    grads, _ = tf.clip_by_global_norm(grads, 12)
+#    return grads
+
+
+# model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=grad_clip, global_gradient_op=True)
+model_runner.config_optimizer(optimizer, params=lr_param)
 
 # sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
 # sess = tf.Session(config=sess_config)
@@ -183,13 +193,15 @@ progress = tqdm(total=len(training_dataset) * args.epochs)
 # ngram_stream = take_it(1, ngram_stream)
 
 # DO EVAL T = 0
-evaluation(model_runner, progress, epoch=1, step=0)
+# evaluation(model_runner, progress, epoch=1, step=0)
 
 training_data = get_data_it(training_dataset)
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1
     if epoch != current_epoch:
         current_epoch = epoch
+        eval_steps = deque(eval_steps)
+        step = 0
         progress.write("epoch: {}".format(current_epoch))
 
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
@@ -197,7 +209,7 @@ for ngram_batch in training_data:
     word_ids = ngram_batch[:, -1]
     one_hot = transform.batch_one_hot(word_ids, vocab_size)
 
-    model_runner.train(ctx_ids, one_hot)
+    model_runner.train(ctx_ids, one_hot, args.learning_rate)
     progress.update(args.batch_size)
 
     step += 1
