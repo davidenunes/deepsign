@@ -103,7 +103,7 @@ inputs = Input(n_units=args.ngram_size - 1, name="context_indices", dtype=tf.int
 loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
 
 model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
-             n_gram_size=args.ngram_size - 1,
+             ctx_size=args.ngram_size - 1,
              vocab_size=vocab_size,
              embed_dim=args.embed_dim,
              batch_size=args.batch_size,

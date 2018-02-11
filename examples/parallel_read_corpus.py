@@ -4,7 +4,7 @@
 # with random indexing, the sign index update becomes the bottleneck
 # perhaps this bottleneck is not as sever as I think it is, I should just implement it and profile the code
 # in production, some kind of system providing the sign index would have to exist anyway unless I find a way
-# to learn with models using different vector basis for each word.
+# to learn with run using different vector basis for each word.
 
 import time
 import h5py

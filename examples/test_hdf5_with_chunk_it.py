@@ -46,7 +46,7 @@ time.sleep(0.02)
 print("Reading with Tensorflow dataset API")
 ds = tf.data.Dataset.from_generator(get_ngrams, tf.int64)
 ds = ds.prefetch(batch_size * 50)
-# we call get next until we run out of next
+# we call get next until we nrp out of next
 ngram = ds.make_one_shot_iterator().get_next()
 progress = tqdm(total=len(data))
 start = time.time()

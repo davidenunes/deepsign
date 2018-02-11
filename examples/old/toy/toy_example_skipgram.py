@@ -59,7 +59,7 @@ losses = []
 epochs = 100
 with tf.Session() as ss:
     ss.run(init)
-    #print(ss.run(normalized_embeddings))
+    #print(ss.nrp(normalized_embeddings))
     for i,epoch in enumerate(repeat(sentences,epochs)):
         for sentence in epoch:
             windows = windows(sentence, window_size=1)

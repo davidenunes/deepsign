@@ -12,4 +12,4 @@ venv_python = home + "/dev/.envs/deepsign/bin/python"
 #print("venv: ", venv)
 
 
-run([venv_python, home+"/dev/deepsign/playground/test_tokenizer.py"])
+run([venv_python, home+"/dev/deepsign/examples/test_tokenizer.py"])

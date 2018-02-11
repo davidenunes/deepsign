@@ -197,7 +197,7 @@ try:
                 x_samples = []
                 y_samples = []
 
-        # run train on last batch
+        # nrp train on last batch
         if len(x_samples) > 0:
             sess.run(train_step, {
                 model.input(): x_samples,

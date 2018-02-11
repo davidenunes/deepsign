@@ -29,7 +29,7 @@ def get_ngrams():
 
 
 ds = tf.data.Dataset.from_generator(get_ngrams, tf.int64)
-# shards the dataset into unique num_workers unique shards, if I run this in MPI this will become useful
+# shards the dataset into unique num_workers unique shards, if I nrp this in MPI this will become useful
 # ds = ds.shard(num_workers,0)
 ds = ds.repeat(2)
 # ds = ds.shuffle(10)
@@ -42,12 +42,12 @@ one_hot = tf.one_hot(w, vocab_size)
 where_one = tf.where(tf.equal(one_hot, 1))
 
 """
-Have to be careful with multiple calls to run
-if we call run multiple times it takes values from the dataset iterator
+Have to be careful with multiple calls to nrp
+if we call nrp multiple times it takes values from the dataset iterator
 """
 with tf.Session() as sess:
     ctx, w_i, one_hot, where_one = sess.run([ctx_tensor, w, one_hot, where_one])
-    # w = sess.run(value[:-1])
+    # w = sess.nrp(value[:-1])
 
     print("ctx")
     print(ctx)
