@@ -27,7 +27,6 @@ default_out_dir = os.path.dirname(os.path.realpath(__file__))
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 # prefix used to identify result files
 parser.add_argument('-id', dest="id", type=int, default=-1)
-parser.add_argument('-conf', dest="conf", type=str)
 parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=128)
@@ -81,7 +80,7 @@ validation_dataset = corpus_hdf5["validation"]
 
 
 # data pipeline
-def get_data_it(hdf5_dataset):
+def data_pipeline(hdf5_dataset):
     def chunk_fn(x): return chunk_it(x, chunk_size=args.batch_size * 100)
 
     dataset = repeat_fn(chunk_fn, hdf5_dataset, args.epochs)
@@ -115,10 +114,10 @@ model_runner = tx.ModelRunner(model)
 
 # optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
 lr_param = tx.InputParam()
-optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
+# optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
-# optimizer = tf.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
+optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
 
 # model_runner.config_optimizer(optimizer)
 # def global_grad_clip(grads):
@@ -160,19 +159,21 @@ def eval_model(model_runner, dataset_it, len_dataset):
 
 def evaluation(model_runner, progress, epoch, step):
     progress.write("evaluating validation dataset")
-    ppl_validation = eval_model(model_runner, get_data_it(validation_dataset), len(validation_dataset))
+    ppl_validation = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
     res_row = {"epoch": epoch, "step": step, "dataset": "validation", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
     res_eval_file.flush()
 
     progress.write("evaluating test dataset")
-    ppl_test = eval_model(model_runner, get_data_it(test_dataset), len(test_dataset))
+    ppl_test = eval_model(model_runner, data_pipeline(test_dataset), len(test_dataset))
 
     res_row = {"epoch": epoch, "step": step, "dataset": "test", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
     res_eval_file.flush()
 
     progress.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
+
+    return ppl_validation
 
 
 # ======================================================================================
@@ -196,29 +197,38 @@ progress = tqdm(total=len(training_dataset) * args.epochs)
 # ngram_stream = take_it(1, ngram_stream)
 
 # DO EVAL T = 0
-# evaluation(model_runner, progress, epoch=1, step=0)
+current_lr = args.learning_rate
+last_eval = evaluation(model_runner, progress, epoch=1, step=0)
+current_eval = last_eval
 
-training_data = get_data_it(training_dataset)
+training_data = data_pipeline(training_dataset)
 for ngram_batch in training_data:
+
     epoch = progress.n // len(training_dataset) + 1
+    # changing epoch
     if epoch != current_epoch:
         current_epoch = epoch
         eval_steps = deque(eval_steps)
         step = 0
         progress.write("epoch: {}".format(current_epoch))
 
+        # decay learning rate
+        if current_eval >= last_eval:
+            current_lr = current_lr * 0.5
+            progress.write("learning rate changed to {}".format(current_lr))
+
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1]
     one_hot = transform.batch_one_hot(word_ids, vocab_size)
 
-    model_runner.train(ctx_ids, one_hot, args.learning_rate)
+    model_runner.train(ctx_ids, one_hot, current_lr)
     progress.update(args.batch_size)
 
     step += 1
     if len(eval_steps) > 0 and step == eval_next_step:
         eval_next_step = eval_steps.popleft()
-        evaluation(model_runner, progress, epoch, step)
+        current_eval = evaluation(model_runner, progress, epoch, step)
 
 # DO FINAL EVAL
 evaluation(model_runner, progress, epoch, step)
