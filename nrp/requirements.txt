@@ -1,3 +1,0 @@
-git+git://github.com/davidenunes/tensorx@dev#egg=tensorx
-git+git://bitbucket.org:davex32/deepsign.git
-git+git://bitbucket.org:davex32/exp.git@master#egg=exp

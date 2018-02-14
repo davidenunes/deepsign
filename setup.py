@@ -11,9 +11,7 @@ requirements = [
     'bidict>=0.14.2',
     'marisa-trie>=0.7.4',
     'tensorflow>=1.5',
-    'matplotlib',
-    'tensorx',
-    'exp'
+    'matplotlib'
 ]
 
 links = [
