@@ -20,10 +20,10 @@ class MyTestCase(unittest.TestCase):
                      embed_dim=10,
                      batch_size=1,
                      h_dim=4,
-                     n_hidden_layers=2,
+                     num_h=2,
                      use_dropout=True,
                      keep_prob=0.1,
-                     inputs=inputs,
+                     run_inputs=inputs,
                      loss_inputs=loss_inputs)
 
         print("RUN GRAPH:")

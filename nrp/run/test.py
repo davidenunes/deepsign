@@ -1,1 +1,0 @@
-parser.add_argument('-id', dest="id", type=int)

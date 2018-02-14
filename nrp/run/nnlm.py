@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
 from deepsign.models.nnlm import NNLM
 from tensorx.layers import Input
 
@@ -26,37 +26,52 @@ default_out_dir = os.path.dirname(os.path.realpath(__file__))
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 # prefix used to identify result files
-parser.add_argument('-id', dest="id", type=int, default=-1)
+parser.add_argument('-id', dest="id", type=int, default=0)
 parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=128)
+parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
+parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
+parser.add_argument('-embed_limits', dest="embed_limits", type=float, default=0.01)
+parser.add_argument('-logit_limits', dest="logit_limits", type=float, default=0.01)
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=256)
+parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh'], default="relu")
+parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 128)
-parser.add_argument('-epochs', dest="epochs", type=int, default=1)
+parser.add_argument('-epochs', dest="epochs", type=int, default=4)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
-parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
+parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.05)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
-# number of evaluations between epochs, defaults to doing just one evaluation per epoch
-parser.add_argument('-num_evals', dest='num_evals', type=int, default=10)
+parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=True)
+parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=12.0)
+# evaluation ratio size 0 < eval_epoch < 1 ex if 0.5 evals models on the middle of the dataset
+parser.add_argument('-eval_step', dest='eval_step', type=float, default=0.5)
+parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
+parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
+parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
+parser.add_argument('-dropout', dest='dropout', type=bool, default=True)
+parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
 args = parser.parse_args()
 # ======================================================================================
 # Load Params
 # ======================================================================================
 
-
-# result file name
-# print(arg_dict)
-
-
-res_param_filename = os.path.join(args.out_dir, "{id}_params.csv".format(id=args.id))
+res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
 with open(res_param_filename, "w") as param_file:
     arg_dict = vars(args)
     writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
     writer.writeheader()
     writer.writerow(arg_dict)
 
-res_eval_filename = os.path.join(args.out_dir, "{id}_perplexity.csv".format(id=arg_dict["id"]))
+# make dir for model checkpoints
+model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.id))
+print(model_ckpt_dir)
+os.makedirs(model_ckpt_dir, exist_ok=True)
+
+model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
+
+res_eval_filename = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=arg_dict["id"]))
 eval_header = ["epoch", "step", "dataset", "perplexity"]
 
 res_eval_file = open(res_eval_filename, "w")
@@ -80,8 +95,12 @@ validation_dataset = corpus_hdf5["validation"]
 
 
 # data pipeline
-def data_pipeline(hdf5_dataset):
-    def chunk_fn(x): return chunk_it(x, chunk_size=args.batch_size * 100)
+def data_pipeline(hdf5_dataset, take=None):
+    def chunk_fn(x):
+        data = chunk_it(x, chunk_size=args.batch_size * 100)
+        if take is not None:
+            return take_it(take, data)
+        return data
 
     dataset = repeat_fn(chunk_fn, hdf5_dataset, args.epochs)
 
@@ -101,14 +120,42 @@ def data_pipeline(hdf5_dataset):
 inputs = Input(n_units=args.ngram_size - 1, name="context_indices", dtype=tf.int64)
 loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
 
-model = NNLM(inputs=inputs, loss_inputs=loss_inputs,
+if args.h_act == "relu":
+    h_act = tx.relu
+    h_init = tx.relu_init
+if args.h_act == "tanh":
+    h_act = tx.tanh
+    h_init = tx.xavier_init
+
+if args.embed_init == "normal":
+    embed_init = tx.random_normal(0, args.embed_limits)
+elif args.embed_init == "uniform":
+    embed_init = tx.random_uniform(0, args.embed_limits)
+else:
+    print(args.embed_init)
+    raise ValueError("invalid embed_init, expected normal or uniform")
+
+if args.logit_init == "normal":
+    logit_init = tx.random_normal(0, args.logit_limits)
+elif args.logit_init == "uniform":
+    logit_init = tx.random_uniform(0, args.logit_limits)
+else:
+    print(args.logit_init)
+    raise ValueError("invalid logit_init, expected normal or uniform")
+
+model = NNLM(run_inputs=inputs, loss_inputs=loss_inputs,
              ctx_size=args.ngram_size - 1,
              vocab_size=vocab_size,
              embed_dim=args.embed_dim,
+             embed_init=embed_init,
+             logit_init=logit_init,
              batch_size=args.batch_size,
              h_dim=args.h_dim,
-             use_dropout=True,
-             keep_prob=0.7)
+             num_h = args.num_h,
+             h_activation=h_act,
+             h_init=h_init,
+             use_dropout=args.dropout,
+             keep_prob=args.keep_prob)
 
 model_runner = tx.ModelRunner(model)
 
@@ -119,14 +166,20 @@ lr_param = tx.InputParam()
 # optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
 
+
 # model_runner.config_optimizer(optimizer)
 # def global_grad_clip(grads):
 #    grads, _ = tf.clip_by_global_norm(grads, 12)
 #    return grads
 
+def clip_grad_norm(grad):
+    return tf.clip_by_norm(grad, args.clip_norm)
 
-# model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=grad_clip, global_gradient_op=True)
-model_runner.config_optimizer(optimizer, params=lr_param)
+
+if args.clip_gradients:
+    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=clip_grad_norm, global_gradient_op=False)
+else:
+    model_runner.config_optimizer(optimizer, params=lr_param)
 
 # sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
 # sess = tf.Session(config=sess_config)
@@ -137,35 +190,35 @@ model_runner.set_session(sess)
 # ======================================================================================
 # EVALUATION UTIL FUNCTIONS
 # ======================================================================================
-def eval_model(model_runner, dataset_it, len_dataset):
+def eval_model(runner, dataset_it):
     # progress = tqdm(total=len_dataset)
-    ngrams_processed = 0
+    batches_processed = 0
     sum_loss = 0
-    for ngram_batch in dataset_it:
-        ngram_batch = np.array(ngram_batch, dtype=np.int64)
-        ctx_ids = ngram_batch[:, :-1]
-        word_ids = ngram_batch[:, -1]
-        one_hot = transform.batch_one_hot(word_ids, vocab_size)
+    for batch in dataset_it:
+        batch = np.array(batch, dtype=np.int64)
+        ctx = batch[:, :-1]
+        target = batch[:, -1]
+        target_one_hot = transform.batch_one_hot(target, vocab_size)
 
-        mean_loss = model_runner.eval(ctx_ids, one_hot)
+        mean_loss = runner.eval(ctx, target_one_hot)
         sum_loss += mean_loss
 
         # progress.update(args.batch_size)
-        ngrams_processed += 1
+        batches_processed += 1
 
     # progress.close()
-    return np.exp(sum_loss / ngrams_processed)
+    return np.exp(sum_loss / batches_processed)
 
 
-def evaluation(model_runner, progress, epoch, step):
+def evaluation(model_runner: tx.ModelRunner, progress, epoch, step):
     progress.write("evaluating validation dataset")
-    ppl_validation = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
+    ppl_validation = eval_model(model_runner, data_pipeline(validation_dataset))
     res_row = {"epoch": epoch, "step": step, "dataset": "validation", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
     res_eval_file.flush()
 
     progress.write("evaluating test dataset")
-    ppl_test = eval_model(model_runner, data_pipeline(test_dataset), len(test_dataset))
+    ppl_test = eval_model(model_runner, data_pipeline(test_dataset))
 
     res_row = {"epoch": epoch, "step": step, "dataset": "test", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
@@ -182,41 +235,63 @@ def evaluation(model_runner, progress, epoch, step):
 print("starting TF")
 
 # preparing evaluation steps
-eval_steps = np.linspace(0, 1, 2 + args.num_evals, endpoint=False)
-eval_steps *= (len(training_dataset) / args.batch_size)
-eval_steps = eval_steps[1:-1]
-eval_steps = eval_steps.astype(np.int32)
-eval_steps = deque(eval_steps)
-if len(eval_steps) > 0:
-    eval_next_step = eval_steps.popleft()
 
-# print("eval points", eval_steps)
-step = 0
+eval_step = int(len(training_dataset) // args.batch_size * args.eval_step)
+epoch_step = 0
+global_step = 0
 current_epoch = 0
-progress = tqdm(total=len(training_dataset) * args.epochs)
-# ngram_stream = take_it(1, ngram_stream)
-
-# DO EVAL T = 0
 current_lr = args.learning_rate
-last_eval = evaluation(model_runner, progress, epoch=1, step=0)
+last_eval = np.inf
 current_eval = last_eval
 
+model_runner.init_vars()
+progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset)
 for ngram_batch in training_data:
-
     epoch = progress.n // len(training_dataset) + 1
-    # changing epoch
+    # ================================================
+    # CHANGING EPOCH restart step
+    # ================================================
     if epoch != current_epoch:
         current_epoch = epoch
-        eval_steps = deque(eval_steps)
-        step = 0
+        epoch_step = 0
+
+        # write model state at the beginning of each epoch
+        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
+        model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
+
+        # notify about epoch change
         progress.write("epoch: {}".format(current_epoch))
 
-        # decay learning rate
-        if current_eval >= last_eval:
-            current_lr = current_lr * 0.5
-            progress.write("learning rate changed to {}".format(current_lr))
+        # perplexity evaluation at the beginning of new epoch
+        current_eval = evaluation(model_runner, progress, epoch, global_step)
 
+        if last_eval == np.inf:
+            last_eval = current_eval
+        # decay learning rate if perplexity does not decrease
+
+        if args.lr_decay:
+            if current_eval > last_eval:
+                current_lr = current_lr * 0.5
+                progress.write("learning rate changed to {}".format(current_lr))
+                last_eval = current_eval
+
+    # ================================================
+    # EVAL BETWEEN EPOCHS
+    # ================================================
+    if (epoch_step % eval_step) == 0 and epoch_step != 0:
+        current_eval = evaluation(model_runner, progress, epoch, global_step)
+
+        if args.lr_decay and args.lr_decay_on_eval:
+            if current_eval > last_eval:
+                current_lr = current_lr * args.lr_decay_rate
+                progress.write("learning rate changed to {}".format(current_lr))
+                # only change last eval if we're updating weights on each eval
+                last_eval = current_eval
+
+    # ================================================
+    # TRAIN MODEL
+    # ================================================
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1]
@@ -225,13 +300,15 @@ for ngram_batch in training_data:
     model_runner.train(ctx_ids, one_hot, current_lr)
     progress.update(args.batch_size)
 
-    step += 1
-    if len(eval_steps) > 0 and step == eval_next_step:
-        eval_next_step = eval_steps.popleft()
-        current_eval = evaluation(model_runner, progress, epoch, step)
+    epoch_step += 1
+    global_step += 1
 
-# DO FINAL EVAL
-evaluation(model_runner, progress, epoch, step)
+# write final evaluation at the end of the run
+evaluation(model_runner, progress, epoch, epoch_step)
+
+# write model state at the end of the run
+
+model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
 model_runner.close_session()
 progress.write("Processed {} ngrams".format(progress.n))
