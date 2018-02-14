@@ -238,7 +238,7 @@ print("starting TF")
 
 # preparing evaluation steps
 # I use ceil because I make sure we have padded batches at the end
-num_batches = np.ceil(len(training_dataset / args.batch_size))
+num_batches = np.ceil(len(training_dataset) / args.batch_size)
 eval_step = np.ceil(len(training_dataset) / args.batch_size * args.eval_step)
 epoch_step = 0
 global_step = 0
