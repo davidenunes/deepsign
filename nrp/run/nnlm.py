@@ -12,7 +12,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nnlm import NNLM
+from deepsign.models.models import NNLM
 from tensorx.layers import Input
 
 # ======================================================================================
@@ -41,12 +41,12 @@ parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 128)
 parser.add_argument('-epochs', dest="epochs", type=int, default=4)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
-parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.05)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
 parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=True)
 parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=12.0)
 # evaluation ratio size 0 < eval_epoch < 1 ex if 0.5 evals models on the middle of the dataset
 parser.add_argument('-eval_step', dest='eval_step', type=float, default=0.5)
+parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.05)
 parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
 parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
@@ -151,7 +151,7 @@ model = NNLM(run_inputs=inputs, loss_inputs=loss_inputs,
              logit_init=logit_init,
              batch_size=args.batch_size,
              h_dim=args.h_dim,
-             num_h = args.num_h,
+             num_h=args.num_h,
              h_activation=h_act,
              h_init=h_init,
              use_dropout=args.dropout,
@@ -285,8 +285,8 @@ for ngram_batch in training_data:
         if args.lr_decay and args.lr_decay_on_eval:
             if current_eval > last_eval:
                 current_lr = current_lr * args.lr_decay_rate
-                progress.write("learning rate changed to {}".format(current_lr))
                 # only change last eval if we're updating weights on each eval
+                progress.write("learning rate changed to {}".format(current_lr))
                 last_eval = current_eval
 
     # ================================================
@@ -311,7 +311,7 @@ evaluation(model_runner, progress, epoch, epoch_step)
 model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
 model_runner.close_session()
-progress.write("Processed {} ngrams".format(progress.n))
+progress.write("Processed {} n-grams".format(progress.n))
 progress.close()
 
 # close result files

@@ -1,7 +1,7 @@
 import unittest
 import tensorflow as tf
 import tensorx as tx
-from deepsign.models.nnlm import NNLM
+from deepsign.models.models import NNLM
 
 
 class MyTestCase(unittest.TestCase):
