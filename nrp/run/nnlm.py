@@ -23,11 +23,12 @@ from tensorx.layers import Input
 # ======================================================================================
 home = os.getenv("HOME")
 default_out_dir = os.getcwd()
+default_corpus = os.path.join(home, "data/datasets/ptb/")
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 # prefix used to identify result files
 parser.add_argument('-id', dest="id", type=int, default=0)
-parser.add_argument('-corpus', dest="corpus", type=str, default=home + "/data/datasets/ptb/")
+parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=128)
 parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
@@ -63,6 +64,7 @@ with open(res_param_filename, "w") as param_file:
     writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
     writer.writeheader()
     writer.writerow(arg_dict)
+    param_file.flush()
 
 # make dir for model checkpoints
 model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.id))
@@ -235,8 +237,9 @@ def evaluation(model_runner: tx.ModelRunner, progress, epoch, step):
 print("starting TF")
 
 # preparing evaluation steps
-
-eval_step = int(len(training_dataset) // args.batch_size * args.eval_step)
+# I use ceil because I make sure we have padded batches at the end
+num_batches = np.ceil(len(training_dataset / args.batch_size))
+eval_step = np.ceil(len(training_dataset) / args.batch_size * args.eval_step)
 epoch_step = 0
 global_step = 0
 current_epoch = 0
@@ -255,34 +258,23 @@ for ngram_batch in training_data:
     if epoch != current_epoch:
         current_epoch = epoch
         epoch_step = 0
+        progress.write("epoch: {}".format(current_epoch))
 
-        # write model state at the beginning of each epoch
+    # ================================================
+    # EVAL
+    # ================================================
+    if (epoch_step % eval_step) == 0:
+        # write model state at the beginning of each eval epoch
         model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
         model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
-        # notify about epoch change
-        progress.write("epoch: {}".format(current_epoch))
-
-        # perplexity evaluation at the beginning of new epoch
         current_eval = evaluation(model_runner, progress, epoch, global_step)
 
-        if last_eval == np.inf:
+        # last eval is not defined
+        if global_step == 0 and last_eval == np.inf:
             last_eval = current_eval
-        # decay learning rate if perplexity does not decrease
 
-        if args.lr_decay:
-            if current_eval > last_eval:
-                current_lr = current_lr * 0.5
-                progress.write("learning rate changed to {}".format(current_lr))
-                last_eval = current_eval
-
-    # ================================================
-    # EVAL BETWEEN EPOCHS
-    # ================================================
-    if (epoch_step % eval_step) == 0 and epoch_step != 0:
-        current_eval = evaluation(model_runner, progress, epoch, global_step)
-
-        if args.lr_decay and args.lr_decay_on_eval:
+        if args.lr_decay and (epoch_step == 0 or args.lr_decay_on_eval):
             if current_eval > last_eval:
                 current_lr = current_lr * args.lr_decay_rate
                 # only change last eval if we're updating weights on each eval

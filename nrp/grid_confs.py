@@ -9,7 +9,7 @@ along with all other libraries required by the mode
 mas = grid_conf(venv=VirtualEnvs.Conda,
                 venv_name="deepsign",
                 parallel_env="smp",
-                num_cores=8)
+                num_cores=16)
 
 """
 INGRID Grid Configuration
