@@ -1,10 +1,15 @@
 from exp.params import ParamSpace
+import os
+
+default_out_dir = os.getcwd()
+home = os.getenv("HOME")
 
 ps = ParamSpace("baseline.params")
 # prefix used to identify result files
 
-ps.add_value("corpus", "/data/datasets/ptb/")
+ps.add_value("corpus", os.path.join(home, "/data/datasets/ptb/"))
 ps.add_value("ngram_size", 4)
+ps.add_value("out_dir", default_out_dir)
 
 ps.add_value("embed_dim", 128)
 ps.add_value("embed_init", "normal")

@@ -22,7 +22,7 @@ from tensorx.layers import Input
 # -corpus : dataset file path (uses the hdf5 format defined by convert to hdf5 script)
 # ======================================================================================
 home = os.getenv("HOME")
-default_out_dir = os.path.dirname(os.path.realpath(__file__))
+default_out_dir = os.getcwd()
 
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 # prefix used to identify result files
