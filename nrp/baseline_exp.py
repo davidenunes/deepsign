@@ -10,7 +10,7 @@ import argparse
 parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 parser.add_argument('-grid', choices=['mas', 'ingrid'], default="mas")
 parser.add_argument('-run_script', dest="run_script", type=str, default="run/nnlm.py")
-parser.add_argument('-params', dest="params", type=str, default="baseline_exp")
+parser.add_argument('-params', dest="params", type=str, default="baseline")
 args = parser.parse_args()
 
 grid_cfg = getattr(grid_confs, args.grid)

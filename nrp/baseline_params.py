@@ -13,7 +13,7 @@ ps.add_value("logit_init", "normal")
 ps.add_value("logit_limits", 0.01)
 ps.add_value("h_dim", 256)
 ps.add_value("h_act", "relu")
-ps.add_value("num_h", 1)
+ps.add_value("num_h", 2)
 ps.add_value("shuffle", True)
 ps.add_value("shuffle_buffer_size", 1000 * 128)
 
@@ -32,3 +32,5 @@ ps.add_value("clip_norm", 12.0)
 
 ps.add_value("dropout", True)
 ps.add_value("keep_prob", 0.9)
+
+baseline = ps
