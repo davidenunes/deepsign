@@ -48,3 +48,5 @@ ps.add_value("keep_prob", 0.9)
 print(ps.grid_size)
 
 baseline = ps
+
+ps.write(ps.config.filename)

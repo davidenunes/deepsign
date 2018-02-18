@@ -97,20 +97,20 @@ validation_dataset = corpus_hdf5["validation"]
 
 
 # data pipeline
-def data_pipeline(hdf5_dataset, take=None):
+def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=args.shuffle):
     def chunk_fn(x):
-        data = chunk_it(x, chunk_size=args.batch_size * 100)
-        if take is not None:
-            return take_it(take, data)
-        return data
+        return chunk_it(x, chunk_size=batch_size * 1000)
 
-    dataset = repeat_fn(chunk_fn, hdf5_dataset, args.epochs)
+    if epochs > 1:
+        dataset = repeat_fn(chunk_fn, hdf5_dataset, epochs)
+    else:
+        dataset = chunk_fn(hdf5_dataset)
 
-    if args.shuffle:
+    if shuffle:
         dataset = shuffle_it(dataset, args.shuffle_buffer_size)
 
     padding = np.zeros([args.ngram_size], dtype=np.int64)
-    dataset = batch_it(dataset, size=args.batch_size, padding=True, padding_elem=padding)
+    dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
     return dataset
 
 
@@ -192,8 +192,8 @@ model_runner.set_session(sess)
 # ======================================================================================
 # EVALUATION UTIL FUNCTIONS
 # ======================================================================================
-def eval_model(runner, dataset_it):
-    # progress = tqdm(total=len_dataset)
+def eval_model(runner, dataset_it, len_dataset=None):
+    pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
     sum_loss = 0
     for batch in dataset_it:
@@ -205,28 +205,29 @@ def eval_model(runner, dataset_it):
         mean_loss = runner.eval(ctx, target_one_hot)
         sum_loss += mean_loss
 
-        # progress.update(args.batch_size)
+        pb.update(args.batch_size)
         batches_processed += 1
 
-    # progress.close()
+    pb.close()
     return np.exp(sum_loss / batches_processed)
 
 
-def evaluation(model_runner: tx.ModelRunner, progress, epoch, step):
-    progress.write("evaluating validation dataset")
-    ppl_validation = eval_model(model_runner, data_pipeline(validation_dataset))
+def evaluation(runner: tx.ModelRunner, pb, epoch, step):
+    pb.write("evaluating validation...")
+    ppl_validation = eval_model(runner, data_pipeline(validation_dataset, epochs=1, shuffle=False),
+                                len(validation_dataset))
     res_row = {"epoch": epoch, "step": step, "dataset": "validation", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
     res_eval_file.flush()
 
-    progress.write("evaluating test dataset")
-    ppl_test = eval_model(model_runner, data_pipeline(test_dataset))
+    pb.write("evaluating test...")
+    ppl_test = eval_model(runner, data_pipeline(test_dataset, epochs=1, shuffle=False), len(test_dataset))
 
     res_row = {"epoch": epoch, "step": step, "dataset": "test", "perplexity": ppl_validation}
     res_eval_writer.writerow(res_row)
     res_eval_file.flush()
 
-    progress.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
+    pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
 
     return ppl_validation
 
@@ -249,7 +250,7 @@ current_eval = last_eval
 
 model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
-training_data = data_pipeline(training_dataset)
+training_data = data_pipeline(training_dataset,epochs=args.epochs)
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1
     # ================================================
@@ -264,9 +265,9 @@ for ngram_batch in training_data:
     # EVAL
     # ================================================
     if (epoch_step % eval_step) == 0:
-        # write model state at the beginning of each eval epoch
-        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
-        model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
+        # write model state at the beginning of each eval epoch (not the first one)
+        if not global_step == 0 and epoch_step == 0:
+            model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
         current_eval = evaluation(model_runner, progress, epoch, global_step)
 
@@ -296,10 +297,8 @@ for ngram_batch in training_data:
     global_step += 1
 
 # write final evaluation at the end of the run
-evaluation(model_runner, progress, epoch, epoch_step)
-
 # write model state at the end of the run
-
+evaluation(model_runner, progress, epoch, epoch_step)
 model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
 model_runner.close_session()
