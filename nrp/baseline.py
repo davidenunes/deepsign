@@ -250,7 +250,7 @@ current_eval = last_eval
 
 model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
-training_data = data_pipeline(training_dataset,epochs=args.epochs)
+training_data = data_pipeline(training_dataset, epochs=args.epochs)
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1
     # ================================================
@@ -272,7 +272,7 @@ for ngram_batch in training_data:
         current_eval = evaluation(model_runner, progress, epoch, global_step)
 
         # last eval is not defined
-        if global_step == 0 and last_eval == np.inf:
+        if global_step == 0:
             last_eval = current_eval
 
         if args.lr_decay and (epoch_step == 0 or args.lr_decay_on_eval):
@@ -280,7 +280,8 @@ for ngram_batch in training_data:
                 current_lr = current_lr * args.lr_decay_rate
                 # only change last eval if we're updating weights on each eval
                 progress.write("learning rate changed to {}".format(current_lr))
-                last_eval = current_eval
+
+        last_eval = current_eval
 
     # ================================================
     # TRAIN MODEL
