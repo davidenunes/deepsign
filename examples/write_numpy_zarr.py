@@ -13,7 +13,7 @@ ri_active = 5
 num_samples = 10
 
 
-gen = ri.Generator(dim=ri_dim, active=ri_active)
+gen = ri.Generator(dim=ri_dim, num_active=ri_active)
 c_matrix = np.matrix([gen.generate().to_vector() for i in range(num_samples)])
 
 # write the matrix to hdf5 dataset

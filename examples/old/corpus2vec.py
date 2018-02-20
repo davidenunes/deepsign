@@ -92,7 +92,7 @@ else:
 
 vocab_hdf5 = h5py.File(vocab_file, 'r')
 
-ri_gen = Generator(dim=k, active=s)
+ri_gen = Generator(dim=k, num_active=s)
 print("Loading Vocabulary...")
 index = TrieSignIndex(ri_gen, list(vocab_hdf5["vocabulary"][:]), pregen_indexes=False)
 

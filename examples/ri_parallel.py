@@ -101,7 +101,7 @@ if __name__ == '__main__':
     vocabulary = h5v["vocabulary"]
     frequencies = h5v["frequencies"]
 
-    ri_gen = Generator(dim=1000, active=10)
+    ri_gen = Generator(dim=1000, num_active=10)
     sign_index = TrieSignIndex(generator=ri_gen,
                                vocabulary=list(vocabulary[()]),
                                pregen_indexes=True)

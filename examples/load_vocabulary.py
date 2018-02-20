@@ -39,7 +39,7 @@ print(top10w)
 print(top10f)
 print(top10w_trie)
 
-ri_gen = Generator(dim=1000, active=10)
+ri_gen = Generator(dim=1000, num_active=10)
 
 t0 = time.time()
 sign_index = TrieSignIndex(ri_gen, list(vocabulary[:]))

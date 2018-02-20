@@ -114,7 +114,7 @@ class NNLM(tx.Model):
 class NRP(tx.Model):
     def __init__(self,
                  ctx_size,
-                 ri_size,
+                 ri_dim,
                  embed_dim,
                  batch_size,
                  h_dim,
@@ -139,31 +139,25 @@ class NRP(tx.Model):
         self.num_h = num_h
         self.batch_size = batch_size
         self.embed_dim = embed_dim
-        self.ri_size = ri_size
-        self.n_gram_size = ctx_size
+        self.ri_dim = ri_dim
+        self.ctx_size = ctx_size
         self.use_dropout = use_dropout
         self.keep_prob = keep_prob
         self.logit_init = logit_init
 
         if self.run_inputs is None:
-            self.run_inputs = tx.SparseInput(self.ri_size, dtype=tf.float32)
+            self.run_inputs = tx.SparseInput(self.ri_dim, dtype=tf.float32)
         elif not isinstance(self.run_inputs, tx.SparseInput):
             raise TypeError(
                 "expected run_inputs to be a SparseInput layer got {} instead".format(type(self.run_inputs)))
 
         if self.loss_inputs is None:
-            loss_inputs = tx.SparseInput(self.ri_size * 2, dtype=tf.float32, name="ri_labels_loss")
+            loss_inputs = tx.Input(self.ri_dim * 2, dtype=tf.float32, name="ri_labels_loss")
             self.loss_inputs = loss_inputs
-        elif not isinstance(self.loss_inputs, tx.SparseInput):
-            raise TypeError(
-                "expected loss_inputs to be a SparseInput layer got {} instead".format(type(self.loss_inputs)))
 
         if self.eval_inputs is None:
-            eval_inputs = tx.SparseInput(n_units=self.ri_size * 2, name="ri_labels_eval")
+            eval_inputs = tx.Input(n_units=self.ri_dim * 2, name="ri_labels_eval")
             self.eval_inputs = eval_inputs
-        elif not isinstance(self.eval_inputs, tx.SparseInput):
-            raise TypeError(
-                "expected eval_inputs to be a SparseInput layer got {} instead".format(type(self.eval_inputs)))
 
         # hidden layer
         if num_h < 1:
@@ -174,12 +168,14 @@ class NRP(tx.Model):
         # ===============================================
 
         # lookup layer
-        embeddings_shape = [ri_size, embed_dim]
+        embeddings_shape = [ri_dim, embed_dim]
         lookup_layer = tx.Lookup(self.run_inputs,
                                  ctx_size,
                                  embeddings_shape,
                                  batch_size,
                                  weight_init=embed_init)
+
+        self.lookup = lookup_layer
 
         out_layer = lookup_layer
         h_layers = []
@@ -193,7 +189,7 @@ class NRP(tx.Model):
         # NRP uses random projections so we compare them with the actual random projections and use sigmoids
         # to model each feature probability independently
         # 2 classes of probabilities for positive entries and negative entries (ri_size*2)
-        run_logits = tx.Linear(out_layer, ri_size * 2, init=logit_init, bias=True, name="run_logits")
+        run_logits = tx.Linear(out_layer, ri_dim * 2, init=logit_init, bias=True, name="run_logits")
         run_output = tx.Activation(run_logits, tx.sigmoid, name="run_output")
 
         # ===============================================

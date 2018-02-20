@@ -232,7 +232,7 @@ class TrieSignIndex:
         random_state = pickle.loads(indexes.attrs["state"].tostring())
         random.setstate(random_state)
 
-        generator = Generator(dim=ri_k,active=ri_s)
+        generator = Generator(dim=ri_k, num_active=ri_s)
         index = TrieSignIndex(generator,vocabulary=list(signs[:]),pregen_indexes=False)
 
         random_indexes = {}

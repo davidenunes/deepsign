@@ -14,7 +14,7 @@ class TestEncode(unittest.TestCase):
     def setUp(self):
         dim = 10
         act = 2
-        self.generator = Generator(dim=dim, active=act)
+        self.generator = Generator(dim=dim, num_active=act)
         self.sign_index = SignIndex(self.generator)
         self.perm_generator = PermutationGenerator(dim=dim)
 

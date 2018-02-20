@@ -29,7 +29,7 @@ class RandomIndex:
         """
         Returns a vector of dimension dim*2 with the sparse distribution for the positive
         and negative labels concatenated [pos dist][neg dist]
-        :return:
+
         """
         v = np.zeros(self.dim * 2)
         v[self.positive] = 1 / self.s
@@ -89,18 +89,17 @@ class Generator:
     their positive and negative indexes.
     """
 
-    def __init__(self, dim, active, seed=None):
+    def __init__(self, dim, num_active, seed=None):
         # system time is used if seed not supplied
         if seed:
             random.seed(seed)
 
         self.dim = dim
-        self.num_active = active
+        self.num_active = int(num_active)
 
     def generate(self):
         # ensure that you can make other calls to random
         # random.setstate(self.random_state)
-
         active_indexes = random.sample(range(self.dim), self.num_active)
 
         num_positive = self.num_active // 2

@@ -30,11 +30,11 @@ ps.add_value("h_act", "relu")
 ps.add_value("epochs", 8)
 ps.add_value("eval_step", 0.5)
 
-ps.add_list("batch_size", [64, 128])
+ps.add_list("batch_size", [128])
 ps.add_value("shuffle", True)
 ps.add_value("shuffle_buffer_size", 1000 * 128)
 
-ps.add_value("learning_rate", 0.05)
+ps.add_value("learning_rate", [0.05])
 ps.add_list("lr_decay", [True])
 ps.add_value("lr_decay_rate", 0.5)
 ps.add_value("lr_decay_on_eval", True)

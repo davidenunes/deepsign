@@ -45,7 +45,7 @@ def load_dataset():
 # do something with the dataset
 
 # Create Sign RI Index
-ri_gen = Generator(dim=ri_dim, active=ri_num_active)
+ri_gen = Generator(dim=ri_dim, num_active=ri_num_active)
 sign_index = SignIndex(ri_gen)
 
 max_sentences = 200000

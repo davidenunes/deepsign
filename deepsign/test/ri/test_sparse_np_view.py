@@ -10,7 +10,7 @@ class TestSparseNPView(unittest.TestCase):
     def setUp(self):
         dim = 1000
         act = 10
-        self.generator = Generator(dim=dim, active=act)
+        self.generator = Generator(dim=dim, num_active=act)
 
     def test_ri_to_sparse(self):
         ri_vector = self.generator.generate().to_vector()

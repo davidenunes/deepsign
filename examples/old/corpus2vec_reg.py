@@ -68,7 +68,7 @@ pipeline = BNCPipe(datagen=sentences)
 vocab_file = data_dir + "bnc_vocab_spacy.hdf5"
 vocab_hdf5 = h5py.File(vocab_file, 'r')
 
-ri_gen = Generator(dim=k, active=s)
+ri_gen = Generator(dim=k, num_active=s)
 print("Loading Vocabulary...")
 sign_index = TrieSignIndex(ri_gen, list(vocab_hdf5["vocabulary"][:]), pregen_indexes=False)
 
