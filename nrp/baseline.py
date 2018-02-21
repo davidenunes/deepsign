@@ -48,6 +48,13 @@ parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=12.0)
 # evaluation ratio size 0 < eval_epoch < 1 ex if 0.5 evals models on the middle of the dataset
 parser.add_argument('-eval_step', dest='eval_step', type=float, default=0.5)
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.05)
+parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="sgd")
+
+# only needed for adam and ams
+parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
+parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, default=0.999)
+parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, default=1e-8)
+
 parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
 parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
@@ -55,9 +62,10 @@ parser.add_argument('-dropout', dest='dropout', type=bool, default=True)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
 args = parser.parse_args()
 # ======================================================================================
-# Load Params
+# Load Params, Prepare results files
 # ======================================================================================
 
+# parameters file
 res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
 with open(res_param_filename, "w") as param_file:
     arg_dict = vars(args)
@@ -73,12 +81,28 @@ os.makedirs(model_ckpt_dir, exist_ok=True)
 
 model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
 
-res_eval_filename = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=arg_dict["id"]))
+# perplexity file
+ppl_eval_filename = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=arg_dict["id"]))
 eval_header = ["epoch", "step", "dataset", "perplexity"]
 
-res_eval_file = open(res_eval_filename, "w")
+res_eval_file = open(ppl_eval_filename, "w")
 res_eval_writer = csv.DictWriter(f=res_eval_file, fieldnames=eval_header)
 res_eval_writer.writeheader()
+
+"""
+# dynamic hyperparams to be recorded
+hyperparam_filename = os.path.join(args.out_dir, "hyperparams_{id}.csv".format(id=arg_dict["id"]))
+hyperparam_header = ["epoch", "step", "param", "value"]
+hyperparam_file = open(hyperparam_filename, "w")
+hyperparam_writer = csv.DictWriter(f=hyperparam_file, fieldnames=hyperparam_header)
+hyperparam_writer.writeheader()
+
+def write_hyperparam(name, value, step, epoch):
+    res_row = {"epoch": epoch, "step": step, "param": name, "value": value}
+    hyperparam_writer.writerow(res_row)
+    hyperparam_file.flush()
+
+"""
 
 # ======================================================================================
 # Load Corpus & Vocab
@@ -161,12 +185,22 @@ model = NNLM(run_inputs=inputs, loss_inputs=loss_inputs,
 
 model_runner = tx.ModelRunner(model)
 
-# optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
 lr_param = tx.InputParam()
 # optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+if args.optimizer == "sgd":
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+elif args.optimizer == "adam":
+    optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor,
+                                       beta1=args.optimizer_beta1,
+                                       beta2=args.optimizer_beta2,
+                                       epsilon=args.optimizer_epsilon)
+elif args.optimizer == "ams":
+    optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
+                           beta1=args.optimizer_beta1,
+                           beta2=args.optimizer_beta2,
+                           epsilon=args.optimizer_epsilon)
 
 
 # model_runner.config_optimizer(optimizer)
@@ -192,6 +226,7 @@ model_runner.set_session(sess)
 # ======================================================================================
 # EVALUATION UTIL FUNCTIONS
 # ======================================================================================
+
 def eval_model(runner, dataset_it, len_dataset=None):
     pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
@@ -245,6 +280,7 @@ epoch_step = 0
 global_step = 0
 current_epoch = 0
 current_lr = args.learning_rate
+
 last_eval = np.inf
 current_eval = last_eval
 
