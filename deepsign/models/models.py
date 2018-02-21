@@ -64,7 +64,7 @@ class NNLM(tx.Model):
         lookup_layer = tx.Lookup(self.run_inputs,
                                  ctx_size,
                                  embeddings_shape,
-                                 batch_size,
+                                 batch_size=None,
                                  weight_init=embed_init)
 
         out_layer = lookup_layer

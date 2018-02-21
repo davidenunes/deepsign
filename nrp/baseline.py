@@ -55,6 +55,9 @@ parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, defa
 parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, default=0.999)
 parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, default=1e-8)
 
+# model checkpoint frequency
+parser.add_argument('-model_eval_checkpoint', dest='model_eval_checkpoint', type=bool, default=False)
+
 parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
 parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
@@ -133,8 +136,10 @@ def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=ar
     if shuffle:
         dataset = shuffle_it(dataset, args.shuffle_buffer_size)
 
-    padding = np.zeros([args.ngram_size], dtype=np.int64)
-    dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
+    # cannot pad because 0 might be a valid index and that screws our evaluation
+    #padding = np.zeros([args.ngram_size], dtype=np.int64)
+    #dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
+    dataset = batch_it(dataset, size=batch_size, padding=False)
     return dataset
 
 
@@ -302,7 +307,7 @@ for ngram_batch in training_data:
     # ================================================
     if (epoch_step % eval_step) == 0:
         # write model state at the beginning of each eval epoch (not the first one)
-        if not global_step == 0 and epoch_step == 0:
+        if args.model_eval_checkpoint and not global_step == 0 and epoch_step == 0:
             model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
         current_eval = evaluation(model_runner, progress, epoch, global_step)
