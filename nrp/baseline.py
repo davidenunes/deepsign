@@ -2,7 +2,6 @@ import argparse
 import csv
 import marisa_trie
 import os
-from collections import deque
 
 import h5py
 import numpy as np
@@ -11,7 +10,7 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
 from deepsign.models.models import NNLM
 from tensorx.layers import Input
 
@@ -110,7 +109,7 @@ def write_hyperparam(name, value, step, epoch):
 # ======================================================================================
 # Load Corpus & Vocab
 # ======================================================================================
-corpus_file = args.corpus + "ptb.hdf5"
+corpus_file = os.path.join(args.corpus, "ptb.hdf5")
 corpus_hdf5 = h5py.File(corpus_file, mode='r')
 
 vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
@@ -137,8 +136,8 @@ def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=ar
         dataset = shuffle_it(dataset, args.shuffle_buffer_size)
 
     # cannot pad because 0 might be a valid index and that screws our evaluation
-    #padding = np.zeros([args.ngram_size], dtype=np.int64)
-    #dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
+    # padding = np.zeros([args.ngram_size], dtype=np.int64)
+    # dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
     dataset = batch_it(dataset, size=batch_size, padding=False)
     return dataset
 
