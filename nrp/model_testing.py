@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
 from deepsign.models.models import NNLM
 from tensorx.layers import Input
 
@@ -29,25 +29,23 @@ parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 parser.add_argument('-id', dest="id", type=int, default=0)
 parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
-parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=128)
+parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
 parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-embed_limits', dest="embed_limits", type=float, default=0.01)
 parser.add_argument('-logit_limits', dest="logit_limits", type=float, default=0.01)
-parser.add_argument('-h_dim', dest="h_dim", type=int, default=256)
-parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh'], default="tanh")
-parser.add_argument('-num_h', dest="num_h", type=int, default=1)
+parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
+parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh'], default="relu")
+parser.add_argument('-num_h', dest="num_h", type=int, default=2)
 parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
-parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 128)
-parser.add_argument('-epochs', dest="epochs", type=int, default=4)
+parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 12800)
+parser.add_argument('-epochs', dest="epochs", type=int, default=20)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
-parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=True)
+parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=False)
 parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=12.0)
-# evaluation ratio size 0 < eval_epoch < 1 ex if 0.5 evals models on the middle of the dataset
-parser.add_argument('-eval_step', dest='eval_step', type=float, default=0.5)
-parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.01)
-parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="adam")
+parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.0001)
+parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "ams"], default="sgd")
 
 # only needed for adam and ams
 parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
@@ -58,10 +56,10 @@ parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, 
 parser.add_argument('-model_eval_checkpoint', dest='model_eval_checkpoint', type=bool, default=False)
 
 parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
-parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
+parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=1)
 parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
 parser.add_argument('-dropout', dest='dropout', type=bool, default=True)
-parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
+parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.95)
 args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
@@ -108,10 +106,6 @@ def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=ar
 # MODEL
 # ======================================================================================
 
-# N-Gram size should also be verified against dataset attributes
-inputs = Input(n_units=args.ngram_size - 1, name="context_indices", dtype=tf.int64)
-loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int64)
-
 if args.h_act == "relu":
     h_act = tx.relu
     h_init = tx.relu_init()
@@ -135,8 +129,7 @@ else:
     print(args.logit_init)
     raise ValueError("invalid logit_init, expected normal or uniform")
 
-model = NNLM(run_inputs=inputs, loss_inputs=loss_inputs,
-             ctx_size=args.ngram_size - 1,
+model = NNLM(ctx_size=args.ngram_size - 1,
              vocab_size=vocab_size,
              embed_dim=args.embed_dim,
              embed_init=embed_init,
@@ -147,39 +140,39 @@ model = NNLM(run_inputs=inputs, loss_inputs=loss_inputs,
              h_activation=h_act,
              h_init=h_init,
              use_dropout=args.dropout,
-             keep_prob=args.keep_prob)
+             keep_prob=args.keep_prob,
+             nce=True,
+             nce_samples=400)
 
 model_runner = tx.ModelRunner(model)
 
 lr_param = tx.InputParam()
-# optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
+#optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
-# optimizer = tx.AMSGrad(learning_rate=args.learning_rate)
-if args.optimizer == "sgd":
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
-elif args.optimizer == "adam":
-    optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor,
-                                       beta1=args.optimizer_beta1,
-                                       beta2=args.optimizer_beta2,
-                                       epsilon=args.optimizer_epsilon)
-elif args.optimizer == "ams":
-    optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
-                           beta1=args.optimizer_beta1,
-                           beta2=args.optimizer_beta2,
-                           epsilon=args.optimizer_epsilon)
+optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
+
+#optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+#optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
+
+
+#optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
+#                           beta1=args.optimizer_beta1,
+#                           beta2=args.optimizer_beta2,
+#                           epsilon=args.optimizer_epsilon)
 
 
 # model_runner.config_optimizer(optimizer)
-# def global_grad_clip(grads):
-#    grads, _ = tf.clip_by_global_norm(grads, 12)
-#    return grads
+def global_grad_clip(grads):
+    grads, _ = tf.clip_by_global_norm(grads, args.clip_norm)
+    return grads
 
-def clip_grad_norm(grad):
-    return tf.clip_by_norm(grad, args.clip_norm)
+
+# def clip_grad_norm(grad):
+#    return tf.clip_by_norm(grad, args.clip_norm)
 
 
 if args.clip_gradients:
-    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=clip_grad_norm, global_gradient_op=False)
+    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=global_grad_clip, global_gradient_op=True)
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
@@ -193,23 +186,24 @@ model_runner.set_session(sess)
 # EVALUATION UTIL FUNCTIONS
 # ======================================================================================
 
-def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
-    pb = tqdm(total=len_dataset, ncols=60, disable=not display_progress)
+def eval_model(runner, dataset_it, len_dataset=None):
+    pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
     sum_loss = 0
     for batch in dataset_it:
         batch = np.array(batch, dtype=np.int64)
         ctx = batch[:, :-1]
-        target = batch[:, -1]
-        target_one_hot = transform.batch_one_hot(target, vocab_size)
+        target = batch[:, -1:]
 
-        mean_loss = runner.eval(ctx, target_one_hot)
+        mean_loss = runner.eval(ctx, target)
+        # print(mean_loss)
         sum_loss += mean_loss
 
         pb.update(args.batch_size)
         batches_processed += 1
 
     pb.close()
+
     return np.exp(sum_loss / batches_processed)
 
 
@@ -221,7 +215,9 @@ print("Starting Training")
 # preparing evaluation steps
 # I use ceil because I make sure we have padded batches at the end
 num_batches = np.ceil(len(training_dataset) / args.batch_size)
-eval_step = np.ceil(len(training_dataset) / args.batch_size * args.eval_step)
+eval_step = num_batches // 2
+print("eval every ", eval_step)
+
 epoch_step = 0
 global_step = 0
 current_epoch = 0
@@ -230,20 +226,36 @@ current_lr = args.learning_rate
 model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
+
+# ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1), len(validation_dataset))
+# progress.write("val perplexity {}".format(ppl))
+
 for ngram_batch in training_data:
+    epoch = progress.n // len(training_dataset) + 1
+    # ================================================
+    # CHANGING EPOCH restart step
+    # ================================================
+    if epoch != current_epoch:
+        current_epoch = epoch
+        epoch_step = 0
+        progress.write("epoch: {}".format(current_epoch))
+        if epoch > 1:
+            ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
+            progress.write("val perplexity {}".format(ppl))
+
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
-    word_ids = ngram_batch[:, -1]
-    one_hot = transform.batch_one_hot(word_ids, vocab_size)
+    word_ids = ngram_batch[:, -1:]
 
-    model_runner.train(ctx_ids, one_hot, current_lr)
-
+    assert (np.ndim(word_ids) == 2)
+    model_runner.train(ctx_ids, word_ids, current_lr)
     progress.update(args.batch_size)
 
-    if progress.n % 100 == 0:
-        res = model_runner.eval(ctx_ids, one_hot)
-        progress.write("current loss: {}".format(res))
-        # progress.write("current loss: {}", str(res))
+    epoch_step += 1
+
+    if epoch_step % eval_step == 0 and epoch_step > 0:
+        ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
+        progress.write("val perplexity {}".format(ppl))
 
 model_runner.close_session()
 progress.close()

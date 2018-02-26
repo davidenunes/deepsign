@@ -329,9 +329,10 @@ for ngram_batch in training_data:
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1]
-    one_hot = transform.batch_one_hot(word_ids, vocab_size)
+    # one_hot = transform.batch_one_hot(word_ids, vocab_size)
 
-    model_runner.train(ctx_ids, one_hot, current_lr)
+    # model_runner.train(ctx_ids, one_hot, current_lr)
+    model_runner.train(ctx_ids, word_ids, current_lr)
     progress.update(args.batch_size)
 
     epoch_step += 1

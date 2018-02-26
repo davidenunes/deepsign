@@ -18,7 +18,9 @@ class NNLM(tx.Model):
                  keep_prob=0.1,
                  run_inputs=None,
                  eval_inputs=None,
-                 loss_inputs=None):
+                 loss_inputs=None,
+                 nce=False,
+                 nce_samples=10):
         # NNLM PARAMS
         self.embed_init = embed_init
         self.loss_inputs = loss_inputs
@@ -35,21 +37,22 @@ class NNLM(tx.Model):
         self.use_dropout = use_dropout
         self.keep_prob = keep_prob
         self.logit_init = logit_init
+        self.nce = nce
+        self.nce_samples = nce_samples
 
         if self.run_inputs is None:
             self.run_inputs = tx.Input(ctx_size, dtype=tf.int32)
 
         if self.loss_inputs is None:
-            loss_inputs = tx.Input(n_units=vocab_size, name="one_hot_labels_loss")
-            self.loss_inputs = loss_inputs
+            self.loss_inputs = tx.Input(n_units=1, name="one_hot_labels_loss", dtype=tf.int64)
 
         if self.eval_inputs is None:
-            eval_inputs = tx.Input(n_units=vocab_size, name="one_hot_labels_eval")
-            self.eval_inputs = eval_inputs
+            self.eval_inputs = tx.Input(n_units=1, name="one_hot_labels_eval", dtype=tf.int64)
 
-        if run_inputs.dtype != tf.int32 and run_inputs.dtype != tf.int64:
+        if self.run_inputs.dtype != tf.int32 and self.run_inputs.dtype != tf.int64:
             raise TypeError(
-                "Invalid dtype for input layer: expected int32 or int64 got {a} instead".format(a=run_inputs.dtype))
+                "Invalid dtype for input layer: expected int32 or int64 got {a} instead".format(
+                    a=self.run_inputs.dtype))
 
         # hidden layer
         if num_h < 1:
@@ -95,12 +98,41 @@ class NNLM(tx.Model):
         # share logits but connected to train graph (which contains dropout)
         train_logits = run_logits.reuse_with(out_layer, name="train_logits")
         train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
-        train_loss = tx.categorical_cross_entropy(self.loss_inputs.tensor, train_logits.tensor)
+
+        if self.nce:
+            # learns unigram dist during training
+            # sampled_values = tf.nn.learned_unigram_candidate_sampler(self.loss_inputs.tensor,
+            #                                                         num_true=1,
+            #                                                         num_sampled=self.nce_samples,
+            #                                                         unique=True,
+            #                                                         range_max=self.vocab_size)
+            # labels = tf.reshape(self.loss_inputs.tensor, [-1])
+
+            sampled_values = tf.nn.uniform_candidate_sampler(self.loss_inputs.tensor, 1, self.nce_samples,
+                                                             unique=True, range_max=self.vocab_size)
+
+            # one_hot = tx.dense_one_hot(column_indices=self.loss_inputs.tensor, num_cols=self.vocab_size)
+            train_loss = tf.nn.nce_loss(weights=tf.transpose(train_logits.weights),
+                                        biases=train_logits.bias,
+                                        inputs=out_layer.tensor,
+                                        labels=self.loss_inputs.tensor,
+                                        num_sampled=self.nce_samples,
+                                        num_classes=self.vocab_size,
+                                        num_true=1,
+                                        sampled_values=sampled_values)
+        else:
+            one_hot = tx.dense_one_hot(column_indices=self.loss_inputs.tensor, num_cols=self.vocab_size)
+            train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
+
+        train_loss = tf.reduce_mean(train_loss)
 
         # ===============================================
         # EVAL GRAPH
         # ===============================================
-        eval_loss = tx.categorical_cross_entropy(self.eval_inputs.tensor, run_logits.tensor)
+        one_hot = tx.dense_one_hot(column_indices=self.eval_inputs.tensor, num_cols=self.vocab_size)
+        print(one_hot)
+        eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
+
         eval_tensors = tf.reduce_mean(eval_loss)
 
         # BUILD MODEL
