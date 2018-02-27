@@ -9,18 +9,18 @@ class NNLM(tx.Model):
                  embed_dim,
                  batch_size,
                  h_dim,
-                 embed_init=tx.random_normal(0, 0.01),
-                 logit_init=tx.random_normal(0, 0.01),
+                 embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  num_h=1,
-                 h_activation=tx.relu,
-                 h_init=tx.relu_init,
+                 h_activation=tx.elu,
+                 h_init=tx.he_normal_init,
                  use_dropout=False,
-                 keep_prob=0.1,
+                 keep_prob=0.95,
                  run_inputs=None,
                  eval_inputs=None,
                  loss_inputs=None,
                  nce=False,
-                 nce_samples=10):
+                 nce_samples=100):
         # NNLM PARAMS
         self.embed_init = embed_init
         self.loss_inputs = loss_inputs
@@ -130,7 +130,6 @@ class NNLM(tx.Model):
         # EVAL GRAPH
         # ===============================================
         one_hot = tx.dense_one_hot(column_indices=self.eval_inputs.tensor, num_cols=self.vocab_size)
-        print(one_hot)
         eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
 
         eval_tensors = tf.reduce_mean(eval_loss)
@@ -154,7 +153,7 @@ class NRP(tx.Model):
                  logit_init=tx.random_normal(0, 0.01),
                  num_h=1,
                  h_activation=tx.relu,
-                 h_init=tx.relu_init,
+                 h_init=tx.he_normal_init,
                  use_dropout=False,
                  keep_prob=0.1,
                  run_inputs=None,

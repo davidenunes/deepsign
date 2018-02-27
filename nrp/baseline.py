@@ -152,7 +152,7 @@ loss_inputs = Input(n_units=vocab_size, batch_size=args.batch_size, dtype=tf.int
 
 if args.h_act == "relu":
     h_act = tx.relu
-    h_init = tx.relu_init()
+    h_init = tx.he_normal_init()
 if args.h_act == "tanh":
     h_act = tx.tanh
     h_init = tx.xavier_init()

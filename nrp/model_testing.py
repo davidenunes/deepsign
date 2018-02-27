@@ -30,20 +30,20 @@ parser.add_argument('-id', dest="id", type=int, default=0)
 parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
-parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
-parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
+parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="uniform")
+parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="uniform")
 parser.add_argument('-embed_limits', dest="embed_limits", type=float, default=0.01)
 parser.add_argument('-logit_limits', dest="logit_limits", type=float, default=0.01)
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
-parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh'], default="relu")
+parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', "elu"], default="elu")
 parser.add_argument('-num_h', dest="num_h", type=int, default=2)
 parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 12800)
-parser.add_argument('-epochs', dest="epochs", type=int, default=20)
+parser.add_argument('-epochs', dest="epochs", type=int, default=4)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
 parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=False)
-parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=12.0)
+parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=1.0)
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.0001)
 parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "ams"], default="sgd")
 
@@ -106,28 +106,28 @@ def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=ar
 # MODEL
 # ======================================================================================
 
+# Hidden layer weight init.
 if args.h_act == "relu":
     h_act = tx.relu
-    h_init = tx.relu_init()
-if args.h_act == "tanh":
+    h_init = tx.he_normal_init()
+elif args.h_act == "elu":
+    h_act = tx.elu
+    h_init = tx.he_normal_init()
+elif args.h_act == "tanh":
     h_act = tx.tanh
     h_init = tx.xavier_init()
 
+# Embedding (Lookup) layer weight init
 if args.embed_init == "normal":
-    embed_init = tx.random_normal(0, args.embed_limits)
+    embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
 elif args.embed_init == "uniform":
-    embed_init = tx.random_uniform(0, args.embed_limits)
-else:
-    print(args.embed_init)
-    raise ValueError("invalid embed_init, expected normal or uniform")
+    embed_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
 
+# Logit layer weight init
 if args.logit_init == "normal":
-    logit_init = tx.random_normal(0, args.logit_limits)
+    logit_init = embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
 elif args.logit_init == "uniform":
-    logit_init = tx.random_uniform(0, args.logit_limits)
-else:
-    print(args.logit_init)
-    raise ValueError("invalid logit_init, expected normal or uniform")
+    logit_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
 
 model = NNLM(ctx_size=args.ngram_size - 1,
              vocab_size=vocab_size,
@@ -141,21 +141,22 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_init=h_init,
              use_dropout=args.dropout,
              keep_prob=args.keep_prob,
-             nce=True,
-             nce_samples=400)
+             nce=False,
+             nce_samples=100)
 
 model_runner = tx.ModelRunner(model)
 
 lr_param = tx.InputParam()
-#optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
+# optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
-optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
-
-#optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
-#optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
+# optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
 
 
-#optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
+# optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
+
+
+# optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
 #                           beta1=args.optimizer_beta1,
 #                           beta2=args.optimizer_beta2,
 #                           epsilon=args.optimizer_epsilon)
@@ -167,17 +168,15 @@ def global_grad_clip(grads):
     return grads
 
 
-# def clip_grad_norm(grad):
-#    return tf.clip_by_norm(grad, args.clip_norm)
+def local_grad_clip(grad):
+    return tf.clip_by_norm(grad, args.clip_norm)
 
 
 if args.clip_gradients:
-    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=global_grad_clip, global_gradient_op=True)
+    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=local_grad_clip, global_gradient_op=False)
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
-# sess_config = tf.ConfigProto(intra_op_parallelism_threads=8)
-# sess = tf.Session(config=sess_config)
 sess = tf.Session()
 model_runner.set_session(sess)
 
@@ -185,7 +184,6 @@ model_runner.set_session(sess)
 # ======================================================================================
 # EVALUATION UTIL FUNCTIONS
 # ======================================================================================
-
 def eval_model(runner, dataset_it, len_dataset=None):
     pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
@@ -227,8 +225,8 @@ model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
-# ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1), len(validation_dataset))
-# progress.write("val perplexity {}".format(ppl))
+ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
+progress.write("val perplexity {}".format(ppl))
 
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1
