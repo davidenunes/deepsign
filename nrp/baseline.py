@@ -66,8 +66,8 @@ parser.add_argument('-lr', dest="lr", type=float, default=0.001)
 parser.add_argument('-lr_decay', dest='lr_decay', type=str2bool, default=False)
 # lr does not decay beyond threshold
 parser.add_argument('-lr_decay_threshold', dest='lr_decay_threshold', type=float, default=1e-5)
-# lr decay when last_ppl - current_ppl < lr_decay_when
-parser.add_argument('-lr_decay_when', dest='lr_decay_when', type=float, default=1.0)
+# lr decay when last_ppl - current_ppl < eval_threshold
+parser.add_argument('-eval_threshold', dest='eval_threshold', type=float, default=1.0)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
 # number of epochs without improvement before stopping
 parser.add_argument('-early_stop', dest='early_stop', type=str2bool, default=True)
@@ -88,8 +88,6 @@ args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
 # ======================================================================================
-print(args)
-
 
 # Experiment parameter summary
 res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
@@ -307,20 +305,23 @@ for ngram_batch in training_data:
     # Eval Time
     if epoch_step == 0:
         current_eval = evaluation(model_runner, progress, epoch, global_step)
-
-        # lr decay only at the start of each epoch
-        if len(evals) > 0 and epoch_step == 0 and args.lr_decay:
-            if evals[-1] - current_eval < args.lr_decay_when:
-                if args.early_stop and patience >= 3:
-                    progress.write("early stop: the model didn't improve"
-                                   "more than {} in the last {} epochs".format(args.lr_decay_when, patience))
-                    break
-                patience += 1
-                lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                progress.write("lr changed to {}".format(lr_param.value))
-            else:
-                patience = 0
         evals.append(current_eval)
+
+        if global_step > 0:
+            if args.early_stop:
+                if evals[-2] - evals[-1] < args.eval_threshold:
+                    if patience >= 3:
+                        progress.write("early stop")
+                        break
+                    patience += 1
+                else:
+                    patience = 0
+
+            # lr decay only at the start of each epoch
+            if args.lr_decay and len(evals) > 0:
+                if evals[-2] - evals[-1] < args.eval_threshold:
+                    lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
+                    progress.write("lr changed to {}".format(lr_param.value))
 
     # ================================================
     # TRAIN MODEL
