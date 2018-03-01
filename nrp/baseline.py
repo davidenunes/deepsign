@@ -14,6 +14,16 @@ from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
 from deepsign.models.models import NNLM
 from tensorx.layers import Input
 
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
@@ -27,7 +37,7 @@ parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
 parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
 
 default_out_dir = os.getcwd()
-parser.add_argument('-save_model', dest='save_model', type=bool, default=False)
+parser.add_argument('-save_model', dest='save_model', type=str2bool, default=False)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
@@ -42,10 +52,9 @@ parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 
 # training data pipeline
 parser.add_argument('-epochs', dest="epochs", type=int, default=2)
-parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
+parser.add_argument('-shuffle', dest="shuffle", type=str2bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 100000)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
-
 
 parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="ams")
 # only needed for adam and ams
@@ -54,31 +63,33 @@ parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, defa
 parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, default=1e-8)
 
 parser.add_argument('-lr', dest="lr", type=float, default=0.001)
-parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=False)
+parser.add_argument('-lr_decay', dest='lr_decay', type=str2bool, default=False)
 # lr does not decay beyond threshold
 parser.add_argument('-lr_decay_threshold', dest='lr_decay_threshold', type=float, default=1e-5)
 # lr decay when last_ppl - current_ppl < lr_decay_when
 parser.add_argument('-lr_decay_when', dest='lr_decay_when', type=float, default=1.0)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
 # number of epochs without improvement before stopping
-parser.add_argument('-early_stop', dest='early_stop', type=bool, default=True)
+parser.add_argument('-early_stop', dest='early_stop', type=str2bool, default=True)
 parser.add_argument('-patience', dest='patience', type=int, default=3)
 
 # REGULARISATION
 
 # clip grads by norm
-parser.add_argument('-clip_grads', dest="clip_grads", type=bool, default=True)
+parser.add_argument('-clip_grads', dest="clip_grads", type=str2bool, default=True)
 # if true clips each gradient by its norm, else clip all gradients by global norm
-parser.add_argument('-clip_local', dest="clip_local", type=bool, default=True)
+parser.add_argument('-clip_local', dest="clip_local", type=str2bool, default=True)
 parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
 
 # use dropout
-parser.add_argument('-dropout', dest='dropout', type=bool, default=True)
+parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
 args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
 # ======================================================================================
+print(args)
+
 
 # Experiment parameter summary
 res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
