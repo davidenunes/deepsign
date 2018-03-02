@@ -6,13 +6,13 @@ import marisa_trie
 from collections import Counter
 
 from deepsign.data.corpora.ptb import PTBReader
-from deepsign.data.views import n_grams
+from deepsign.data.views import window_it, flatten_it
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
-parser.add_argument('-n', dest="n", type=int, default=4)
+parser.add_argument('-n', dest="n", type=int, default=9)
 parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/datasets/ptb")
 parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME") + "/data/results/")
-parser.add_argument('-out_filename', dest="out_filename", type=str, default="ptb.hdf5")
+parser.add_argument('-flatten', dest="flatten", type=bool, default=True)
 args = parser.parse_args()
 
 # ======================================================================================
@@ -37,7 +37,7 @@ vocabulary = np.array(word_list, dtype="S")
 ids = np.array([vocab[word] for word in word_list])
 frequencies = np.array(word_freq)
 
-hdf5_path = os.path.join(args.data_dir, args.out_filename)
+hdf5_path = os.path.join(args.data_dir, "ptb_{}.hdf5".format(args.n))
 hdf5_file = h5py.File(hdf5_path, "a")
 
 # write words (needs str type)
@@ -55,24 +55,35 @@ print("processing n-grams...")
 
 
 def store_ngrams(corpus_stream, name):
-    sentence_ngrams = (n_grams(sentence, args.n) for sentence in corpus_stream)
-    ngrams = (ngram for ngrams in sentence_ngrams for ngram in ngrams)
-    n_gram_ids = [list(map(lambda w: vocab[w], ngram)) for ngram in ngrams]
-    ngrams = np.array(n_gram_ids)
-    # sample = hdf5_file["ngrams/training"][100:110]
-    # sample = [list(map(lambda id: vocab.restore_key(id), ngram)) for ngram in sample]
+    # if flatten, ngrams go across sentences
+    if args.flatten:
+        word_it = flatten_it(corpus_stream)
+        ngrams = window_it(word_it, args.n)
+    else:
+        sentence_ngrams = (window_it(sentence, args.n) for sentence in corpus_stream)
+        ngrams = flatten_it(sentence_ngrams)
+
+    ngram_ids = [list(map(lambda w: vocab[w], ngram)) for ngram in ngrams]
+    ngrams = np.array(ngram_ids)
     dataset = hdf5_file.create_dataset(name, data=ngrams, compression="gzip")
     dataset.attrs['n'] = args.n
 
 
-training_dataset = ptb_reader.training_set()
-store_ngrams(training_dataset, "training")
+try:
+    print("storing training set")
+    training_dataset = ptb_reader.training_set()
+    store_ngrams(training_dataset, "training")
 
-test_dataset = ptb_reader.test_set()
-store_ngrams(test_dataset, "test")
+    print("storing test set")
+    test_dataset = ptb_reader.test_set()
+    store_ngrams(test_dataset, "test")
 
-validation_dataset = ptb_reader.validation_set()
-store_ngrams(validation_dataset, "validation")
+    print("storing validation set")
+    validation_dataset = ptb_reader.validation_set()
+    store_ngrams(validation_dataset, "validation")
 
-hdf5_file.close()
-print("done")
+    hdf5_file.close()
+    print("done")
+except (KeyboardInterrupt, Exception) as e:
+    os.remove(hdf5_path)
+    raise e

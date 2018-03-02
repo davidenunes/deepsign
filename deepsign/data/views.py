@@ -1,6 +1,6 @@
 import numpy as np
 import itertools
-from functools import partial
+from collections import deque
 
 
 def _pairwise(iterable):
@@ -191,14 +191,26 @@ def subset_chunk_it(dataset, data_range, chunk_size=1):
     return row_gen
 
 
-def n_grams(seq, n=1):
-    """ Creates a list of n-grams from a list of strings
+def consume_it(iterator, n):
+    """Advance the iterator n-steps ahead. If n is none, consume entirely."""
+    # Use functions that consume iterators at C speed.
+    if n is None:
+        # feed the entire iterator into a zero-length deque
+        deque(iterator, maxlen=0)
+    else:
+        # advance to the empty slice starting at position n
+        next(itertools.islice(iterator, n, n), None)
 
-    :param seq: list of strings
-    :param n: size for the n-gram
-    :return:
+
+def window_it(iterable, n, as_list=True):
+    """ Creates fixed sized slidding windows from iterable
+    s -> (s0, ...,s(n-1)), (s1, ...,sn), (s2, ..., s(n+1)), ...
     """
-    return [seq[i:i + n] for i in range(len(seq) - n + 1)]
+    iters = itertools.tee(iterable, n)
+    for i, it in enumerate(iters):
+        consume_it(it, i)
+
+    return map(list, zip(*iters)) if as_list else zip(*iters)
 
 
 def batch_it(data_it, size, padding=False, padding_elem=None):

@@ -35,15 +35,15 @@ parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal
 parser.add_argument('-embed_limits', dest="embed_limits", type=float, default=0.01)
 parser.add_argument('-logit_limits', dest="logit_limits", type=float, default=0.01)
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
-parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', "elu"], default="relu")
-parser.add_argument('-num_h', dest="num_h", type=int, default=2)
+parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', "elu"], default="elu")
+parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 12800)
 parser.add_argument('-epochs', dest="epochs", type=int, default=4)
-parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
+parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=17)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
-parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=False)
-parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=1.0)
+parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=True)
+parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=5.0)
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.001)
 parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "ams"], default="sgd")
 
@@ -69,7 +69,7 @@ args = parser.parse_args()
 # ======================================================================================
 # Load Corpus & Vocab
 # ======================================================================================
-corpus_file = os.path.join(args.corpus, "ptb.hdf5")
+corpus_file = os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size))
 corpus_hdf5 = h5py.File(corpus_file, mode='r')
 
 vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
@@ -143,6 +143,9 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              keep_prob=args.keep_prob,
              nce=False,
              nce_samples=100)
+
+#for layer in tx.layers_to_list(model.run_out_layers):
+#    print(layer)
 
 model_runner = tx.ModelRunner(model)
 
@@ -225,8 +228,8 @@ model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
-#ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
-#progress.write("val perplexity {}".format(ppl))
+ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
+progress.write("val perplexity {}".format(ppl))
 
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1

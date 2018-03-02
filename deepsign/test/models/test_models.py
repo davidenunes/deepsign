@@ -129,7 +129,7 @@ class TestModels(unittest.TestCase):
 
         # s1: RandomIndex = sign_index.get_ri("mr")
 
-        n_grams = views.n_grams(samples, ngram_size)
+        n_grams = views.window_it(samples, ngram_size)
 
         def to_id(i):
             return sign_index.get_id(i)

@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, n_grams, batch_it, shuffle_it, flatten_it, repeat_fn, chain_it
+from deepsign.data.views import divide_slice, window_it, batch_it, shuffle_it, flatten_it, repeat_fn, chain_it
 import itertools
 
 
@@ -40,7 +40,7 @@ class TestViews(TestCase):
     def test_ngrams(self):
         sentence = "hello there mr smith welcome back to the world"
         tokens = sentence.split()
-        windows = n_grams(tokens, 3)
+        windows = window_it(tokens, 3)
         for window in windows:
             print(window)
 
@@ -48,7 +48,10 @@ class TestViews(TestCase):
         sentence = "hello there"
 
         tokens = sentence.split()
-        windows = n_grams(tokens, 3)
+        windows = list(window_it(tokens, 3))
+
+        print(windows)
+
         self.assertEqual(len(windows), 0)
 
         for window in windows:
