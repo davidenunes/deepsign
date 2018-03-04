@@ -2,6 +2,7 @@ import unittest
 
 import deepsign.nlp.regex_utils
 from deepsign.nlp import patterns as pm
+from deepsign.nlp import is_token
 import re
 
 

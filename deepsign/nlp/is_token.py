@@ -56,6 +56,7 @@ def is_stopword(text):
 def is_copyright(text):
     return re.match(patterns.COPYRIGHT, text) is not None
 
+
 # TODO add patterns for time
 # Days of the Week, Months, Years, Today, Yesterday, Tomorrow
 # Abbrev of Months
