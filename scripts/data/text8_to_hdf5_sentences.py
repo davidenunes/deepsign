@@ -21,7 +21,7 @@ args = parser.parse_args()
 
 dataset = os.path.join(args.data_dir, "text8.txt")
 
-corpus = Text8Corpus(dataset, max_sentence_length=1000)
+corpus = Text8Corpus(dataset, sentence_length=1000)
 
 word_counter = Counter()
 for word in tqdm(views.flatten_it(corpus)):

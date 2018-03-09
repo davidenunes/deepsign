@@ -45,6 +45,14 @@ class RandomIndex:
         v[negative] = 1
         return v
 
+    def to_class_indices(self):
+        """ Same as to_class_vector but returns the final indices only
+        """
+        positive = np.array(self.positive)
+        negative = np.array(self.negative) + self.dim
+
+        return np.concatenate([positive, negative])
+
     def get_positive_vector(self):
         v = np.zeros(self.dim)
         v[self.positive] = 1
@@ -100,6 +108,7 @@ class Generator:
     def generate(self):
         # ensure that you can make other calls to random
         # random.setstate(self.random_state)
+
         active_indexes = random.sample(range(self.dim), self.num_active)
 
         num_positive = self.num_active // 2
@@ -108,5 +117,11 @@ class Generator:
 
         # ensure that you can make other calls to random
         # self.random_state = random.getstate()
+
+        return RandomIndex(self.dim, positive, negative)
+
+    def generate_v2(self):
+        active_indexes = np.random.choice(np.arange(self.dim), self.num_active, replace=False)
+        positive, negative = np.split(active_indexes, 2)
 
         return RandomIndex(self.dim, positive, negative)

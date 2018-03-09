@@ -1,14 +1,21 @@
 from smart_open import smart_open
 
-MAX_WORDS_IN_BATCH = 10000
-
 
 class Text8Corpus(object):
-    """Iterate over sentences from the "text8" corpus, unzipped from http://mattmahoney.net/dc/text8.zip ."""
+    """Iterate over sentences from the text8 or enwik9 corpus files.
 
-    def __init__(self, fname, max_sentence_length=MAX_WORDS_IN_BATCH):
+    The has everything in a single line so this tries to read a chunk with a given
+    sentence length at a time. It reads a chunk of bytes and if a token is split,
+    it keeps it for the nest iteration.
+
+    corpus url:
+        from http://mattmahoney.net/dc/text8.zip .
+
+    """
+
+    def __init__(self, fname, sentence_length=1000):
         self.fname = fname
-        self.max_sentence_length = max_sentence_length
+        self.sentence_length = sentence_length
 
     def __iter__(self):
         # the entire corpus is one gigantic line -- there are no sentence marks at all
@@ -27,6 +34,6 @@ class Text8Corpus(object):
                 words, rest = (text[:last_token].decode("utf8").split(),
                                text[last_token:].strip()) if last_token >= 0 else ([], text)
                 sentence.extend(words)
-                while len(sentence) >= self.max_sentence_length:
-                    yield sentence[:self.max_sentence_length]
-                    sentence = sentence[self.max_sentence_length:]
+                while len(sentence) >= self.sentence_length:
+                    yield sentence[:self.sentence_length]
+                    sentence = sentence[self.sentence_length:]

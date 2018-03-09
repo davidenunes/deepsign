@@ -11,8 +11,13 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.models import NNLM
+from deepsign.models.models import NNLM, NRP
 from tensorx.layers import Input
+
+from deepsign.rp.index import TrieSignIndex
+from deepsign.rp.ri import Generator, RandomIndex
+from deepsign.rp.tf_utils import to_sparse_tensor_value
+import deepsign.data.views as views
 
 
 def str2bool(v):
@@ -40,8 +45,8 @@ default_out_dir = os.getcwd()
 parser.add_argument('-save_model', dest='save_model', type=str2bool, default=False)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 
-parser.add_argument('-k_dim', dest="k_dim", type=int, default=10000)
-parser.add_argument('-s_active', dest="s_active", type=int, default=3333)
+parser.add_argument('-k_dim', dest="k_dim", type=int, default=9999)
+parser.add_argument('-s_active', dest="s_active", type=int, default=6666)
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
 parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-embed_init_val', dest="embed_init_val", type=float, default=0.01)
@@ -86,6 +91,7 @@ parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
 # use dropout
 parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
+
 args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
@@ -116,10 +122,24 @@ ppl_writer.writeheader()
 
 # ======================================================================================
 # Load Corpus & Vocab
+#
+# Instead of feeding the vocab indexes directly we will turn each n-gram into
+# a random index
 # ======================================================================================
-corpus = h5py.File(os.path.join(args.corpus, "ptb.hdf5"), mode='r')
+corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
+
 vocab = marisa_trie.Trie(corpus["vocabulary"])
-vocab_size = len(vocab)
+
+# generates k-dimensional random indexes with s_active units
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
+
+# pre-gen indices for vocab
+ri = dict()
+for word in vocab.keys():
+    w_id = vocab[word]
+    ri[w_id] = ri_generator.generate()
+
+print("done")
 
 
 def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
@@ -135,7 +155,29 @@ def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         data = shuffle_it(data, args.shuffle_buffer_size)
 
     data = batch_it(data, size=batch_size, padding=False)
+
     return data
+
+
+def nrp_encode(ctx_ids, target_ids):
+    """
+
+    Args:
+        ctx_ids: batch of ctx with the ids of words of current ctx
+        target_ids: batch of current word ids.
+
+    Returns:
+        (spv_ctx,class_target) tuple with sparse tensor values encoding the
+        input random indexes
+
+        output with large class-based
+    """
+
+    stv_ctx = to_sparse_tensor_value((ri[w] for w in ctx_ids.flatten()), args.k_dim)
+    target_ris = (ri[w] for w in target_ids.flatten())
+    class_target = np.array([rindex.to_class_vector() for rindex in target_ris])
+
+    return stv_ctx, class_target
 
 
 # ======================================================================================
@@ -162,24 +204,26 @@ elif args.embed_init == "uniform":
 
 if args.logit_init == "normal":
     logit_init = tx.random_normal(mean=0.,
+
                                   stddev=args.logit_init_val)
 elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-model = NNLM(ctx_size=args.ngram_size - 1,
-             vocab_size=vocab_size,
-             embed_dim=args.embed_dim,
-             embed_init=embed_init,
-             logit_init=logit_init,
-             batch_size=args.batch_size,
-             h_dim=args.h_dim,
-             num_h=args.num_h,
-             h_activation=h_act,
-             h_init=h_init,
-             use_dropout=args.dropout,
-             keep_prob=args.keep_prob)
-
+# new Random Neural Projection Model
+model = NRP(ctx_size=args.ngram_size - 1,
+            ri_dim=args.k_dim,
+            embed_dim=args.embed_dim,
+            batch_size=args.batch_size,
+            h_dim=args.h_dim,
+            embed_init=embed_init,
+            logit_init=logit_init,
+            num_h=args.num_h,
+            h_activation=h_act,
+            h_init=h_init,
+            use_dropout=args.dropout,
+            keep_prob=args.keep_prob
+            )
 model_runner = tx.ModelRunner(model)
 
 # we use an InputParam because we might want to change it during training
@@ -236,6 +280,8 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
         ctx = batch[:, :-1]
         target = batch[:, -1:]
 
+        ctx, target = nrp_encode(ctx, target)
+
         mean_loss = runner.eval(ctx, target)
         sum_loss += mean_loss
 
@@ -249,7 +295,7 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
     return np.exp(sum_loss / batches_processed)
 
 
-def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
+def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=True):
     pb.write("[Eval Validation]")
 
     val_data = corpus["validation"]
@@ -329,10 +375,12 @@ for ngram_batch in training_data:
     # TRAIN MODEL
     # ================================================
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
-    ctx_ids = ngram_batch[:, :-1]
-    word_ids = ngram_batch[:, -1:]
+    ctx = ngram_batch[:, :-1]
+    target = ngram_batch[:, -1:]
 
-    model_runner.train(ctx_ids, word_ids)
+    ctx, target = nrp_encode(ctx, target)
+
+    model_runner.train(ctx, target)
     progress.update(args.batch_size)
 
     epoch_step += 1

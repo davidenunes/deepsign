@@ -56,7 +56,7 @@ parser.add_argument('-shuffle', dest="shuffle", type=str2bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 100000)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
 
-parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="ams")
+parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="adam")
 # only needed for adam and ams
 parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
 parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, default=0.999)
@@ -65,7 +65,7 @@ parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, 
 parser.add_argument('-lr', dest="lr", type=float, default=0.001)
 parser.add_argument('-lr_decay', dest='lr_decay', type=str2bool, default=False)
 # lr does not decay beyond threshold
-parser.add_argument('-lr_decay_threshold', dest='lr_decay_threshold', type=float, default=1e-5)
+parser.add_argument('-lr_decay_threshold', dest='lr_decay_threshold', type=float, default=1e-6)
 # lr decay when last_ppl - current_ppl < eval_threshold
 parser.add_argument('-eval_threshold', dest='eval_threshold', type=float, default=1.0)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
@@ -115,9 +115,9 @@ ppl_writer.writeheader()
 # ======================================================================================
 # Load Corpus & Vocab
 # ======================================================================================
-corpus = h5py.File(os.path.join(args.corpus, "ptb.hdf5"), mode='r')
+corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
 vocab = marisa_trie.Trie(corpus["vocabulary"])
-vocab_size = len(vocab)
+
 
 
 def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
@@ -166,7 +166,7 @@ elif args.logit_init == "uniform":
                                    maxval=args.logit_init_val)
 
 model = NNLM(ctx_size=args.ngram_size - 1,
-             vocab_size=vocab_size,
+             vocab_size=len(vocab),
              embed_dim=args.embed_dim,
              embed_init=embed_init,
              logit_init=logit_init,
@@ -262,7 +262,7 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
     ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
     res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
-               "perplexity": ppl_validation}
+               "perplexity": ppl_test}
     ppl_writer.writerow(res_row)
 
     ppl_file.flush()

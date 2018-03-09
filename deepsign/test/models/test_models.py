@@ -151,7 +151,7 @@ class TestModels(unittest.TestCase):
 
             ris = to_sparse_tensor_value(map(to_ri, ctx_ids.flatten()), ri_dim)
 
-            target_ids = batch[:, -1]
+            target_ids = batch[:, -1:]
 
             # need to call flatten to make sure im iterating over the individual entries in map
             target_ris = map(to_ri, target_ids.flatten())
@@ -159,6 +159,9 @@ class TestModels(unittest.TestCase):
             #print("ctx: ", ris)
             #print("wid: ", target_ris)
 
+            print(ris)
+            print(target_ris)
+            print(np.argwhere(target_ris == 1))
 
 
             runner.train(ris, target_ris)

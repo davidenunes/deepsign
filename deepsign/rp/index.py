@@ -6,6 +6,7 @@ import random
 import pickle
 from deepsign.rp.ri import Generator, ri_from_indexes
 
+
 class SignIndex:
     def __init__(self, generator):
         """
@@ -153,6 +154,15 @@ class TrieSignIndex:
             if sid in self.random_indexes:
                 self.random_indexes.pop(sign)
 
+    def ri_from_id(self, sign_id):
+        """ Returns None if ``sign_id`` not in SignIndex
+        """
+        try:
+            s = self.sign_trie.restore_key(sign_id)
+            return self.get_ri(s)
+        except KeyError:
+            return None
+
     def get_ri(self, sign):
         if sign not in self.sign_trie:
             return None
@@ -207,7 +217,7 @@ class TrieSignIndex:
 
         # store generator state
         state = random.getstate()
-        b_state = pickle.dumps(state,pickle.HIGHEST_PROTOCOL)
+        b_state = pickle.dumps(state, pickle.HIGHEST_PROTOCOL)
         ri_dataset.attrs["state"] = np.void(b_state)
 
         h5index.close()
@@ -233,7 +243,7 @@ class TrieSignIndex:
         random.setstate(random_state)
 
         generator = Generator(dim=ri_k, num_active=ri_s)
-        index = TrieSignIndex(generator,vocabulary=list(signs[:]),pregen_indexes=False)
+        index = TrieSignIndex(generator, vocabulary=list(signs[:]), pregen_indexes=False)
 
         random_indexes = {}
 
@@ -244,7 +254,7 @@ class TrieSignIndex:
         for i in range(len(indexes)):
             w = signs[i]
             id = index.get_id(w)
-            ri = ri_from_indexes(ri_k,indexes[i])
+            ri = ri_from_indexes(ri_k, indexes[i])
             random_indexes[id] = ri
 
         index.random_indexes = random_indexes
@@ -252,4 +262,3 @@ class TrieSignIndex:
         h5index.close()
 
         return index
-

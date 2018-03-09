@@ -7,8 +7,8 @@ import time
 
 class TestRI(unittest.TestCase):
     def test_generator(self):
-        dim = 18
-        active = 2
+        dim = 1000
+        active = 666
 
         gen = ri.Generator(dim=dim, num_active=active)
 
@@ -27,7 +27,7 @@ class TestRI(unittest.TestCase):
         vectors = [gen.generate().to_vector() for x in range(0, 18)]
 
         t0 = time.time()
-        for i in range(pow(10, 4)):
+        for i in range(999):
             v = gen.generate()
         t1 = time.time()
         print("time to generate: ",t1-t0)
