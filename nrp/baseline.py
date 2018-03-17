@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.models import NNLM
+from deepsign.models.nnlm import NNLM
 from tensorx.layers import Input
 
 
@@ -46,7 +46,7 @@ parser.add_argument('-embed_init_val', dest="embed_init_val", type=float, defaul
 parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-logit_init_val', dest="logit_init_val", type=float, default=0.01)
 
-parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
+parser.add_argument('-h_dim', dest="h_dim", type=int, default=256)
 parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', 'elu'], default="elu")
 parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 
@@ -56,7 +56,7 @@ parser.add_argument('-shuffle', dest="shuffle", type=str2bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 100000)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
 
-parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="adam")
+parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="ams")
 # only needed for adam and ams
 parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
 parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, default=0.999)
@@ -84,6 +84,10 @@ parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
 # use dropout
 parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
+
+parser.add_argument('-l2_loss', dest='l2_loss', type=str2bool, default=False)
+parser.add_argument('-l2_loss_coef', dest='l2_loss_coef', type=float, default=1e-5)
+
 args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
@@ -117,7 +121,6 @@ ppl_writer.writeheader()
 # ======================================================================================
 corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
 vocab = marisa_trie.Trie(corpus["vocabulary"])
-
 
 
 def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
@@ -176,7 +179,9 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_activation=h_act,
              h_init=h_init,
              use_dropout=args.dropout,
-             keep_prob=args.keep_prob)
+             keep_prob=args.keep_prob,
+             l2_loss=args.l2_loss,
+             l2_loss_coef=args.l2_loss_coef)
 
 model_runner = tx.ModelRunner(model)
 

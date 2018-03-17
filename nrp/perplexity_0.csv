@@ -1,0 +1,3 @@
+id,epoch,step,lr,dataset,perplexity
+0,1,0,0.001,validation,9998.848874316613
+0,1,0,0.001,test,9998.994633122142

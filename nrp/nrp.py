@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.models import NNLM, NRP
+from deepsign.models.nnlm import NNLM, NRP
 from tensorx.layers import Input
 
 from deepsign.rp.index import TrieSignIndex

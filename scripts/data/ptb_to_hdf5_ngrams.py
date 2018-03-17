@@ -9,7 +9,7 @@ from deepsign.data.corpora.ptb import PTBReader
 from deepsign.data.views import window_it, flatten_it
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
-parser.add_argument('-n', dest="n", type=int, default=4)
+parser.add_argument('-n', dest="n", type=int, default=5)
 parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/datasets/ptb")
 parser.add_argument('-out_dir', dest="out_path", type=str, default=os.getenv("HOME") + "/data/results/")
 parser.add_argument('-flatten', dest="flatten", type=bool, default=False)

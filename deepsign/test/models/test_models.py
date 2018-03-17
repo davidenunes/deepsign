@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 import tensorflow as tf
 import tensorx as tx
-from deepsign.models.models import NNLM, NRP
+from deepsign.models.nnlm import NNLM
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value

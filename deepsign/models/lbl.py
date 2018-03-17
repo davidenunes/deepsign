@@ -41,7 +41,9 @@ class LBL(tx.Model):
 
         # TRAIN GRAPH ===============================================
         if nce:
-            # TODO FIGURE OUT IF USING UNIFORM CANDIDATE SAMPLER IS APPROPRIATE
+            # uniform gets good enough results if enough samples are used
+            # but we can load the empirical unigram distribution
+            # or learn the unigram distribution during training
             sampled_values = uniform_sampler(loss_inputs.tensor, 1, nce_samples, True, vocab_size)
             loss = tf.nn.nce_loss(weights=tf.transpose(logits.weights),
                                   biases=logits.bias,

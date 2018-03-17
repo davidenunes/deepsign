@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.models import NNLM
+from deepsign.models.nnlm import NNLM
 from tensorx.layers import Input
 
 # ======================================================================================
@@ -29,23 +29,23 @@ parser = argparse.ArgumentParser(description="NNLM Baseline Parameters")
 parser.add_argument('-id', dest="id", type=int, default=0)
 parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
-parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
+parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=100)
 parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="uniform")
 parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="uniform")
 parser.add_argument('-embed_limits', dest="embed_limits", type=float, default=0.01)
 parser.add_argument('-logit_limits', dest="logit_limits", type=float, default=0.01)
-parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
+parser.add_argument('-h_dim', dest="h_dim", type=int, default=200)
 parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', "elu"], default="elu")
 parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 parser.add_argument('-shuffle', dest="shuffle", type=bool, default=True)
 parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=100 * 12800)
 parser.add_argument('-epochs', dest="epochs", type=int, default=4)
-parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=17)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
+parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
+parser.add_argument('-batch_size', dest="batch_size", type=int, default=256)
 parser.add_argument('-clip_gradients', dest="clip_gradients", type=bool, default=True)
 parser.add_argument('-clip_norm', dest="clip_norm", type=float, default=5.0)
 parser.add_argument('-learning_rate', dest="learning_rate", type=float, default=0.001)
-parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "ams"], default="sgd")
+parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "ams"], default="ams")
 
 # only needed for adam and ams
 parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
@@ -58,7 +58,7 @@ parser.add_argument('-model_eval_checkpoint', dest='model_eval_checkpoint', type
 parser.add_argument('-lr_decay', dest='lr_decay', type=bool, default=True)
 parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=1)
 parser.add_argument('-lr_decay_on_eval', dest='lr_decay_on_eval', type=bool, default=True)
-parser.add_argument('-dropout', dest='dropout', type=bool, default=True)
+parser.add_argument('-dropout', dest='dropout', type=bool, default=False)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.95)
 args = parser.parse_args()
 # ======================================================================================
@@ -141,11 +141,9 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_init=h_init,
              use_dropout=args.dropout,
              keep_prob=args.keep_prob,
-             nce=False,
-             nce_samples=100)
-
-#for layer in tx.layers_to_list(model.run_out_layers):
-#    print(layer)
+             l2_loss=True,
+             l2_loss_coef=1e-5
+             )
 
 model_runner = tx.ModelRunner(model)
 

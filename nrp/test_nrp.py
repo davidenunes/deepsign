@@ -14,7 +14,7 @@ from deepsign.rp.ri import RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.models import NNLM, NRP
+from deepsign.models.nnlm import NNLM, NRP
 from tensorx.layers import Input
 
 # ======================================================================================
