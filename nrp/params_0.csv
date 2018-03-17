@@ -1,2 +1,0 @@
-id,corpus,ngram_size,save_model,out_dir,embed_dim,embed_init,embed_init_val,logit_init,logit_init_val,h_dim,h_act,num_h,epochs,shuffle,shuffle_buffer_size,batch_size,optimizer,optimizer_beta1,optimizer_beta2,optimizer_epsilon,lr,lr_decay,lr_decay_threshold,eval_threshold,lr_decay_rate,early_stop,patience,clip_grads,clip_local,clip_value,dropout,keep_prob
-0,/Users/davide/data/datasets/ptb/,4,False,/Users/davide/dev/deepsign/nrp,128,normal,0.01,normal,0.01,512,elu,1,2,True,12800000,128,ams,0.9,0.999,1e-08,0.001,False,1e-06,1.0,0.5,True,3,True,True,1.0,True,0.9
