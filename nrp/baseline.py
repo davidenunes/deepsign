@@ -83,6 +83,7 @@ parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
 
 # use dropout
 parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
+parser.add_argument('-embed_dropout', dest='embed_dropout', type=str2bool, default=False)
 parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
 
 parser.add_argument('-l2_loss', dest='l2_loss', type=str2bool, default=False)
@@ -180,6 +181,7 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_init=h_init,
              use_dropout=args.dropout,
              keep_prob=args.keep_prob,
+             embed_dropout=args.embed_dropout,
              l2_loss=args.l2_loss,
              l2_loss_coef=args.l2_loss_coef)
 

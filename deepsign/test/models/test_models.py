@@ -3,6 +3,7 @@ import unittest
 import tensorflow as tf
 import tensorx as tx
 from deepsign.models.nnlm import NNLM
+from deepsign.models.lbl import LBL
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -17,6 +18,23 @@ class TestModels(unittest.TestCase):
 
     def tearDown(self):
         self.ss.close()
+
+    def test_lbl(self):
+        model = LBL(ctx_size=2,
+                    vocab_size=4,
+                    embed_dim=10,
+                    embed_share=True,
+                    use_gate=False,
+                    use_hidden=True,
+                    h_dim=4,
+                    use_dropout=False)
+
+        print("RUN GRAPH:")
+        for layer in tx.layers_to_list(model.run_out_layers):
+            print(layer.full_str())
+
+        print("=" * 60)
+
 
     def test_baseline_nnlm_init(self):
         inputs = tx.TensorLayer([[1, 2]], 1, batch_size=1, dtype=tf.int32)

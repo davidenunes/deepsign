@@ -15,6 +15,7 @@ class NNLM(tx.Model):
                  h_activation=tx.elu,
                  h_init=tx.he_normal_init,
                  use_dropout=False,
+                 embed_dropout=False,
                  keep_prob=0.95,
                  run_inputs=None,
                  eval_inputs=None,
@@ -84,12 +85,15 @@ class NNLM(tx.Model):
         # TRAIN GRAPH
         # ===============================================
         if l2_loss:
-            weigh_losses = []
+            weight_losses = []
 
-        out_layer = lookup_layer
+        if use_dropout and embed_dropout:
+            out_layer = tx.Dropout(lookup_layer, keep_prob=keep_prob)
+        else:
+            out_layer = lookup_layer
 
         if l2_loss:
-            weigh_losses.append(tf.nn.l2_loss(lookup_layer.weights))
+            weight_losses.append(tf.nn.l2_loss(lookup_layer.weights))
 
         # add dropout between each layer
         for layer in h_layers:
@@ -98,13 +102,13 @@ class NNLM(tx.Model):
                 h = tx.Dropout(h, keep_prob=keep_prob)
 
             if l2_loss:
-                weigh_losses.append(tf.nn.l2_loss(h.layers[0].weights))
+                weight_losses.append(tf.nn.l2_loss(h.layers[0].weights))
             out_layer = h
 
         train_logits = run_logits.reuse_with(out_layer, name="train_logits")
 
         if l2_loss:
-            weigh_losses.append(tf.nn.l2_loss(train_logits.weights))
+            weight_losses.append(tf.nn.l2_loss(train_logits.weights))
 
         train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
 
@@ -114,7 +118,7 @@ class NNLM(tx.Model):
         train_loss = tf.reduce_mean(train_loss)
 
         if l2_loss:
-            train_loss = train_loss + l2_loss_coef * tf.add_n(weigh_losses)
+            train_loss = train_loss + l2_loss_coef * tf.add_n(weight_losses)
 
         # ===============================================
         # EVAL GRAPH
