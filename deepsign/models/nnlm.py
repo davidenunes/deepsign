@@ -60,6 +60,7 @@ class NNLM(tx.Model):
         # ===============================================
         # RUN GRAPH
         # ===============================================
+        var_reg = []
 
         # lookup layer
         embeddings_shape = [vocab_size, embed_dim]
@@ -69,6 +70,8 @@ class NNLM(tx.Model):
                                  batch_size=None,
                                  weight_init=embed_init)
 
+        var_reg.append(lookup_layer.weights)
+
         out_layer = lookup_layer
         h_layers = []
         for i in range(num_h):
@@ -77,39 +80,30 @@ class NNLM(tx.Model):
             h = tx.Compose([h_i, h_a], name="h_{i}".format(i=i))
             h_layers.append(h)
             out_layer = h
+            var_reg.append(h_i.weights)
 
         run_logits = tx.Linear(out_layer, vocab_size, init=logit_init, bias=True, name="run_logits")
         run_output = tx.Activation(run_logits, tx.softmax, name="run_output")
 
+        var_reg.append(run_logits.weights)
+
         # ===============================================
         # TRAIN GRAPH
         # ===============================================
-        if l2_loss:
-            weight_losses = []
 
         if use_dropout and embed_dropout:
             out_layer = tx.Dropout(lookup_layer, keep_prob=keep_prob)
         else:
             out_layer = lookup_layer
 
-        if l2_loss:
-            weight_losses.append(tf.nn.l2_loss(lookup_layer.weights))
-
         # add dropout between each layer
         for layer in h_layers:
             h = layer.reuse_with(out_layer)
             if use_dropout:
                 h = tx.Dropout(h, keep_prob=keep_prob)
-
-            if l2_loss:
-                weight_losses.append(tf.nn.l2_loss(h.layers[0].weights))
             out_layer = h
 
         train_logits = run_logits.reuse_with(out_layer, name="train_logits")
-
-        if l2_loss:
-            weight_losses.append(tf.nn.l2_loss(train_logits.weights))
-
         train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
 
         one_hot = tx.dense_one_hot(column_indices=self.loss_inputs.tensor, num_cols=self.vocab_size)
@@ -118,7 +112,8 @@ class NNLM(tx.Model):
         train_loss = tf.reduce_mean(train_loss)
 
         if l2_loss:
-            train_loss = train_loss + l2_loss_coef * tf.add_n(weight_losses)
+            losses = [tf.nn.l2_loss(var) for var in var_reg]
+            train_loss = train_loss + l2_loss_coef * tf.add_n(losses)
 
         # ===============================================
         # EVAL GRAPH

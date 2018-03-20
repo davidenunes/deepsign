@@ -42,27 +42,36 @@ class LBL(tx.Model):
         eval_inputs = loss_inputs
 
         # RUN GRAPH
+        var_reg = []
+
         lookup = tx.Lookup(run_inputs, ctx_size, [vocab_size, embed_dim], embed_init, name="embed")
+        var_reg.append(lookup.weights)
 
         if use_gate or use_hidden:
             hl = tx.Linear(lookup, h_dim, h_init, name="h_wb")
             ha = tx.Activation(hl, h_activation, name="h_fn")
             h = tx.Compose([hl, ha], name="h")
+            var_reg.append(hl.weights)
 
         features = lookup
         if use_gate:
             features = tx.Gate(features, ctx_size, gate_input=h)
             gate = features
+            var_reg.append(features.gate_weights)
 
         x_to_y = tx.Linear(features, embed_dim, y_pred_init, name="x_y")
+        var_reg.append(x_to_y.weights)
         y_pred = x_to_y
         if use_hidden:
             h_to_y = tx.Linear(h, embed_dim, w_init, name="h_y")
+            var_reg.append(h_to_y.weights)
             y_pred = tx.Add([y_pred, h_to_y])
 
         shared_weights = tf.transpose(lookup.weights) if embed_share else None
         logit_init = logit_init if not embed_share else None
         run_logits = tx.Linear(y_pred, vocab_size, logit_init, shared_weights, name="logits")
+        if not embed_share:
+            var_reg.append(run_logits.weights)
         y_prob = tx.Activation(run_logits, tx.softmax)
 
         # TRAIN GRAPH ===============================================
@@ -71,37 +80,21 @@ class LBL(tx.Model):
         else:
             features = lookup
 
-        if l2_loss:
-            weights_losses = [tf.nn.l2_loss(lookup.weights)]
-
         if use_gate or use_hidden:
             h = h.reuse_with(features)
 
-            if l2_loss:
-                weights_losses.append(tf.nn.l2_loss(h.layers[0].weights))
-                weights_losses.append(tf.nn.l2_loss(y_pred.weights))
-
             if use_gate:
                 features = gate.reuse_with(features)
-                if l2_loss:
-                    weights_losses.append(tf.nn.l2_loss(gate.gate.layers[0].weights))
 
             y_pred = x_to_y.reuse_with(features)
 
             if use_hidden:
                 h_to_y = h_to_y.reuse_with(h)
-                if l2_loss:
-                    weights_losses.append(tf.nn.l2_loss(h_to_y.weights))
                 y_pred = tx.Add([y_pred, h_to_y])
         else:
             y_pred = y_pred.reuse_with(features)
-            if l2_loss:
-                weights_losses.append(tf.nn.l2_loss(y_pred.weights))
 
         train_logits = run_logits.reuse_with(y_pred)
-
-        if l2_loss and not embed_share:
-            weights_losses.append(tf.nn.l2_loss(train_logits.weights))
 
         if nce:
             # uniform gets good enough results if enough samples are used
@@ -123,7 +116,8 @@ class LBL(tx.Model):
         train_loss = tf.reduce_mean(train_loss)
 
         if l2_loss:
-            train_loss = train_loss + l2_loss_coef * tf.add_n(weights_losses)
+            losses = [tf.nn.l2_loss(var) for var in var_reg]
+            train_loss = train_loss + l2_loss_coef * tf.add_n(losses)
 
         # EVAL GRAPH ===============================================
         one_hot = tx.dense_one_hot(column_indices=eval_inputs.tensor, num_cols=vocab_size)
