@@ -11,7 +11,6 @@ import deepsign.data.views as views
 import marisa_trie
 
 
-
 class TestModels(unittest.TestCase):
     def setUp(self):
         self.ss = tf.InteractiveSession()
@@ -24,10 +23,11 @@ class TestModels(unittest.TestCase):
                     vocab_size=4,
                     embed_dim=10,
                     embed_share=True,
-                    use_gate=False,
+                    use_gate=True,
                     use_hidden=True,
                     h_dim=4,
-                    use_dropout=False)
+                    use_dropout=True,
+                    embed_dropout=True)
 
         print("RUN GRAPH:")
         for layer in tx.layers_to_list(model.run_out_layers):
@@ -35,6 +35,13 @@ class TestModels(unittest.TestCase):
 
         print("=" * 60)
 
+        graph_def = tf.get_default_graph().as_graph_def()
+        graphpb_txt = str(graph_def)
+        with open('/Users/davide/graphpb.txt', 'w') as f:
+            f.write(graphpb_txt)
+
+        runner = tx.ModelRunner(model)
+        runner.save_graph("/tmp/")
 
     def test_baseline_nnlm_init(self):
         inputs = tx.TensorLayer([[1, 2]], 1, batch_size=1, dtype=tf.int32)
@@ -105,7 +112,7 @@ class TestModels(unittest.TestCase):
         ri_s = 0.01
         batch_size = 2
         ngram_size = 3
-        ctx_size = ngram_size-1
+        ctx_size = ngram_size - 1
 
         inputs = tx.SparseInput(ri_dim)
         loss_inputs = tx.Input(ri_dim * 2)
@@ -158,8 +165,7 @@ class TestModels(unittest.TestCase):
 
         n_grams = [list(map(to_id, n)) for n in n_grams]
 
-
-        n_grams = views.batch_it(n_grams, size=batch_size,padding=True,padding_elem=np.zeros([ngram_size]))
+        n_grams = views.batch_it(n_grams, size=batch_size, padding=True, padding_elem=np.zeros([ngram_size]))
         # print("how data is usually fed \n", n_grams)
         for batch in n_grams:
             batch = np.array(batch)
@@ -174,18 +180,17 @@ class TestModels(unittest.TestCase):
             # need to call flatten to make sure im iterating over the individual entries in map
             target_ris = map(to_ri, target_ids.flatten())
             target_ris = np.array([ri.to_class_vector() for ri in target_ris])
-            #print("ctx: ", ris)
-            #print("wid: ", target_ris)
+            # print("ctx: ", ris)
+            # print("wid: ", target_ris)
 
             print(ris)
             print(target_ris)
             print(np.argwhere(target_ris == 1))
 
-
             runner.train(ris, target_ris)
-            #res = runner.session.run(model.lookup.tensor,{model.run_inputs.placeholder: ris})
-            #print(res)
-            #res = runner.run(ris)
+            # res = runner.session.run(model.lookup.tensor,{model.run_inputs.placeholder: ris})
+            # print(res)
+            # res = runner.run(ris)
 
 
 if __name__ == '__main__':

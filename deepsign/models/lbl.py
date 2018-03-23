@@ -7,13 +7,23 @@ from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampl
 
 
 class LBL(tx.Model):
-    """
+    """ Log BiLinear Model
+
+    Log BiLinear Model with gating and hidden non-linear layer extensions.
+
+    Notes:
+        - If embed_share is False, the model uses two embedding layers, one for the context words
+        and one for the target words. The context word embeddings are initialized with the embed_init
+        function. The target word embeddings are initialized with the logit_init function
+
     Args:
-            ctx_size:
-            feature_dim: feature / embedding dimension
-            feature_share: share the features with target words
-            nce: bool if true uses NCE approximation to softmax
+            ctx_size: number of words in the input context / sequence
+            embed_dim: feature / embedding dimension
+            embed_init: initialisation function for embedding weights
+            embed_share: share the features with target words
+            nce: bool if true uses NCE approximation to softmax with random uniform samples
             nce_samples: number of samples for nce
+            logit_init: initialisation function for logits only applicable if embed_share is set to False.
     """
 
     def __init__(self,
@@ -21,7 +31,7 @@ class LBL(tx.Model):
                  vocab_size,
                  embed_dim,
                  embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 y_pred_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 feature_pred_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=True,
                  use_gate=True,
@@ -37,92 +47,107 @@ class LBL(tx.Model):
                  l2_loss_coef=1e-5,
                  nce=False,
                  nce_samples=100):
-        run_inputs = tx.Input(ctx_size, dtype=tf.int32)
-        loss_inputs = tx.Input(n_units=1, dtype=tf.int32)
+
+        # GRAPH INPUTS
+        run_inputs = tx.Input(ctx_size, dtype=tf.int32, name="input")
+        loss_inputs = tx.Input(n_units=1, dtype=tf.int32, name="target")
         eval_inputs = loss_inputs
 
         # RUN GRAPH
+        # if I create a scope here the Tensorboard graph will be a mess to read
+        # because it groups everything by nested scope names
+        # instead if I choose to create different scopes for train and eval only
+        # the graph stays readable because it allows us to use the same names
+        # under different scopes while still sharing variables
         var_reg = []
+        with tf.name_scope("run"):
+            feature_lookup = tx.Lookup(run_inputs, ctx_size, [vocab_size, embed_dim], embed_init, name="lookup")
+            var_reg.append(feature_lookup.weights)
 
-        lookup = tx.Lookup(run_inputs, ctx_size, [vocab_size, embed_dim], embed_init, name="embed")
-        var_reg.append(lookup.weights)
+            if use_gate or use_hidden:
+                hl = tx.Linear(feature_lookup, h_dim, h_init, name="h_linear")
+                ha = tx.Activation(hl, h_activation, name="h_activation")
+                h = tx.Compose([hl, ha], name="hidden")
+                var_reg.append(hl.weights)
 
-        if use_gate or use_hidden:
-            hl = tx.Linear(lookup, h_dim, h_init, name="h_wb")
-            ha = tx.Activation(hl, h_activation, name="h_fn")
-            h = tx.Compose([hl, ha], name="h")
-            var_reg.append(hl.weights)
-
-        features = lookup
-        if use_gate:
-            features = tx.Gate(features, ctx_size, gate_input=h)
-            gate = features
-            var_reg.append(features.gate_weights)
-
-        x_to_y = tx.Linear(features, embed_dim, y_pred_init, name="x_y")
-        var_reg.append(x_to_y.weights)
-        y_pred = x_to_y
-        if use_hidden:
-            h_to_y = tx.Linear(h, embed_dim, w_init, name="h_y")
-            var_reg.append(h_to_y.weights)
-            y_pred = tx.Add([y_pred, h_to_y])
-
-        shared_weights = tf.transpose(lookup.weights) if embed_share else None
-        logit_init = logit_init if not embed_share else None
-        run_logits = tx.Linear(y_pred, vocab_size, logit_init, shared_weights, name="logits")
-        if not embed_share:
-            var_reg.append(run_logits.weights)
-        y_prob = tx.Activation(run_logits, tx.softmax)
-
-        # TRAIN GRAPH ===============================================
-        if use_dropout and embed_dropout:
-            features = tx.Dropout(lookup, keep_prob=keep_prob)
-        else:
-            features = lookup
-
-        if use_gate or use_hidden:
-            h = h.reuse_with(features)
-
+            features = feature_lookup
             if use_gate:
-                features = gate.reuse_with(features)
+                features = tx.Gate(features, ctx_size, gate_input=h)
+                gate = features
+                var_reg.append(features.gate_weights)
 
-            y_pred = x_to_y.reuse_with(features)
+            x_to_y = tx.Linear(features, embed_dim, feature_pred_init, name="x_to_f")
+            var_reg.append(x_to_y.weights)
+            f_prediction = x_to_y
 
             if use_hidden:
-                h_to_y = h_to_y.reuse_with(h)
-                y_pred = tx.Add([y_pred, h_to_y])
-        else:
-            y_pred = y_pred.reuse_with(features)
+                h_to_y = tx.Linear(h, embed_dim, w_init, name="h_to_f")
+                var_reg.append(h_to_y.weights)
+                f_prediction = tx.Add([x_to_y, h_to_y], name="f_predicted")
 
-        train_logits = run_logits.reuse_with(y_pred)
+            shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
+            logit_init = logit_init if not embed_share else None
+            run_logits = tx.Linear(f_prediction, vocab_size, logit_init, shared_weights, name="logits")
+            if not embed_share:
+                var_reg.append(run_logits.weights)
+            y_prob = tx.Activation(run_logits, tx.softmax)
 
-        if nce:
-            # uniform gets good enough results if enough samples are used
-            # but we can load the empirical unigram distribution
-            # or learn the unigram distribution during training
-            sampled_values = uniform_sampler(loss_inputs.tensor, 1, nce_samples, True, vocab_size)
-            train_loss = tf.nn.nce_loss(weights=tf.transpose(train_logits.weights),
-                                        biases=train_logits.bias,
-                                        inputs=y_pred.tensor,
-                                        labels=loss_inputs.tensor,
-                                        num_sampled=nce_samples,
-                                        num_classes=vocab_size,
-                                        num_true=1,
-                                        sampled_values=sampled_values)
-        else:
-            one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
-            train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
+        # TRAIN GRAPH ===============================================
+        with tf.name_scope("train"):
+            if use_dropout and embed_dropout:
+                feature_lookup = feature_lookup.reuse_with(run_inputs)
+                features = tx.Dropout(feature_lookup, keep_prob=keep_prob)
+            else:
+                features = feature_lookup
 
-        train_loss = tf.reduce_mean(train_loss)
+            if use_gate or use_hidden:
+                if use_dropout:
+                    h = h.reuse_with(features)
+                    h = tx.Dropout(h, keep_prob=keep_prob)
 
-        if l2_loss:
-            losses = [tf.nn.l2_loss(var) for var in var_reg]
-            train_loss = train_loss + l2_loss_coef * tf.add_n(losses)
+                if use_gate:
+                    features = gate.reuse_with(features, gate_input=h)
+
+                f_prediction = x_to_y.reuse_with(features)
+
+                if use_hidden:
+                    h_to_y = h_to_y.reuse_with(h)
+                    if use_dropout:
+                        h_to_y = tx.Dropout(h_to_y, keep_prob=keep_prob)
+                    f_prediction = tx.Add([f_prediction, h_to_y])
+            else:
+                f_prediction = f_prediction.reuse_with(features)
+
+            train_logits = run_logits.reuse_with(f_prediction)
+
+            if nce:
+                # uniform gets good enough results if enough samples are used
+                # but we can load the empirical unigram distribution
+                # or learn the unigram distribution during training
+                sampled_values = uniform_sampler(loss_inputs.tensor, 1, nce_samples, True, vocab_size)
+                train_loss = tf.nn.nce_loss(weights=tf.transpose(train_logits.weights),
+                                            biases=train_logits.bias,
+                                            inputs=f_prediction.tensor,
+                                            labels=loss_inputs.tensor,
+                                            num_sampled=nce_samples,
+                                            num_classes=vocab_size,
+                                            num_true=1,
+                                            sampled_values=sampled_values)
+            else:
+                one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
+                train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
+
+            train_loss = tf.reduce_mean(train_loss)
+
+            if l2_loss:
+                losses = [tf.nn.l2_loss(var) for var in var_reg]
+                train_loss = train_loss + l2_loss_coef * tf.add_n(losses)
 
         # EVAL GRAPH ===============================================
-        one_hot = tx.dense_one_hot(column_indices=eval_inputs.tensor, num_cols=vocab_size)
-        eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
-        eval_loss = tf.reduce_mean(eval_loss)
+        with tf.name_scope("eval"):
+            one_hot = tx.dense_one_hot(column_indices=eval_inputs.tensor, num_cols=vocab_size)
+            eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
+            eval_loss = tf.reduce_mean(eval_loss)
 
         # SETUP MODEL CONTAINER ====================================
         super().__init__(run_in_layers=run_inputs, run_out_layers=y_prob,
