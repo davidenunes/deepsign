@@ -22,7 +22,7 @@ class TestModels(unittest.TestCase):
         model = LBL(ctx_size=2,
                     vocab_size=4,
                     embed_dim=10,
-                    embed_share=True,
+                    embed_share=False,
                     use_gate=True,
                     use_hidden=True,
                     h_dim=4,
