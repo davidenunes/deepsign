@@ -44,19 +44,14 @@ class TestModels(unittest.TestCase):
         runner.save_graph("/tmp/")
 
     def test_baseline_nnlm_init(self):
-        inputs = tx.TensorLayer([[1, 2]], 1, batch_size=1, dtype=tf.int32)
-        loss_inputs = tx.TensorLayer([[1, 0, 0, 1]], 1, batch_size=1, dtype=tf.int32)
-
         model = NNLM(ctx_size=2,
                      vocab_size=4,
                      embed_dim=10,
-                     batch_size=1,
                      h_dim=4,
                      num_h=2,
                      use_dropout=True,
-                     keep_prob=0.1,
-                     run_inputs=inputs,
-                     loss_inputs=loss_inputs)
+                     embed_dropout=True,
+                     keep_prob=0.1)
 
         print("RUN GRAPH:")
         for layer in tx.layers_to_list(model.run_out_layers):
@@ -73,6 +68,9 @@ class TestModels(unittest.TestCase):
         for layer in tx.layers_to_list(model.eval_out_layers):
             print(layer.full_str())
         print("=" * 60)
+
+        runner = tx.ModelRunner(model)
+        runner.save_graph("/tmp/")
 
     def test_nrp_init(self):
         ri_dim = 1000
