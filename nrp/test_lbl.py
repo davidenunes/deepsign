@@ -10,8 +10,8 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.nnlm import NNLM
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
+from deepsign.models.lbl import LBL
 from tensorx.layers import Input
 
 
@@ -22,12 +22,10 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
-
-
 # ======================================================================================
-# Experiment Args
+# ARGUMENTS
 # ======================================================================================
-parser = argparse.ArgumentParser(description="NNLM base experiment")
+parser = argparse.ArgumentParser(description="LBL base experiment")
 # experiment ID
 parser.add_argument('-id', dest="id", type=int, default=0)
 
@@ -40,20 +38,29 @@ default_out_dir = os.getcwd()
 parser.add_argument('-save_model', dest='save_model', type=str2bool, default=False)
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 
-parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
-parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
+parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=128)
+parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="uniform")
 parser.add_argument('-embed_init_val', dest="embed_init_val", type=float, default=0.01)
+
+parser.add_argument('-x_to_f_init', dest="x_to_f_init", type=str, choices=["normal", "uniform"], default="uniform")
+parser.add_argument('-x_to_f_init_val', dest="x_to_f_init_val", type=float, default=0.01)
 parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-logit_init_val', dest="logit_init_val", type=float, default=0.01)
+parser.add_argument('-h_to_f_init', dest="h_to_f_init", type=str, choices=["normal", "uniform"], default="uniform")
+parser.add_argument('-h_to_f_init_val', dest="h_to_f_init_val", type=float, default=0.01)
+
+parser.add_argument('-use_gate', dest='use_gate', type=str2bool, default=True)
+parser.add_argument('-use_hidden', dest='use_hidden', type=str2bool, default=True)
+parser.add_argument('-embed_share', dest='embed_share', type=str2bool, default=True)
 
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=256)
 parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', 'elu'], default="elu")
 parser.add_argument('-num_h', dest="num_h", type=int, default=1)
 
 # training data pipeline
-parser.add_argument('-epochs', dest="epochs", type=int, default=2)
+parser.add_argument('-epochs', dest="epochs", type=int, default=8)
 parser.add_argument('-shuffle', dest="shuffle", type=str2bool, default=True)
-parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 100000)
+parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 10000)
 parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
 
 parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="ams")
@@ -89,60 +96,48 @@ parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
 parser.add_argument('-l2_loss', dest='l2_loss', type=str2bool, default=False)
 parser.add_argument('-l2_loss_coef', dest='l2_loss_coef', type=float, default=1e-5)
 
-parser.add_argument('-use_f_predict', dest='use_f_predict', type=str2bool, default=False)
-parser.add_argument('-f_init', dest="f_init", type=str, choices=["normal", "uniform"], default="uniform")
-parser.add_argument('-f_init_val', dest="f_init_val", type=float, default=0.01)
-
 args = parser.parse_args()
-# ======================================================================================
-# Load Params, Prepare results files
-# ======================================================================================
 
-# Experiment parameter summary
-res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
-with open(res_param_filename, "w") as param_file:
-    arg_dict = vars(args)
-    writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
-    writer.writeheader()
-    writer.writerow(arg_dict)
-    param_file.flush()
-
-# make dir for model checkpoints
-if args.save_model:
-    model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.id))
-    os.makedirs(model_ckpt_dir, exist_ok=True)
-    model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
-
-# start perplexity file
-ppl_header = ["id", "epoch", "step", "lr", "dataset", "perplexity"]
-ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.id))
-
-ppl_file = open(ppl_fname, "w")
-ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
-ppl_writer.writeheader()
 
 # ======================================================================================
 # Load Corpus & Vocab
 # ======================================================================================
-corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
-vocab = marisa_trie.Trie(corpus["vocabulary"])
+corpus_file = os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size))
+corpus_hdf5 = h5py.File(corpus_file, mode='r')
+
+vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
+vocab_size = len(vocab)
+print("Vocabulary loaded: {} words".format(vocab_size))
+
+# corpus
+training_dataset = corpus_hdf5["training"]
+test_dataset = corpus_hdf5["test"]
+validation_dataset = corpus_hdf5["validation"]
 
 
-def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
+# data pipeline
+def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=args.shuffle):
     def chunk_fn(x):
         return chunk_it(x, chunk_size=batch_size * 1000)
 
     if epochs > 1:
-        data = repeat_fn(chunk_fn, data, epochs)
+        dataset = repeat_fn(chunk_fn, hdf5_dataset, epochs)
     else:
-        data = chunk_fn(data)
+        dataset = chunk_fn(hdf5_dataset)
 
     if shuffle:
-        data = shuffle_it(data, args.shuffle_buffer_size)
+        dataset = shuffle_it(dataset, args.shuffle_buffer_size)
 
-    data = batch_it(data, size=batch_size, padding=False)
-    return data
+    # cannot pad because 0 might be a valid index and that screws our evaluation
+    # padding = np.zeros([args.ngram_size], dtype=np.int64)
+    # dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
+    dataset = batch_it(dataset, size=batch_size, padding=False)
+    return dataset
 
+
+# ======================================================================================
+# MODEL
+# ======================================================================================
 
 # ======================================================================================
 # MODEL
@@ -173,47 +168,52 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-f_init = None
-if args.use_f_predict:
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+if args.h_to_f_init == "normal":
+    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
 
-model = NNLM(ctx_size=args.ngram_size - 1,
-             vocab_size=len(vocab),
-             embed_dim=args.embed_dim,
-             embed_init=embed_init,
-             logit_init=logit_init,
-             batch_size=args.batch_size,
-             h_dim=args.h_dim,
-             num_h=args.num_h,
-             h_activation=h_act,
-             h_init=h_init,
-             use_dropout=args.dropout,
-             keep_prob=args.keep_prob,
-             embed_dropout=args.embed_dropout,
-             l2_loss=args.l2_loss,
-             l2_loss_coef=args.l2_loss_coef,
-             use_f_predict=args.use_f_predict,
-             f_init=f_init)
+if args.x_to_f_init == "normal":
+    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+
+model = LBL(ctx_size=args.ngram_size - 1,
+            vocab_size=len(vocab),
+            embed_dim=args.embed_dim,
+            embed_init=embed_init,
+            x_to_f_init=x_to_f_init,
+            logit_init=logit_init,
+            embed_share=args.embed_share,
+            use_gate=args.use_gate,
+            use_hidden=args.use_hidden,
+            h_dim=args.h_dim,
+            h_activation=h_act,
+            h_init=h_init,
+            h_to_f_init=h_to_f_init,
+            use_dropout=args.dropout,
+            embed_dropout=args.embed_dropout,
+            keep_prob=args.keep_prob,
+            l2_loss=args.l2_loss,
+            l2_loss_coef=args.l2_loss_coef,
+            use_nce=False)
 
 model_runner = tx.ModelRunner(model)
 
-# we use an InputParam because we might want to change it during training
 lr_param = tx.InputParam(init_value=args.lr)
-if args.optimizer == "sgd":
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
-elif args.optimizer == "adam":
-    optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor,
-                                       beta1=args.optimizer_beta1,
-                                       beta2=args.optimizer_beta2,
-                                       epsilon=args.optimizer_epsilon)
-elif args.optimizer == "ams":
-    optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
-                           beta1=args.optimizer_beta1,
-                           beta2=args.optimizer_beta2,
-                           epsilon=args.optimizer_epsilon)
+# optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
+
+# optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
+
+
+# optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
+
+
+# optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
+#                           beta1=args.optimizer_beta1,
+#                           beta2=args.optimizer_beta2,
+#                           epsilon=args.optimizer_epsilon)
 
 
 def clip_grad_global(grads):
@@ -238,15 +238,15 @@ if args.clip_grads:
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
+sess = tf.Session()
+model_runner.set_session(sess)
+
 
 # ======================================================================================
-# EVALUATION
+# EVALUATION UTIL FUNCTIONS
 # ======================================================================================
-
-
-def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
-    if display_progress:
-        pb = tqdm(total=len_dataset, ncols=60)
+def eval_model(runner, dataset_it, len_dataset=None):
+    pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
     sum_loss = 0
     for batch in dataset_it:
@@ -255,114 +255,66 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
         target = batch[:, -1:]
 
         mean_loss = runner.eval(ctx, target)
+        # print(mean_loss)
         sum_loss += mean_loss
 
-        if display_progress:
-            pb.update(args.batch_size)
+        pb.update(args.batch_size)
         batches_processed += 1
 
-    if display_progress:
-        pb.close()
+    pb.close()
 
     return np.exp(sum_loss / batches_processed)
-
-
-def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
-    pb.write("[Eval Validation]")
-
-    val_data = corpus["validation"]
-    ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
-                                display_progress)
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
-               "perplexity": ppl_validation}
-    ppl_writer.writerow(res_row)
-
-    pb.write("Eval Test")
-    test_data = corpus["test"]
-    ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
-
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
-               "perplexity": ppl_test}
-    ppl_writer.writerow(res_row)
-
-    ppl_file.flush()
-
-    pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
-    return ppl_validation
 
 
 # ======================================================================================
 # TRAINING LOOP
 # ======================================================================================
-print("starting TF")
+print("Starting Training")
 
 # preparing evaluation steps
 # I use ceil because I make sure we have padded batches at the end
+num_batches = np.ceil(len(training_dataset) / args.batch_size)
+eval_step = num_batches // 2
+print("eval every ", eval_step)
 
 epoch_step = 0
 global_step = 0
 current_epoch = 0
-patience = 0
+current_lr = args.lr
 
-sess = tf.Session()
-model_runner.set_session(sess)
 model_runner.init_vars()
+progress = tqdm(total=len(training_dataset) * args.epochs)
+training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
-training_dset = corpus["training"]
-progress = tqdm(total=len(training_dset) * args.epochs)
-training_data = data_pipeline(training_dset, epochs=args.epochs, shuffle=True)
-
-evals = []
+ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
+progress.write("val perplexity {}".format(ppl))
 
 for ngram_batch in training_data:
-    epoch = progress.n // len(training_dset) + 1
-    # Start New Epoch
+    epoch = progress.n // len(training_dataset) + 1
+    # ================================================
+    # CHANGING EPOCH restart step
+    # ================================================
     if epoch != current_epoch:
         current_epoch = epoch
         epoch_step = 0
         progress.write("epoch: {}".format(current_epoch))
+        if epoch > 1:
+            ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
+            progress.write("val perplexity {}".format(ppl))
 
-    # Eval Time
-    if epoch_step == 0:
-        current_eval = evaluation(model_runner, progress, epoch, global_step)
-        evals.append(current_eval)
-
-        if global_step > 0:
-            if args.early_stop:
-                if evals[-2] - evals[-1] < args.eval_threshold:
-                    if patience >= 3:
-                        progress.write("early stop")
-                        break
-                    patience += 1
-                else:
-                    patience = 0
-
-            # lr decay only at the start of each epoch
-            if args.lr_decay and len(evals) > 0:
-                if evals[-2] - evals[-1] < args.eval_threshold:
-                    lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                    progress.write("lr changed to {}".format(lr_param.value))
-
-    # ================================================
-    # TRAIN MODEL
-    # ================================================
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1:]
 
+    assert (np.ndim(word_ids) == 2)
     model_runner.train(ctx_ids, word_ids)
     progress.update(args.batch_size)
 
     epoch_step += 1
-    global_step += 1
 
-# if not early stop, evaluate last state of the model
-if not args.early_stop or patience < 3:
-    evaluation(model_runner, progress, epoch, epoch_step)
-ppl_file.close()
-
-if args.save_model:
-    model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
+    if epoch_step % eval_step == 0 and epoch_step > 0:
+        ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
+        progress.write("val perplexity {}".format(ppl))
 
 model_runner.close_session()
 progress.close()

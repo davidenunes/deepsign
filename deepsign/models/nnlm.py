@@ -32,7 +32,7 @@ class NNLM(tx.Model):
                  l2_loss=False,
                  l2_loss_coef=1e-5,
                  use_f_predict=False,
-                 f_predict_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False
                  ):
 
@@ -68,7 +68,7 @@ class NNLM(tx.Model):
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
-                last_layer = tx.Linear(last_layer, embed_dim, f_predict_init, "f_predict")
+                last_layer = tx.Linear(last_layer, embed_dim, f_init, "f_predict")
                 var_reg.append(last_layer.weights)
 
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None

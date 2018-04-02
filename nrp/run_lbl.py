@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.nnlm import NNLM
+from deepsign.models.lbl import LBL
 from tensorx.layers import Input
 
 
@@ -27,7 +27,7 @@ def str2bool(v):
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
-parser = argparse.ArgumentParser(description="NNLM base experiment")
+parser = argparse.ArgumentParser(description="LBL base experiment")
 # experiment ID
 parser.add_argument('-id', dest="id", type=int, default=0)
 
@@ -41,10 +41,19 @@ parser.add_argument('-save_model', dest='save_model', type=str2bool, default=Fal
 parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 
 parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
-parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
+parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="uniform")
 parser.add_argument('-embed_init_val', dest="embed_init_val", type=float, default=0.01)
+
+parser.add_argument('-x_to_f_init', dest="x_to_f_init", type=str, choices=["normal", "uniform"], default="uniform")
+parser.add_argument('-x_to_f_init_val', dest="x_to_f_init_val", type=float, default=0.01)
 parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
 parser.add_argument('-logit_init_val', dest="logit_init_val", type=float, default=0.01)
+parser.add_argument('-h_to_f_init', dest="h_to_f_init", type=str, choices=["normal", "uniform"], default="uniform")
+parser.add_argument('-h_to_f_init_val', dest="h_to_f_init_val", type=float, default=0.01)
+
+parser.add_argument('-use_gate', dest='use_gate', type=str2bool, default=True)
+parser.add_argument('-use_hidden', dest='use_hidden', type=str2bool, default=True)
+parser.add_argument('-embed_share', dest='embed_share', type=str2bool, default=True)
 
 parser.add_argument('-h_dim', dest="h_dim", type=int, default=256)
 parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', 'elu'], default="elu")
@@ -83,15 +92,11 @@ parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
 
 # use dropout
 parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
-parser.add_argument('-embed_dropout', dest='embed_dropout', type=str2bool, default=False)
-parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
+parser.add_argument('-embed_dropout', dest='embed_dropout', type=str2bool, default=True)
+parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.95)
 
 parser.add_argument('-l2_loss', dest='l2_loss', type=str2bool, default=False)
 parser.add_argument('-l2_loss_coef', dest='l2_loss_coef', type=float, default=1e-5)
-
-parser.add_argument('-use_f_predict', dest='use_f_predict', type=str2bool, default=False)
-parser.add_argument('-f_init', dest="f_init", type=str, choices=["normal", "uniform"], default="uniform")
-parser.add_argument('-f_init_val', dest="f_init_val", type=float, default=0.01)
 
 args = parser.parse_args()
 # ======================================================================================
@@ -173,30 +178,35 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-f_init = None
-if args.use_f_predict:
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+if args.h_to_f_init == "normal":
+    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
 
-model = NNLM(ctx_size=args.ngram_size - 1,
-             vocab_size=len(vocab),
-             embed_dim=args.embed_dim,
-             embed_init=embed_init,
-             logit_init=logit_init,
-             batch_size=args.batch_size,
-             h_dim=args.h_dim,
-             num_h=args.num_h,
-             h_activation=h_act,
-             h_init=h_init,
-             use_dropout=args.dropout,
-             keep_prob=args.keep_prob,
-             embed_dropout=args.embed_dropout,
-             l2_loss=args.l2_loss,
-             l2_loss_coef=args.l2_loss_coef,
-             use_f_predict=args.use_f_predict,
-             f_init=f_init)
+if args.x_to_f_init == "normal":
+    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+
+model = LBL(ctx_size=args.ngram_size - 1,
+            vocab_size=len(vocab),
+            embed_dim=args.embed_dim,
+            embed_init=embed_init,
+            x_to_f_init=x_to_f_init,
+            logit_init=logit_init,
+            embed_share=args.embed_share,
+            use_gate=args.use_gate,
+            use_hidden=args.use_hidden,
+            h_dim=args.h_dim,
+            h_activation=h_act,
+            h_init=h_init,
+            h_to_f_init=h_to_f_init,
+            use_dropout=args.dropout,
+            embed_dropout=args.embed_dropout,
+            keep_prob=args.keep_prob,
+            l2_loss=args.l2_loss,
+            l2_loss_coef=args.l2_loss_coef,
+            use_nce=False)
 
 model_runner = tx.ModelRunner(model)
 

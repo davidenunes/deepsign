@@ -24,6 +24,7 @@ class LBL(tx.Model):
             nce: bool if true uses NCE approximation to softmax with random uniform samples
             nce_samples: number of samples for nce
             logit_init: initialisation function for logits only applicable if embed_share is set to False.
+            h_to_f_init: if use hidden we have an additional set of parameters from the hidden layer to f_predict
     """
 
     def __init__(self,
@@ -31,7 +32,7 @@ class LBL(tx.Model):
                  vocab_size,
                  embed_dim,
                  embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 feature_pred_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 x_to_f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=True,
                  use_gate=True,
@@ -39,13 +40,13 @@ class LBL(tx.Model):
                  h_dim=100,
                  h_activation=tx.elu,
                  h_init=tx.he_normal_init(),
-                 w_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 h_to_f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  use_dropout=True,
                  embed_dropout=False,
                  keep_prob=0.95,
                  l2_loss=False,
                  l2_loss_coef=1e-5,
-                 nce=False,
+                 use_nce=False,
                  nce_samples=100):
 
         # GRAPH INPUTS
@@ -76,14 +77,14 @@ class LBL(tx.Model):
                 gate = features
                 var_reg.append(features.gate_weights)
 
-            x_to_y = tx.Linear(features, embed_dim, feature_pred_init, name="x_to_f")
-            var_reg.append(x_to_y.weights)
-            f_prediction = x_to_y
+            x_to_f = tx.Linear(features, embed_dim, x_to_f_init, name="x_to_f")
+            var_reg.append(x_to_f.weights)
+            f_prediction = x_to_f
 
             if use_hidden:
-                h_to_y = tx.Linear(h, embed_dim, w_init, name="h_to_f")
-                var_reg.append(h_to_y.weights)
-                f_prediction = tx.Add([x_to_y, h_to_y], name="f_predicted")
+                h_to_f = tx.Linear(h, embed_dim, h_to_f_init, name="h_to_f")
+                var_reg.append(h_to_f.weights)
+                f_prediction = tx.Add([x_to_f, h_to_f], name="f_predicted")
 
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
             logit_init = logit_init if not embed_share else None
@@ -108,19 +109,19 @@ class LBL(tx.Model):
                 if use_gate:
                     features = gate.reuse_with(features, gate_input=h)
 
-                f_prediction = x_to_y.reuse_with(features)
+                f_prediction = x_to_f.reuse_with(features)
 
                 if use_hidden:
-                    h_to_y = h_to_y.reuse_with(h)
+                    h_to_f = h_to_f.reuse_with(h)
                     if use_dropout:
-                        h_to_y = tx.Dropout(h_to_y, keep_prob=keep_prob)
-                    f_prediction = tx.Add([f_prediction, h_to_y])
+                        h_to_f = tx.Dropout(h_to_f, keep_prob=keep_prob)
+                    f_prediction = tx.Add([f_prediction, h_to_f])
             else:
                 f_prediction = f_prediction.reuse_with(features)
 
             train_logits = run_logits.reuse_with(f_prediction)
 
-            if nce:
+            if use_nce:
                 # uniform gets good enough results if enough samples are used
                 # but we can load the empirical unigram distribution
                 # or learn the unigram distribution during training
