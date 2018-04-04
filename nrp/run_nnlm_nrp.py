@@ -11,13 +11,11 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.nnlm import NNLM, NRP
+from deepsign.models.nrp import NNLMNRP
 from tensorx.layers import Input
 
-from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
-import deepsign.data.views as views
 
 
 def str2bool(v):
@@ -32,70 +30,89 @@ def str2bool(v):
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
-parser = argparse.ArgumentParser(description="NRP Baseline Experiment")
-# experiment ID
-parser.add_argument('-id', dest="id", type=int, default=0)
+parser = argparse.ArgumentParser(description="LBL base experiment")
 
-# corpus and ngram size should match since we pre-process the corpus to yield n-grams
+
+# clean argparse a bit
+def param(name, argtype, default, valid=[]):
+    parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default, choices=valid)
+
+
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
-parser.add_argument('-corpus', dest="corpus", type=str, default=default_corpus)
-parser.add_argument('-ngram_size', dest="ngram_size", type=int, default=4)
-
 default_out_dir = os.getcwd()
-parser.add_argument('-save_model', dest='save_model', type=str2bool, default=False)
-parser.add_argument('-out_dir', dest="out_dir", type=str, default=default_out_dir)
 
-parser.add_argument('-k_dim', dest="k_dim", type=int, default=9999)
-parser.add_argument('-s_active', dest="s_active", type=int, default=6666)
-parser.add_argument('-embed_dim', dest="embed_dim", type=int, default=64)
-parser.add_argument('-embed_init', dest="embed_init", type=str, choices=["normal", "uniform"], default="normal")
-parser.add_argument('-embed_init_val', dest="embed_init_val", type=float, default=0.01)
-parser.add_argument('-logit_init', dest="logit_init", type=str, choices=["normal", "uniform"], default="normal")
-parser.add_argument('-logit_init_val', dest="logit_init_val", type=float, default=0.01)
+# experiment ID
+param("id", int, 0)
+param("corpus", str, default_corpus)
+param("ngram_size", int, 4)
+param("save_model", str2bool, False)
+param("out_dir", str, default_out_dir)
 
-parser.add_argument('-h_dim', dest="h_dim", type=int, default=128)
-parser.add_argument('-h_act', dest="h_act", type=str, choices=['relu', 'tanh', 'elu'], default="elu")
-parser.add_argument('-num_h', dest="num_h", type=int, default=1)
+param("k_dim", int, 9999)
+param("s_active", int, 100)
 
-# training data pipeline
-parser.add_argument('-epochs', dest="epochs", type=int, default=2)
-parser.add_argument('-shuffle', dest="shuffle", type=str2bool, default=True)
-parser.add_argument('-shuffle_buffer_size', dest="shuffle_buffer_size", type=int, default=128 * 100000)
-parser.add_argument('-batch_size', dest="batch_size", type=int, default=128)
+param("embed_dim", int, 64)
 
-parser.add_argument('-optimizer', dest="optimizer", type=str, choices=["sgd", "adam", "ams"], default="ams")
+param("embed_init", str, "uniform", valid=["normal", "uniform"])
+param("embed_init_val", float, 0.01)
+
+param("logit_init", str, "uniform", valid=["normal", "uniform"])
+param("logit_init_val", float, 0.01)
+
+param("use_gate", str2bool, True)
+param("use_hidden", str2bool, True)
+param("embed_share", str2bool, True)
+
+param("num_h", int, 1)
+param("h_dim", int, 256)
+param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
+
+param("epochs", int, 2)
+param("batch_size", int, 128)
+param("shuffle", str2bool, True)
+param("shuffle_buffer_size", int, 128 * 10000)
+
+param("optimizer", str, "ams", valid=["sgd", "adam", "ams"])
 # only needed for adam and ams
-parser.add_argument('-optimizer_beta1', dest="optimizer_beta1", type=float, default=0.9)
-parser.add_argument('-optimizer_beta2', dest="optimizer_beta2", type=float, default=0.999)
-parser.add_argument('-optimizer_epsilon', dest="optimizer_epsilon", type=float, default=1e-8)
+param("optimizer_beta1", float, 0.9)
+param("optimizer_beta2", float, 0.999)
+param("optimizer_epsilon", float, 1e-8)
 
-parser.add_argument('-lr', dest="lr", type=float, default=0.001)
-parser.add_argument('-lr_decay', dest='lr_decay', type=str2bool, default=False)
-# lr does not decay beyond threshold
-parser.add_argument('-lr_decay_threshold', dest='lr_decay_threshold', type=float, default=1e-5)
+param("lr", float, 0.001)
+param("lr_decay", str2bool, False)
+param("lr_decay_rate", float, 0.5)
+# lr does not decay beyond this threshold
+param("lr_decay_threshold", float, 1e-6)
 # lr decay when last_ppl - current_ppl < eval_threshold
-parser.add_argument('-eval_threshold', dest='eval_threshold', type=float, default=1.0)
-parser.add_argument('-lr_decay_rate', dest='lr_decay_rate', type=float, default=0.5)
+param("eval_threshold", float, 1.0)
+
 # number of epochs without improvement before stopping
-parser.add_argument('-early_stop', dest='early_stop', type=str2bool, default=True)
-parser.add_argument('-patience', dest='patience', type=int, default=3)
+param("early_stop", str2bool, True)
+param("patience", int, 3)
+param("use_f_predict", str2bool, False)
+param("f_init", str, "uniform", valid=["normal", "uniform"])
+param("f_init_val", float, 0.01)
 
 # REGULARISATION
-
 # clip grads by norm
-parser.add_argument('-clip_grads', dest="clip_grads", type=str2bool, default=True)
-# if true clips each gradient by its norm, else clip all gradients by global norm
-parser.add_argument('-clip_local', dest="clip_local", type=str2bool, default=True)
-parser.add_argument('-clip_value', dest="clip_value", type=float, default=1.0)
+param("clip_grads", str2bool, True)
+# if true clips by local norm, else clip by norm of all gradients
+param("clip_local", str2bool, True)
+param("clip_value", float, 1.0)
 
-# use dropout
-parser.add_argument('-dropout', dest='dropout', type=str2bool, default=True)
-parser.add_argument('-keep_prob', dest='keep_prob', type=float, default=0.9)
+param("dropout", str2bool, True)
+param("embed_dropout", str2bool, True)
+param("keep_prob", float, 0.95)
+
+param("l2_loss", str2bool, False)
+param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
 # ======================================================================================
+
+print(args.corpus)
 
 # Experiment parameter summary
 res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
@@ -121,26 +138,24 @@ ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
 ppl_writer.writeheader()
 
 # ======================================================================================
-# Load Corpus & Vocab
-#
-# Instead of feeding the vocab indexes directly we will turn each n-gram into
-# a random index
+# CORPUS, Vocab and RIs
 # ======================================================================================
 corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
-
 vocab = marisa_trie.Trie(corpus["vocabulary"])
 
+print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
 ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 
 # pre-gen indices for vocab
-ri = dict()
-for word in vocab.keys():
-    w_id = vocab[word]
-    ri[w_id] = ri_generator.generate()
+# it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+ris = [ri_generator.generate() for i in range(len(vocab))]
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 
+
+# ======================================================================================
 
 def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
     def chunk_fn(x):
@@ -155,29 +170,7 @@ def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         data = shuffle_it(data, args.shuffle_buffer_size)
 
     data = batch_it(data, size=batch_size, padding=False)
-
     return data
-
-
-def nrp_encode(ctx_ids, target_ids):
-    """
-
-    Args:
-        ctx_ids: batch of ctx with the ids of words of current ctx
-        target_ids: batch of current word ids.
-
-    Returns:
-        (spv_ctx,class_target) tuple with sparse tensor values encoding the
-        input random indexes
-
-        output with large class-based
-    """
-
-    stv_ctx = to_sparse_tensor_value((ri[w] for w in ctx_ids.flatten()), args.k_dim)
-    target_ris = (ri[w] for w in target_ids.flatten())
-    class_target = np.array([rindex.to_class_vector() for rindex in target_ris])
-
-    return stv_ctx, class_target
 
 
 # ======================================================================================
@@ -204,26 +197,36 @@ elif args.embed_init == "uniform":
 
 if args.logit_init == "normal":
     logit_init = tx.random_normal(mean=0.,
-
                                   stddev=args.logit_init_val)
 elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-# new Random Neural Projection Model
-model = NRP(ctx_size=args.ngram_size - 1,
-            ri_dim=args.k_dim,
-            embed_dim=args.embed_dim,
-            batch_size=args.batch_size,
-            h_dim=args.h_dim,
-            embed_init=embed_init,
-            logit_init=logit_init,
-            num_h=args.num_h,
-            h_activation=h_act,
-            h_init=h_init,
-            use_dropout=args.dropout,
-            keep_prob=args.keep_prob
-            )
+f_init = None
+if args.use_f_predict:
+    if args.f_init == "normal":
+        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+    elif args.f_init == "uniform":
+        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+
+model = NNLMNRP(ctx_size=args.ngram_size - 1,
+                vocab_size=len(vocab),
+                k_dim=args.k_dim,
+                ri_tensor=ri_tensor,
+                embed_dim=args.embed_dim,
+                embed_init=embed_init,
+                logit_init=logit_init,
+                h_dim=args.h_dim,
+                num_h=args.num_h,
+                h_activation=h_act,
+                h_init=h_init,
+                use_dropout=args.dropout,
+                keep_prob=args.keep_prob,
+                embed_dropout=args.embed_dropout,
+                l2_loss=args.l2_loss,
+                l2_loss_coef=args.l2_loss_coef,
+                f_init=f_init)
+
 model_runner = tx.ModelRunner(model)
 
 # we use an InputParam because we might want to change it during training
@@ -280,8 +283,6 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
         ctx = batch[:, :-1]
         target = batch[:, -1:]
 
-        ctx, target = nrp_encode(ctx, target)
-
         mean_loss = runner.eval(ctx, target)
         sum_loss += mean_loss
 
@@ -295,7 +296,7 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
     return np.exp(sum_loss / batches_processed)
 
 
-def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=True):
+def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
     pb.write("[Eval Validation]")
 
     val_data = corpus["validation"]
@@ -310,7 +311,7 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Tru
     ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
     res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
-               "perplexity": ppl_validation}
+               "perplexity": ppl_test}
     ppl_writer.writerow(res_row)
 
     ppl_file.flush()
@@ -375,12 +376,10 @@ for ngram_batch in training_data:
     # TRAIN MODEL
     # ================================================
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
-    ctx = ngram_batch[:, :-1]
-    target = ngram_batch[:, -1:]
+    ctx_ids = ngram_batch[:, :-1]
+    word_ids = ngram_batch[:, -1:]
 
-    ctx, target = nrp_encode(ctx, target)
-
-    model_runner.train(ctx, target)
+    model_runner.train(ctx_ids, word_ids)
     progress.update(args.batch_size)
 
     epoch_step += 1

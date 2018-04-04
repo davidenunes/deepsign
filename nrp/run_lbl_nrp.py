@@ -10,9 +10,12 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.lbl import LBL
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
+from deepsign.models.nrp import LBLNRP
 from tensorx.layers import Input
+
+from deepsign.rp.ri import Generator, RandomIndex
+from deepsign.rp.tf_utils import to_sparse_tensor_value
 
 
 def str2bool(v):
@@ -44,6 +47,9 @@ param("corpus", str, default_corpus)
 param("ngram_size", int, 4)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
+
+param("k_dim", int, 9999)
+param("s_active", int, 100)
 
 param("embed_dim", int, 64)
 
@@ -105,46 +111,68 @@ param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
+# ======================================================================================
+# Load Params, Prepare results files
+# ======================================================================================
+
+# Experiment parameter summary
+res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
+with open(res_param_filename, "w") as param_file:
+    arg_dict = vars(args)
+    writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
+    writer.writeheader()
+    writer.writerow(arg_dict)
+    param_file.flush()
+
+# make dir for model checkpoints
+if args.save_model:
+    model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.id))
+    os.makedirs(model_ckpt_dir, exist_ok=True)
+    model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
+
+# start perplexity file
+ppl_header = ["id", "epoch", "step", "lr", "dataset", "perplexity"]
+ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.id))
+
+ppl_file = open(ppl_fname, "w")
+ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
+ppl_writer.writeheader()
 
 # ======================================================================================
-# Load Corpus & Vocab
+# CORPUS, Vocab and RIs
 # ======================================================================================
-corpus_file = os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size))
-corpus_hdf5 = h5py.File(corpus_file, mode='r')
+corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
+vocab = marisa_trie.Trie(corpus["vocabulary"])
 
-vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
-vocab_size = len(vocab)
-print("Vocabulary loaded: {} words".format(vocab_size))
+print("generating random indexes")
+# generates k-dimensional random indexes with s_active units
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 
-# corpus
-training_dataset = corpus_hdf5["training"]
-test_dataset = corpus_hdf5["test"]
-validation_dataset = corpus_hdf5["validation"]
+# pre-gen indices for vocab
+# it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+ris = [ri_generator.generate() for i in range(len(vocab))]
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+print("done")
 
 
-# data pipeline
-def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=args.shuffle):
+# ======================================================================================
+
+def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
     def chunk_fn(x):
         return chunk_it(x, chunk_size=batch_size * 1000)
 
     if epochs > 1:
-        dataset = repeat_fn(chunk_fn, hdf5_dataset, epochs)
+        data = repeat_fn(chunk_fn, data, epochs)
     else:
-        dataset = chunk_fn(hdf5_dataset)
+        data = chunk_fn(data)
 
     if shuffle:
-        dataset = shuffle_it(dataset, args.shuffle_buffer_size)
+        data = shuffle_it(data, args.shuffle_buffer_size)
 
-    # cannot pad because 0 might be a valid index and that screws our evaluation
-    # padding = np.zeros([args.ngram_size], dtype=np.int64)
-    # dataset = batch_it(dataset, size=batch_size, padding=True, padding_elem=padding)
-    dataset = batch_it(dataset, size=batch_size, padding=False)
-    return dataset
+    data = batch_it(data, size=batch_size, padding=False)
+    return data
 
-
-# ======================================================================================
-# MODEL
-# ======================================================================================
 
 # ======================================================================================
 # MODEL
@@ -185,42 +213,44 @@ if args.x_to_f_init == "normal":
 elif args.h_to_f_init == "uniform":
     x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
 
-model = LBL(ctx_size=args.ngram_size - 1,
-            vocab_size=len(vocab),
-            embed_dim=args.embed_dim,
-            embed_init=embed_init,
-            x_to_f_init=x_to_f_init,
-            logit_init=logit_init,
-            embed_share=args.embed_share,
-            use_gate=args.use_gate,
-            use_hidden=args.use_hidden,
-            h_dim=args.h_dim,
-            h_activation=h_act,
-            h_init=h_init,
-            h_to_f_init=h_to_f_init,
-            use_dropout=args.dropout,
-            embed_dropout=args.embed_dropout,
-            keep_prob=args.keep_prob,
-            l2_loss=args.l2_loss,
-            l2_loss_coef=args.l2_loss_coef,
-            use_nce=False)
+model = LBLNRP(ctx_size=args.ngram_size - 1,
+               vocab_size=len(vocab),
+               k_dim=args.k_dim,
+               ri_tensor=ri_tensor,
+               embed_dim=args.embed_dim,
+               embed_init=embed_init,
+               x_to_f_init=x_to_f_init,
+               logit_init=logit_init,
+               embed_share=args.embed_share,
+               use_gate=args.use_gate,
+               use_hidden=args.use_hidden,
+               h_dim=args.h_dim,
+               h_activation=h_act,
+               h_init=h_init,
+               h_to_f_init=h_to_f_init,
+               use_dropout=args.dropout,
+               embed_dropout=args.embed_dropout,
+               keep_prob=args.keep_prob,
+               l2_loss=args.l2_loss,
+               l2_loss_coef=args.l2_loss_coef
+               )
 
 model_runner = tx.ModelRunner(model)
 
+# we use an InputParam because we might want to change it during training
 lr_param = tx.InputParam(init_value=args.lr)
-# optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
-
-# optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
-
-
-# optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
-optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
-
-
-# optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
-#                           beta1=args.optimizer_beta1,
-#                           beta2=args.optimizer_beta2,
-#                           epsilon=args.optimizer_epsilon)
+if args.optimizer == "sgd":
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
+elif args.optimizer == "adam":
+    optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor,
+                                       beta1=args.optimizer_beta1,
+                                       beta2=args.optimizer_beta2,
+                                       epsilon=args.optimizer_epsilon)
+elif args.optimizer == "ams":
+    optimizer = tx.AMSGrad(learning_rate=lr_param.tensor,
+                           beta1=args.optimizer_beta1,
+                           beta2=args.optimizer_beta2,
+                           epsilon=args.optimizer_epsilon)
 
 
 def clip_grad_global(grads):
@@ -245,15 +275,15 @@ if args.clip_grads:
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
-sess = tf.Session()
-model_runner.set_session(sess)
-
 
 # ======================================================================================
-# EVALUATION UTIL FUNCTIONS
+# EVALUATION
 # ======================================================================================
-def eval_model(runner, dataset_it, len_dataset=None):
-    pb = tqdm(total=len_dataset, ncols=60)
+
+
+def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
+    if display_progress:
+        pb = tqdm(total=len_dataset, ncols=60)
     batches_processed = 0
     sum_loss = 0
     for batch in dataset_it:
@@ -262,66 +292,114 @@ def eval_model(runner, dataset_it, len_dataset=None):
         target = batch[:, -1:]
 
         mean_loss = runner.eval(ctx, target)
-        # print(mean_loss)
         sum_loss += mean_loss
 
-        pb.update(args.batch_size)
+        if display_progress:
+            pb.update(args.batch_size)
         batches_processed += 1
 
-    pb.close()
+    if display_progress:
+        pb.close()
 
     return np.exp(sum_loss / batches_processed)
+
+
+def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
+    pb.write("[Eval Validation]")
+
+    val_data = corpus["validation"]
+    ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
+                                display_progress)
+    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
+               "perplexity": ppl_validation}
+    ppl_writer.writerow(res_row)
+
+    pb.write("Eval Test")
+    test_data = corpus["test"]
+    ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
+
+    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+               "perplexity": ppl_test}
+    ppl_writer.writerow(res_row)
+
+    ppl_file.flush()
+
+    pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
+    return ppl_validation
 
 
 # ======================================================================================
 # TRAINING LOOP
 # ======================================================================================
-print("Starting Training")
+print("starting TF")
 
 # preparing evaluation steps
 # I use ceil because I make sure we have padded batches at the end
-num_batches = np.ceil(len(training_dataset) / args.batch_size)
-eval_step = num_batches // 2
-print("eval every ", eval_step)
 
 epoch_step = 0
 global_step = 0
 current_epoch = 0
-current_lr = args.lr
+patience = 0
 
+sess = tf.Session()
+model_runner.set_session(sess)
 model_runner.init_vars()
-progress = tqdm(total=len(training_dataset) * args.epochs)
-training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
-ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
-progress.write("val perplexity {}".format(ppl))
+training_dset = corpus["training"]
+progress = tqdm(total=len(training_dset) * args.epochs)
+training_data = data_pipeline(training_dset, epochs=args.epochs, shuffle=True)
+
+evals = []
 
 for ngram_batch in training_data:
-    epoch = progress.n // len(training_dataset) + 1
-    # ================================================
-    # CHANGING EPOCH restart step
-    # ================================================
+    epoch = progress.n // len(training_dset) + 1
+    # Start New Epoch
     if epoch != current_epoch:
         current_epoch = epoch
         epoch_step = 0
         progress.write("epoch: {}".format(current_epoch))
-        if epoch > 1:
-            ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
-            progress.write("val perplexity {}".format(ppl))
 
+    # Eval Time
+    if epoch_step == 0:
+        current_eval = evaluation(model_runner, progress, epoch, global_step)
+        evals.append(current_eval)
+
+        if global_step > 0:
+            if args.early_stop:
+                if evals[-2] - evals[-1] < args.eval_threshold:
+                    if patience >= 3:
+                        progress.write("early stop")
+                        break
+                    patience += 1
+                else:
+                    patience = 0
+
+            # lr decay only at the start of each epoch
+            if args.lr_decay and len(evals) > 0:
+                if evals[-2] - evals[-1] < args.eval_threshold:
+                    lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
+                    progress.write("lr changed to {}".format(lr_param.value))
+
+    # ================================================
+    # TRAIN MODEL
+    # ================================================
     ngram_batch = np.array(ngram_batch, dtype=np.int64)
     ctx_ids = ngram_batch[:, :-1]
     word_ids = ngram_batch[:, -1:]
 
-    assert (np.ndim(word_ids) == 2)
     model_runner.train(ctx_ids, word_ids)
     progress.update(args.batch_size)
 
     epoch_step += 1
+    global_step += 1
 
-    if epoch_step % eval_step == 0 and epoch_step > 0:
-        ppl = eval_model(model_runner, data_pipeline(validation_dataset), len(validation_dataset))
-        progress.write("val perplexity {}".format(ppl))
+# if not early stop, evaluate last state of the model
+if not args.early_stop or patience < 3:
+    evaluation(model_runner, progress, epoch, epoch_step)
+ppl_file.close()
+
+if args.save_model:
+    model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
 model_runner.close_session()
 progress.close()

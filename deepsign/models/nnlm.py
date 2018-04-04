@@ -68,8 +68,9 @@ class NNLM(tx.Model):
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
-                last_layer = tx.Linear(last_layer, embed_dim, f_init, "f_predict")
+                last_layer = tx.Linear(last_layer, embed_dim, f_init, name="f_predict")
                 var_reg.append(last_layer.weights)
+                f_predict = last_layer
 
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
             logit_init = logit_init if not embed_share else None
@@ -95,6 +96,10 @@ class NNLM(tx.Model):
                 if use_dropout:
                     h = tx.Dropout(h, keep_prob=keep_prob)
                 last_layer = h
+
+            # feature prediction for Energy-Based Model
+            if use_f_predict:
+                last_layer = f_predict.reuse_with(last_layer)
 
             train_logits = run_logits.reuse_with(last_layer, name="train_logits")
             train_output = tx.Activation(train_logits, tx.softmax, name="train_output")

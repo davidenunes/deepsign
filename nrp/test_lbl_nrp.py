@@ -11,13 +11,12 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nnlm import NNLM
+from deepsign.models.nrp import LBLNRP
 from tensorx.layers import Input
 
+from deepsign.rp.ri import Generator, RandomIndex
+from deepsign.rp.tf_utils import to_sparse_tensor_value
 
-# ======================================================================================
-# Experiment Args
-# ======================================================================================
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -28,6 +27,9 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+# ======================================================================================
+# Experiment Args
+# ======================================================================================
 parser = argparse.ArgumentParser(description="LBL base experiment")
 
 
@@ -46,6 +48,9 @@ param("ngram_size", int, 4)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
+param("k_dim", int, 9999)
+param("s_active", int, 100)
+
 param("embed_dim", int, 64)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
@@ -57,6 +62,11 @@ param("logit_init_val", float, 0.01)
 param("use_gate", str2bool, True)
 param("use_hidden", str2bool, True)
 param("embed_share", str2bool, True)
+
+param("x_to_f_init", str, "uniform", valid=["normal", "uniform"])
+param("x_to_f_init_val", float, 0.01)
+param("h_to_f_init", str, "uniform", valid=["normal", "uniform"])
+param("h_to_f_init_val", float, 0.01)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
@@ -85,8 +95,6 @@ param("eval_threshold", float, 1.0)
 param("early_stop", str2bool, True)
 param("patience", int, 3)
 param("use_f_predict", str2bool, False)
-param("f_init", str, "uniform", valid=["normal", "uniform"])
-param("f_init_val", float, 0.01)
 
 # REGULARISATION
 # clip grads by norm
@@ -103,20 +111,24 @@ param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
-# ======================================================================================
-# Load Params, Prepare results files
-# ======================================================================================
-
 
 # ======================================================================================
-# Load Corpus & Vocab
+# CORPUS, Vocab and RIs
 # ======================================================================================
-corpus_file = os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size))
-corpus_hdf5 = h5py.File(corpus_file, mode='r')
-
+corpus_hdf5 = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
 vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
-vocab_size = len(vocab)
-print("Vocabulary loaded: {} words".format(vocab_size))
+
+print("generating random indexes")
+# generates k-dimensional random indexes with s_active units
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
+
+# pre-gen indices for vocab
+# it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+ris = [ri_generator.generate() for i in range(len(vocab))]
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+print("done")
+# ======================================================================================
 
 # corpus
 training_dataset = corpus_hdf5["training"]
@@ -147,48 +159,67 @@ def data_pipeline(hdf5_dataset, epochs=1, batch_size=args.batch_size, shuffle=ar
 # ======================================================================================
 # MODEL
 # ======================================================================================
-
-# Hidden layer weight init.
+# Activation functions
 if args.h_act == "relu":
     h_act = tx.relu
-    h_init = tx.he_normal_init()
-elif args.h_act == "elu":
-    h_act = tx.elu
     h_init = tx.he_normal_init()
 elif args.h_act == "tanh":
     h_act = tx.tanh
     h_init = tx.xavier_init()
+elif args.h_act == "elu":
+    h_act = tx.elu
+    h_init = tx.he_normal_init()
 
-# Embedding (Lookup) layer weight init
+# Parameter Init
 if args.embed_init == "normal":
-    embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
+    embed_init = tx.random_normal(mean=0.,
+                                  stddev=args.embed_init_val)
 elif args.embed_init == "uniform":
-    embed_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
+    embed_init = tx.random_uniform(minval=-args.embed_init_val,
+                                   maxval=args.embed_init_val)
 
-# Logit layer weight init
 if args.logit_init == "normal":
-    logit_init = embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
+    logit_init = tx.random_normal(mean=0.,
+                                  stddev=args.logit_init_val)
 elif args.logit_init == "uniform":
-    logit_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
+    logit_init = tx.random_uniform(minval=-args.logit_init_val,
+                                   maxval=args.logit_init_val)
 
-model = NNLM(ctx_size=args.ngram_size - 1,
-             vocab_size=vocab_size,
-             embed_dim=args.embed_dim,
-             embed_init=embed_init,
-             logit_init=logit_init,
-             h_dim=args.h_dim,
-             num_h=args.num_h,
-             h_activation=h_act,
-             h_init=h_init,
-             use_dropout=args.dropout,
-             keep_prob=args.keep_prob,
-             l2_loss=True,
-             l2_loss_coef=1e-5
-             )
+if args.h_to_f_init == "normal":
+    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
+
+if args.x_to_f_init == "normal":
+    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
+elif args.h_to_f_init == "uniform":
+    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+
+model = LBLNRP(ctx_size=args.ngram_size - 1,
+               vocab_size=len(vocab),
+               k_dim=args.k_dim,
+               ri_tensor=ri_tensor,
+               embed_dim=args.embed_dim,
+               embed_init=embed_init,
+               x_to_f_init=x_to_f_init,
+               logit_init=logit_init,
+               embed_share=args.embed_share,
+               use_gate=args.use_gate,
+               use_hidden=args.use_hidden,
+               h_dim=args.h_dim,
+               h_activation=h_act,
+               h_init=h_init,
+               h_to_f_init=h_to_f_init,
+               use_dropout=args.dropout,
+               embed_dropout=args.embed_dropout,
+               keep_prob=args.keep_prob,
+               l2_loss=args.l2_loss,
+               l2_loss_coef=args.l2_loss_coef
+               )
 
 model_runner = tx.ModelRunner(model)
 
-lr_param = tx.InputParam(init_value=args.learning_rate)
+lr_param = tx.InputParam(init_value=args.lr)
 # optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
@@ -204,18 +235,25 @@ optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
 #                           epsilon=args.optimizer_epsilon)
 
 
-# model_runner.config_optimizer(optimizer)
-def global_grad_clip(grads):
-    grads, _ = tf.clip_by_global_norm(grads, args.clip_norm)
+def clip_grad_global(grads):
+    grads, _ = tf.clip_by_global_norm(grads, 12)
     return grads
 
 
-def local_grad_clip(grad):
-    return tf.clip_by_norm(grad, args.clip_norm)
+def clip_grad_local(grad):
+    return tf.clip_by_norm(grad, args.clip_value)
 
 
-if args.clip_gradients:
-    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=local_grad_clip, global_gradient_op=False)
+if args.clip_grads:
+    if args.clip_local:
+        clip_fn = clip_grad_local
+    else:
+        clip_fn = clip_grad_global
+
+if args.clip_grads:
+    model_runner.config_optimizer(optimizer, params=lr_param,
+                                  gradient_op=clip_fn,
+                                  global_gradient_op=not args.clip_local)
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
@@ -261,7 +299,7 @@ print("eval every ", eval_step)
 epoch_step = 0
 global_step = 0
 current_epoch = 0
-current_lr = args.learning_rate
+current_lr = args.lr
 
 model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
