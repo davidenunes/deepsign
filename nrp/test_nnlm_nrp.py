@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nrp import LBLNRP
+from deepsign.models.nrp import NNLMNRP
 from tensorx.layers import Input
 
 from deepsign.rp.ri import Generator, RandomIndex
@@ -48,8 +48,8 @@ param("ngram_size", int, 4)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 4000)
-param("s_active", int, 4)
+param("k_dim", int, 9999)
+param("s_active", int, 100)
 
 param("embed_dim", int, 64)
 
@@ -63,13 +63,8 @@ param("use_gate", str2bool, True)
 param("use_hidden", str2bool, True)
 param("embed_share", str2bool, True)
 
-param("x_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("x_to_f_init_val", float, 0.01)
-param("h_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("h_to_f_init_val", float, 0.01)
-
 param("num_h", int, 1)
-param("h_dim", int, 100)
+param("h_dim", int, 256)
 param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
@@ -95,6 +90,8 @@ param("eval_threshold", float, 1.0)
 param("early_stop", str2bool, True)
 param("patience", int, 3)
 param("use_f_predict", str2bool, False)
+param("f_init", str, "uniform", valid=["normal", "uniform"])
+param("f_init_val", float, 0.01)
 
 # REGULARISATION
 # clip grads by norm
@@ -115,8 +112,8 @@ args = parser.parse_args()
 # ======================================================================================
 # CORPUS, Vocab and RIs
 # ======================================================================================
-corpus_hdf5 = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
-vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
+corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
+vocab = marisa_trie.Trie(corpus["vocabulary"])
 
 print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
@@ -131,9 +128,9 @@ print("done")
 # ======================================================================================
 
 # corpus
-training_dataset = corpus_hdf5["training"]
-test_dataset = corpus_hdf5["test"]
-validation_dataset = corpus_hdf5["validation"]
+training_dataset = corpus["training"]
+test_dataset = corpus["test"]
+validation_dataset = corpus["validation"]
 
 
 # data pipeline
@@ -185,37 +182,31 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-if args.h_to_f_init == "normal":
-    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
+f_init = None
+if args.use_f_predict:
+    if args.f_init == "normal":
+        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+    elif args.f_init == "uniform":
+        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-if args.x_to_f_init == "normal":
-    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+model = NNLMNRP(ctx_size=args.ngram_size - 1,
+                vocab_size=len(vocab),
+                k_dim=args.k_dim,
+                ri_tensor=ri_tensor,
+                embed_dim=args.embed_dim,
+                embed_init=embed_init,
+                logit_init=logit_init,
+                h_dim=args.h_dim,
+                num_h=args.num_h,
+                h_activation=h_act,
+                h_init=h_init,
+                use_dropout=args.dropout,
+                keep_prob=args.keep_prob,
+                embed_dropout=args.embed_dropout,
+                l2_loss=args.l2_loss,
+                l2_loss_coef=args.l2_loss_coef,
+                f_init=f_init)
 
-model = LBLNRP(ctx_size=args.ngram_size - 1,
-               vocab_size=len(vocab),
-               k_dim=args.k_dim,
-               ri_tensor=ri_tensor,
-               embed_dim=args.embed_dim,
-               embed_init=embed_init,
-               x_to_f_init=x_to_f_init,
-               logit_init=logit_init,
-               embed_share=args.embed_share,
-               use_gate=args.use_gate,
-               use_hidden=args.use_hidden,
-               h_dim=args.h_dim,
-               h_activation=h_act,
-               h_init=h_init,
-               h_to_f_init=h_to_f_init,
-               use_dropout=args.dropout,
-               embed_dropout=args.embed_dropout,
-               keep_prob=args.keep_prob,
-               l2_loss=args.l2_loss,
-               l2_loss_coef=args.l2_loss_coef
-               )
 
 model_runner = tx.ModelRunner(model)
 

@@ -19,7 +19,7 @@ class TestModels(unittest.TestCase):
     def tearDown(self):
         self.ss.close()
 
-    def test_lbl_nrp(self):
+    def test_nrp_performance(self):
         vocab_size = 4
         k = 10
         s = 4
@@ -42,7 +42,42 @@ class TestModels(unittest.TestCase):
                        )
 
         runner = tx.ModelRunner(model)
-        runner.save_graph("/tmp/")
+        runner.log_graph(logdir="/tmp/")
+        runner.close_logs()
+
+        runner.log_writer
+
+    def test_lbl_nrp(self):
+        vocab_size = 4
+        k = 1000
+        s = 16
+
+        generator = Generator(k, s)
+        ris = [generator.generate() for _ in range(vocab_size)]
+        ri_tensor = to_sparse_tensor_value(ris, k)
+
+        model = LBLNRP(ctx_size=2,
+                       vocab_size=vocab_size,
+                       k_dim=k,
+                       ri_tensor=ri_tensor,
+                       embed_dim=10,
+                       embed_share=True,
+                       use_gate=True,
+                       use_hidden=True,
+                       h_dim=4,
+                       use_dropout=True,
+                       embed_dropout=True
+                       )
+
+        runner = tx.ModelRunner(model)
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        runner.set_session(runtime_stats=True, run_options=options)
+        runner.set_logdir("/tmp/performance/")
+        runner.log_graph()
+        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
+        #runner.run(np.array([[0, 2]]))
+
+        runner.train(data=np.array([[0, 2]]), loss_input_data=np.array([[1]]))
 
     def test_lbl(self):
         model = LBL(ctx_size=2,
@@ -67,7 +102,7 @@ class TestModels(unittest.TestCase):
             f.write(graphpb_txt)
 
         runner = tx.ModelRunner(model)
-        runner.save_graph("/tmp/")
+        runner.log_graph("/tmp/")
 
     def test_baseline_nnlm_init(self):
         model = NNLM(ctx_size=2,
@@ -96,7 +131,7 @@ class TestModels(unittest.TestCase):
         print("=" * 60)
 
         runner = tx.ModelRunner(model)
-        runner.save_graph("/tmp/")
+        runner.log_graph("/tmp/")
 
     def test_nrp_init(self):
         ri_dim = 1000

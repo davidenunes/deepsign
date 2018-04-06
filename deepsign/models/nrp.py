@@ -93,7 +93,7 @@ class LBLNRP(tx.Model):
                 f_prediction = tx.Add([x_to_f, h_to_f], name="f_predicted")
 
             # RI DECODING ===============================================
-            shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
+            shared_weights = feature_lookup.weights if embed_share else None
             logit_init = logit_init if not embed_share else None
             # embedding feature vectors for all words: shape [vocab_size, embed_dim]
             # later, for NCE we don't need to get all the features
@@ -114,7 +114,7 @@ class LBLNRP(tx.Model):
         # TRAIN GRAPH ===================================================
         with tf.name_scope("train"):
             if use_dropout and embed_dropout:
-                feature_lookup = feature_lookup.reuse_with(run_inputs)
+                feature_lookup = feature_lookup.reuse_with(ri_inputs)
                 features = tx.Dropout(feature_lookup, keep_prob=keep_prob)
             else:
                 features = feature_lookup
@@ -241,7 +241,7 @@ class NNLMNRP(tx.Model):
             var_reg.append(f_prediction.weights)
 
             # RI DECODING ===============================================
-            shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
+            shared_weights = feature_lookup.weights if embed_share else None
             logit_init = logit_init if not embed_share else None
             all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="logits", bias=False)
 
@@ -262,6 +262,7 @@ class NNLMNRP(tx.Model):
         # ===============================================
         with tf.name_scope("train"):
             if use_dropout and embed_dropout:
+                feature_lookup = feature_lookup.reuse_with(ri_inputs)
                 last_layer = tx.Dropout(feature_lookup, keep_prob=keep_prob)
             else:
                 last_layer = feature_lookup
