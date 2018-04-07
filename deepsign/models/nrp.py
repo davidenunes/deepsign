@@ -2,8 +2,40 @@
 
 """
 import tensorx as tx
+from tensorx.utils import to_tensor_cast
 import tensorflow as tf
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
+
+
+class RandomIndexTensor:
+    def __init__(self, indices, values, k, s, dtype=tf.float32):
+        self.indices = to_tensor_cast(indices, tf.int64)
+        self.values = to_tensor_cast(values, dtype)
+        self.k = k
+        self.s = s
+
+        indices_shape = self.indices.get_shape().with_rank(2)
+        values_shape = self.values.get_shape().with_rank(2)
+
+        # Assert number of rows in indices match the number of rows in values.
+        indices_shape[0].merge_with(values_shape[0])
+
+    def to_sparse_tensor(self):
+        indices = tx.column_indices_to_matrix_indices(self.indices,dtype=tf.int64)
+        values = tf.reshape(self.values, [-1])
+
+        num_rows = tf.shape(indices)[0]
+
+        dense_shape = tf.cast(tf.stack([num_rows, self.k]), tf.int64)
+        sp = tf.SparseTensor(indices, values, dense_shape)
+        sp = tf.sparse_reorder(sp)
+        return sp
+
+    def gather(self, ids):
+        indices = tf.gather(self.indices, ids)
+        values = tf.gather(self.values, ids)
+
+        return RandomIndexTensor(indices, values, self.k, self.s)
 
 
 class LBLNRP(tx.Model):
