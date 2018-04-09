@@ -21,19 +21,21 @@ class RandomIndexTensor:
         indices_shape[0].merge_with(values_shape[0])
 
     def to_sparse_tensor(self):
-        indices = tx.column_indices_to_matrix_indices(self.indices,dtype=tf.int64)
-        values = tf.reshape(self.values, [-1])
+        with tf.name_scope("to_sparse"):
+            indices = tx.column_indices_to_matrix_indices(self.indices, dtype=tf.int64)
+            values = tf.reshape(self.values, [-1])
 
-        num_rows = tf.shape(indices)[0]
+            num_rows = tf.shape(indices)[0]
 
-        dense_shape = tf.cast(tf.stack([num_rows, self.k]), tf.int64)
-        sp = tf.SparseTensor(indices, values, dense_shape)
-        sp = tf.sparse_reorder(sp)
+            dense_shape = tf.cast(tf.stack([num_rows, self.k]), tf.int64)
+            sp = tf.SparseTensor(indices, values, dense_shape)
+            sp = tf.sparse_reorder(sp)
         return sp
 
     def gather(self, ids):
-        indices = tf.gather(self.indices, ids)
-        values = tf.gather(self.values, ids)
+        with tf.name_scope("gather"):
+            indices = tf.gather(self.indices, ids)
+            values = tf.gather(self.values, ids)
 
         return RandomIndexTensor(indices, values, self.k, self.s)
 

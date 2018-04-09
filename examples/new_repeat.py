@@ -66,11 +66,11 @@ def repeat(elems, repeats):
 
 tf.InteractiveSession()
 
-indices = np.random.random_integers(0, 20, [10])
-repeats = np.random.random_integers(0, 4, [10])
+#indices = np.random.random_integers(0, 20, [10])
+#repeats = np.random.random_integers(0, 4, [10])
 
-# indices = [3, 6, 0]
-# repeats = [2, 1, 2]
+indices = [3, 6, 0]
+repeats = [2, 1, 2]
 
 t0 = time.time()
 print(repeat_loop(indices, repeats).eval())
@@ -83,22 +83,21 @@ print(t1 - t0)
 
 # these are not the correct times though, I should use the proper runtime stats to measure the ops
 
-"""
-total_counts = 5
 
+total_counts = tf.reduce_sum(repeats)
+print(total_counts.eval())
 
 base_rep = repeat(indices, repeats)
 count_rep = repeat(repeats, repeats)
 
-maxlen = tf.reduce_max(repeats)
-print(maxlen.eval())
-coor_inc = tf.tile(tf.range(maxlen), multiples=tf.expand_dims(tf.cast(tf.ceil(total_counts / maxlen), tf.int64), -1))
+#maxlen = tf.reduce_max(repeats)
+#print(maxlen.eval())
+#coor_inc = tf.tile(tf.range(maxlen), multiples=tf.expand_dims(tf.cast(tf.ceil(total_counts / maxlen), tf.int64), -1))
 # crop coor_inc
-coor_inc = coor_inc[0:total_counts]
-print(coor_inc.eval())
-print(count_rep.eval())
-print(base_rep.eval())
+#coor_inc = coor_inc[0:total_counts]
+#print(coor_inc.eval())
+#print(count_rep.eval())
+#print(base_rep.eval())
 
-coors = base_rep + coor_inc % count_rep
-print(coors.eval())
-"""
+#coors = base_rep + coor_inc % count_rep
+#print(coors.eval())
