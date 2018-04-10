@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorx as tx
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
-from deepsign.models.nrp import LBLNRP
+from deepsign.models.nrp import LBLNRP, RandomIndexTensor
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -19,44 +19,17 @@ class TestModels(unittest.TestCase):
     def tearDown(self):
         self.ss.close()
 
-    def test_nrp_performance(self):
-        vocab_size = 4
-        k = 10
-        s = 4
-
-        generator = Generator(k, s)
-        ris = [generator.generate() for _ in range(vocab_size)]
-        ri_tensor = to_sparse_tensor_value(ris, k)
-
-        model = LBLNRP(ctx_size=2,
-                       vocab_size=vocab_size,
-                       k_dim=k,
-                       ri_tensor=ri_tensor,
-                       embed_dim=10,
-                       embed_share=True,
-                       use_gate=True,
-                       use_hidden=True,
-                       h_dim=4,
-                       use_dropout=True,
-                       embed_dropout=True
-                       )
-
-        runner = tx.ModelRunner(model)
-        runner.log_graph(logdir="/tmp/")
-        runner.close_logs()
-
-        runner.log_writer
-
     def test_lbl_nrp(self):
-        vocab_size = 4
-        k = 1000
-        s = 16
+        vocab_size = 10000
+        k = 10000
+        s = 100
 
         generator = Generator(k, s)
         ris = [generator.generate() for _ in range(vocab_size)]
-        ri_tensor = to_sparse_tensor_value(ris, k)
+        ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
+        # ri_tensor = to_sparse_tensor_value(ris, k)
 
-        model = LBLNRP(ctx_size=2,
+        model = LBLNRP(ctx_size=3,
                        vocab_size=vocab_size,
                        k_dim=k,
                        ri_tensor=ri_tensor,
@@ -70,20 +43,22 @@ class TestModels(unittest.TestCase):
                        )
 
         runner = tx.ModelRunner(model)
-        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        options = None
         runner.set_session(runtime_stats=True, run_options=options)
-        runner.set_logdir("/tmp/performance/")
+        runner.set_logdir("/tmp/")
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
-        #runner.run(np.array([[0, 2]]))
+        result = runner.run(np.array([[0, 2,1]]))
+        print(np.shape(result))
 
-        runner.train(data=np.array([[0, 2]]), loss_input_data=np.array([[1]]))
+        #runner.train(data=np.array([[0, 2, 1]]), loss_input_data=np.array([[1]]))
 
     def test_lbl(self):
         model = LBL(ctx_size=2,
-                    vocab_size=4,
+                    vocab_size=10000,
                     embed_dim=10,
-                    embed_share=False,
+                    embed_share=True,
                     use_gate=True,
                     use_hidden=True,
                     h_dim=4,
@@ -96,13 +71,10 @@ class TestModels(unittest.TestCase):
 
         print("=" * 60)
 
-        graph_def = tf.get_default_graph().as_graph_def()
-        graphpb_txt = str(graph_def)
-        with open('/Users/davide/graphpb.txt', 'w') as f:
-            f.write(graphpb_txt)
-
         runner = tx.ModelRunner(model)
+        runner.set_session(runtime_stats=True)
         runner.log_graph("/tmp/")
+        runner.run([[0, 2]])
 
     def test_baseline_nnlm_init(self):
         model = NNLM(ctx_size=2,

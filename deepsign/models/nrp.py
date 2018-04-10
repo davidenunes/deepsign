@@ -5,6 +5,7 @@ import tensorx as tx
 from tensorx.utils import to_tensor_cast
 import tensorflow as tf
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
+import numpy as np
 
 
 class RandomIndexTensor:
@@ -20,12 +21,18 @@ class RandomIndexTensor:
         # Assert number of rows in indices match the number of rows in values.
         indices_shape[0].merge_with(values_shape[0])
 
+    @staticmethod
+    def from_ri_list(ri_list, k, s, dtype=tf.float32):
+        iv = [(ri.positive + ri.negative, [1] * len(ri.positive) + [-1] * len(ri.negative)) for ri in ri_list]
+        indices, values = zip(*iv)
+        return RandomIndexTensor(indices, values, k, s, dtype)
+
     def to_sparse_tensor(self):
         with tf.name_scope("to_sparse"):
             indices = tx.column_indices_to_matrix_indices(self.indices, dtype=tf.int64)
             values = tf.reshape(self.values, [-1])
 
-            num_rows = tf.shape(indices)[0]
+            num_rows = tf.shape(self.indices)[0]
 
             dense_shape = tf.cast(tf.stack([num_rows, self.k]), tf.int64)
             sp = tf.SparseTensor(indices, values, dense_shape)
@@ -34,6 +41,8 @@ class RandomIndexTensor:
 
     def gather(self, ids):
         with tf.name_scope("gather"):
+            ids = to_tensor_cast(ids, tf.int64)
+            ids = tf.reshape(ids, [-1])
             indices = tf.gather(self.indices, ids)
             values = tf.gather(self.values, ids)
 
@@ -67,7 +76,7 @@ class LBLNRP(tx.Model):
                  ctx_size,
                  vocab_size,
                  k_dim,
-                 ri_tensor,
+                 ri_tensor: RandomIndexTensor,
                  embed_dim,
                  embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  x_to_f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
@@ -96,9 +105,16 @@ class LBLNRP(tx.Model):
         with tf.name_scope("run"):
             # RI ENCODING ===============================================
             # convert ids to ris gather a set of random indexes based on the ids in a sequence
-            ri_layer = tx.TensorLayer(ri_tensor, n_units=k_dim)
-            ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
-            ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+
+            # ri_layer = tx.TensorLayer(ri_tensor, n_units=k_dim)
+            # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+            with tf.name_scope("ri_encode"):
+                # used to compute logits
+                ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+
+                ri_inputs = ri_tensor.gather(run_inputs.tensor)
+                ri_inputs = ri_inputs.to_sparse_tensor()
+                ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
             # use those sparse indexes to lookup a set of features based on the ri values
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
@@ -133,11 +149,16 @@ class LBLNRP(tx.Model):
             # later, for NCE we don't need to get all the features
             all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="logits", bias=False)
 
+
             # dot product of f_predicted . all_embeddings with bias for each target word
+
             run_logits = tx.Linear(f_prediction,
                                    n_units=vocab_size,
                                    shared_weights=tf.transpose(all_embeddings.tensor),
                                    bias=True)
+
+
+
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -173,6 +194,9 @@ class LBLNRP(tx.Model):
 
             # we already define all_embeddings from which these logits are computed before so this should be ok
             train_logits = run_logits.reuse_with(f_prediction)
+
+
+
             train_embed_prob = tx.Activation(train_logits, tx.softmax, name="train_output")
 
             one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
@@ -251,9 +275,16 @@ class NNLMNRP(tx.Model):
         with tf.name_scope("run"):
             # RI ENCODING ===============================================
             # convert ids to ris gather a set of random indexes based on the ids in a sequence
-            ri_layer = tx.TensorLayer(ri_tensor, n_units=k_dim)
-            ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
-            ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
+            # ri_layer = tx.TensorLayer(ri_tensor, n_units=k_dim)
+            # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+            # ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
+            with tf.name_scope("ri_encode"):
+                # used to compute logits
+                ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+
+                ri_inputs = ri_tensor.gather(run_inputs.tensor)
+                ri_inputs = ri_inputs.to_sparse_tensor()
+                ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
             var_reg.append(feature_lookup.weights)

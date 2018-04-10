@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nrp import LBLNRP
+from deepsign.models.nrp import LBLNRP, RandomIndexTensor
 from tensorx.layers import Input
 
 from deepsign.rp.ri import Generator, RandomIndex
@@ -48,8 +48,8 @@ param("ngram_size", int, 4)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 4000)
-param("s_active", int, 4)
+param("k_dim", int, 10000)
+param("s_active", int, 10)
 
 param("embed_dim", int, 64)
 
@@ -125,7 +125,9 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+#ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================

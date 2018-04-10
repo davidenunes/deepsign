@@ -9,10 +9,8 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import tensorx as tx
-from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nrp import NNLMNRP
-from tensorx.layers import Input
+from deepsign.models.nrp import NNLMNRP, RandomIndexTensor
 
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -49,7 +47,7 @@ param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
 param("k_dim", int, 9999)
-param("s_active", int, 100)
+param("s_active", int, 200)
 
 param("embed_dim", int, 64)
 
@@ -122,7 +120,9 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+# ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================
@@ -206,7 +206,6 @@ model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 l2_loss=args.l2_loss,
                 l2_loss_coef=args.l2_loss_coef,
                 f_init=f_init)
-
 
 model_runner = tx.ModelRunner(model)
 
