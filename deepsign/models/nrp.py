@@ -110,11 +110,16 @@ class LBLNRP(tx.Model):
             # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
             with tf.name_scope("ri_encode"):
                 # used to compute logits
-                ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+                if isinstance(ri_tensor, RandomIndexTensor):
+                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
 
-                ri_inputs = ri_tensor.gather(run_inputs.tensor)
-                ri_inputs = ri_inputs.to_sparse_tensor()
-                ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                    ri_inputs = ri_tensor.gather(run_inputs.tensor)
+                    ri_inputs = ri_inputs.to_sparse_tensor()
+                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                else:
+                    ri_layer = tx.TensorLayer(ri_tensor, k_dim)
+                    ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
             # use those sparse indexes to lookup a set of features based on the ri values
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
@@ -149,16 +154,12 @@ class LBLNRP(tx.Model):
             # later, for NCE we don't need to get all the features
             all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="logits", bias=False)
 
-
             # dot product of f_predicted . all_embeddings with bias for each target word
 
             run_logits = tx.Linear(f_prediction,
                                    n_units=vocab_size,
                                    shared_weights=tf.transpose(all_embeddings.tensor),
                                    bias=True)
-
-
-
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -194,8 +195,6 @@ class LBLNRP(tx.Model):
 
             # we already define all_embeddings from which these logits are computed before so this should be ok
             train_logits = run_logits.reuse_with(f_prediction)
-
-
 
             train_embed_prob = tx.Activation(train_logits, tx.softmax, name="train_output")
 
@@ -280,11 +279,17 @@ class NNLMNRP(tx.Model):
             # ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
             with tf.name_scope("ri_encode"):
                 # used to compute logits
-                ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+                if isinstance(ri_tensor, RandomIndexTensor):
+                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
 
-                ri_inputs = ri_tensor.gather(run_inputs.tensor)
-                ri_inputs = ri_inputs.to_sparse_tensor()
-                ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                    ri_inputs = ri_tensor.gather(run_inputs.tensor)
+                    ri_inputs = ri_inputs.to_sparse_tensor()
+                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                # ri_tensor is a sparse tensor
+                else:
+                    ri_layer = tx.TensorLayer(ri_tensor, k_dim)
+                    ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
             var_reg.append(feature_lookup.weights)
