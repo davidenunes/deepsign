@@ -9,12 +9,11 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import tensorx as tx
-from deepsign.data import transform
+
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
 from deepsign.models.nrp import NNLMNRP
-from tensorx.layers import Input
 
-from deepsign.rp.ri import Generator, RandomIndex
+from deepsign.rp.ri import Generator
 from deepsign.rp.tf_utils import to_sparse_tensor_value
 
 
@@ -44,7 +43,7 @@ default_out_dir = os.getcwd()
 # experiment ID
 param("id", int, 0)
 param("corpus", str, default_corpus)
-param("ngram_size", int, 4)
+param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
@@ -59,8 +58,6 @@ param("embed_init_val", float, 0.01)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, True)
 param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
@@ -89,7 +86,7 @@ param("eval_threshold", float, 1.0)
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
+
 param("f_init", str, "uniform", valid=["normal", "uniform"])
 param("f_init_val", float, 0.01)
 
@@ -202,12 +199,10 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-f_init = None
-if args.use_f_predict:
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+if args.f_init == "normal":
+    f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+elif args.f_init == "uniform":
+    f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
 model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 vocab_size=len(vocab),
@@ -215,6 +210,7 @@ model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 ri_tensor=ri_tensor,
                 embed_dim=args.embed_dim,
                 embed_init=embed_init,
+                embed_share=args.embed_share,
                 logit_init=logit_init,
                 h_dim=args.h_dim,
                 num_h=args.num_h,

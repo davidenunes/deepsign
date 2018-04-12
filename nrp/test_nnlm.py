@@ -42,7 +42,7 @@ default_out_dir = os.getcwd()
 # experiment ID
 param("id", int, 0)
 param("corpus", str, default_corpus)
-param("ngram_size", int, 4)
+param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
@@ -54,9 +54,7 @@ param("embed_init_val", float, 0.01)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, True)
-param("embed_share", str2bool, True)
+param("embed_share", str2bool, False)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
@@ -84,7 +82,7 @@ param("eval_threshold", float, 1.0)
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
+param("use_f_predict", str2bool, True)
 param("f_init", str, "uniform", valid=["normal", "uniform"])
 param("f_init_val", float, 0.01)
 
@@ -161,21 +159,31 @@ elif args.h_act == "tanh":
 
 # Embedding (Lookup) layer weight init
 if args.embed_init == "normal":
-    embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
+    embed_init = tx.random_normal(mean=0, stdev=args.embed_init_val)
 elif args.embed_init == "uniform":
-    embed_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
+    embed_init = tx.random_uniform(maxval=args.embed_init_val, minval=-args.embed_init_val)
 
 # Logit layer weight init
 if args.logit_init == "normal":
-    logit_init = embed_init = tx.random_normal(mean=0, stdev=args.embed_limits)
+    logit_init = embed_init = tx.random_normal(mean=0, stdev=args.embed_init_val)
 elif args.logit_init == "uniform":
-    logit_init = tx.random_uniform(maxval=args.embed_limits, minval=-args.embed_limits)
+    logit_init = tx.random_uniform(maxval=args.embed_init_val, minval=-args.embed_init_val)
+
+f_init = None
+if args.use_f_predict:
+    if args.f_init == "normal":
+        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+    elif args.f_init == "uniform":
+        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
 model = NNLM(ctx_size=args.ngram_size - 1,
              vocab_size=vocab_size,
              embed_dim=args.embed_dim,
              embed_init=embed_init,
+             embed_share=args.embed_share,
              logit_init=logit_init,
+             use_f_predict=args.use_f_predict,
+             f_init=f_init,
              h_dim=args.h_dim,
              num_h=args.num_h,
              h_activation=h_act,
@@ -188,7 +196,7 @@ model = NNLM(ctx_size=args.ngram_size - 1,
 
 model_runner = tx.ModelRunner(model)
 
-lr_param = tx.InputParam(init_value=args.learning_rate)
+lr_param = tx.InputParam(init_value=args.lr)
 # optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)
@@ -204,18 +212,25 @@ optimizer = tx.AMSGrad(learning_rate=lr_param.tensor)
 #                           epsilon=args.optimizer_epsilon)
 
 
-# model_runner.config_optimizer(optimizer)
-def global_grad_clip(grads):
-    grads, _ = tf.clip_by_global_norm(grads, args.clip_norm)
+def clip_grad_global(grads):
+    grads, _ = tf.clip_by_global_norm(grads, 12)
     return grads
 
 
-def local_grad_clip(grad):
-    return tf.clip_by_norm(grad, args.clip_norm)
+def clip_grad_local(grad):
+    return tf.clip_by_norm(grad, args.clip_value)
 
 
-if args.clip_gradients:
-    model_runner.config_optimizer(optimizer, params=lr_param, gradient_op=local_grad_clip, global_gradient_op=False)
+if args.clip_grads:
+    if args.clip_local:
+        clip_fn = clip_grad_local
+    else:
+        clip_fn = clip_grad_global
+
+if args.clip_grads:
+    model_runner.config_optimizer(optimizer, params=lr_param,
+                                  gradient_op=clip_fn,
+                                  global_gradient_op=not args.clip_local)
 else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
@@ -261,7 +276,7 @@ print("eval every ", eval_step)
 epoch_step = 0
 global_step = 0
 current_epoch = 0
-current_lr = args.learning_rate
+current_lr = args.lr
 
 model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)

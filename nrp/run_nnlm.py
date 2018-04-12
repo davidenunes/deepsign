@@ -9,10 +9,8 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import tensorx as tx
-from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
 from deepsign.models.nnlm import NNLM
-from tensorx.layers import Input
 
 
 def str2bool(v):
@@ -27,7 +25,7 @@ def str2bool(v):
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
-parser = argparse.ArgumentParser(description="LBL base experiment")
+parser = argparse.ArgumentParser(description="NNLM base model experiment")
 
 
 # clean argparse a bit
@@ -41,7 +39,7 @@ default_out_dir = os.getcwd()
 # experiment ID
 param("id", int, 0)
 param("corpus", str, default_corpus)
-param("ngram_size", int, 4)
+param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
@@ -49,17 +47,15 @@ param("embed_dim", int, 64)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
+param("embed_share", str2bool, False)
 
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, True)
-param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
-param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
+param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
 param("batch_size", int, 128)
@@ -72,7 +68,7 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.001)
+param("lr", float, 5e-4)
 param("lr_decay", str2bool, False)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
@@ -83,7 +79,7 @@ param("eval_threshold", float, 1.0)
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
+param("use_f_predict", str2bool, True)
 param("f_init", str, "uniform", valid=["normal", "uniform"])
 param("f_init_val", float, 0.01)
 
@@ -178,14 +174,9 @@ if args.logit_init == "normal":
     logit_init = tx.random_normal(mean=0.,
                                   stddev=args.logit_init_val)
 elif args.logit_init == "uniform":
-    f_init = None
-if args.use_f_predict:
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
+
 
 f_init = None
 if args.use_f_predict:
@@ -198,6 +189,7 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              vocab_size=len(vocab),
              embed_dim=args.embed_dim,
              embed_init=embed_init,
+             embed_share=args.embed_share,
              logit_init=logit_init,
              h_dim=args.h_dim,
              num_h=args.num_h,

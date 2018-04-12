@@ -47,9 +47,9 @@ param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
 param("k_dim", int, 4000)
-param("s_active", int, 40)
+param("s_active", int, 10)
 
-param("embed_dim", int, 64)
+param("embed_dim", int, 128)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
@@ -57,9 +57,7 @@ param("embed_init_val", float, 0.01)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, True)
-param("embed_share", str2bool, True)
+param("embed_share", str2bool, False)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
@@ -87,7 +85,6 @@ param("eval_threshold", float, 1.0)
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
 param("f_init", str, "uniform", valid=["normal", "uniform"])
 param("f_init_val", float, 0.01)
 
@@ -121,8 +118,8 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
 
-#ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+#ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================
@@ -182,12 +179,10 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-f_init = None
-if args.use_f_predict:
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+if args.f_init == "normal":
+    f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+elif args.f_init == "uniform":
+    f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
 model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 vocab_size=len(vocab),
@@ -195,6 +190,7 @@ model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 ri_tensor=ri_tensor,
                 embed_dim=args.embed_dim,
                 embed_init=embed_init,
+                embed_share=args.embed_share,
                 logit_init=logit_init,
                 h_dim=args.h_dim,
                 num_h=args.num_h,
@@ -295,8 +291,9 @@ model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
-ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
-progress.write("val perplexity {}".format(ppl))
+# first eval just to make sure it is something like 9999
+#ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
+#progress.write("val perplexity {}".format(ppl))
 
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1
