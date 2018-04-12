@@ -34,8 +34,11 @@ parser = argparse.ArgumentParser(description="LBL base experiment")
 
 
 # clean argparse a bit
-def param(name, argtype, default, valid=[]):
-    parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default, choices=valid)
+def param(name, argtype, default, valid=None):
+    if valid is not None:
+        parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default, choices=valid)
+    else:
+        parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default)
 
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
@@ -127,7 +130,7 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 ris = [ri_generator.generate() for i in range(len(vocab))]
 
 ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
-#ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+# ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================

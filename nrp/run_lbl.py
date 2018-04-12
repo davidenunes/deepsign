@@ -29,9 +29,11 @@ parser = argparse.ArgumentParser(description="LBL base experiment")
 
 
 # clean argparse a bit
-def param(name, argtype, default, valid=[]):
-    parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default, choices=valid)
-
+def param(name, argtype, default, valid=None):
+    if valid is not None:
+        parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default, choices=valid)
+    else:
+        parser.add_argument('-{}'.format(name), dest=name, type=argtype, default=default)
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
