@@ -2,19 +2,21 @@ from tensorflow.python.ops import array_ops, math_ops, variables, candidate_samp
 from tensorflow.python.framework import dtypes, ops
 from tensorflow.python.ops.nn import embedding_lookup_sparse, embedding_lookup, sigmoid_cross_entropy_with_logits
 import tensorx as tx
+from deepsign.rp.tf_utils import RandomIndexTensor
 
 
 def _sum_rows(x):
-    """Returns a vector summing up each row of the matrix x."""
-    # _sum_rows(x) is equivalent to math_ops.reduce_sum(x, 1) when x is
-    # a matrix.  The gradient of _sum_rows(x) is more efficient than
-    # reduce_sum(x, 1)'s gradient in today's implementation. Therefore,
-    # we use _sum_rows(x) in the nce_loss() computation since the loss
-    # is mostly used for training.
-    cols = array_ops.shape(x)[1]
-    ones_shape = array_ops.stack([cols, 1])
-    ones = array_ops.ones(ones_shape, x.dtype)
-    return array_ops.reshape(math_ops.matmul(x, ones), [-1])
+    with ops.name_scope("row_sum"):
+        """Returns a vector summing up each row of the matrix x."""
+        # _sum_rows(x) is equivalent to math_ops.reduce_sum(x, 1) when x is
+        # a matrix.  The gradient of _sum_rows(x) is more efficient than
+        # reduce_sum(x, 1)'s gradient in today's implementation. Therefore,
+        # we use _sum_rows(x) in the nce_loss() computation since the loss
+        # is mostly used for training.
+        cols = array_ops.shape(x)[1]
+        ones_shape = array_ops.stack([cols, 1])
+        ones = array_ops.ones(ones_shape, x.dtype)
+        return array_ops.reshape(math_ops.matmul(x, ones), [-1])
 
 
 # TODO we can simply generate a set of randomly generated random
@@ -47,6 +49,21 @@ def generate_ri(k, s, n):
                                 symmetrical=True)
 
     return ris
+
+def gather_ri_tensor(ri_tensor):
+    with ops.name_scope("gather_ri_tensor"):
+        # used to compute logits
+        if isinstance(ri_tensor, RandomIndexTensor):
+            ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+
+            ri_inputs = ri_tensor.gather(run_inputs.tensor)
+            ri_inputs = ri_inputs.to_sparse_tensor()
+            ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+        # ri_tensor is a sparse tensor
+        else:
+            ri_layer = tx.TensorLayer(ri_tensor, k_dim)
+            ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+            ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
 
 def _compute_ri_sampled_logits(ri_tensors,
@@ -100,7 +117,7 @@ def _compute_ri_sampled_logits(ri_tensors,
         # sampled_ris = generate_ri(k, s, num_sampled)
         # all_ris = sparse_ops.sparse_concat(0, [true_ris, sampled_ris])
 
-        all_ris = tx.gather_sparse(ri_tensors, all_ids)
+        all_ris = tx.gather_sparse(sp_tensor=ri_tensors, ids=all_ids)
         sp_values = all_ris
         sp_indices = tx.sparse_indices(sp_values)
 
@@ -108,7 +125,7 @@ def _compute_ri_sampled_logits(ri_tensors,
 
         # weights shape is [num_classes, dim]
         all_w = embedding_lookup_sparse(
-            weights, sp_indices, sp_values, partition_strategy=partition_strategy)
+            weights, sp_indices, sp_values, combiner="sum", partition_strategy=partition_strategy)
 
         # true_w shape is [batch_size * num_true, dim]
         true_w = array_ops.slice(all_w, [0, 0],

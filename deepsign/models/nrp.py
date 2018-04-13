@@ -8,47 +8,7 @@ from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampl
 import numpy as np
 
 from deepsign.models.ri_nce import ri_nce_loss
-
-
-class RandomIndexTensor:
-    def __init__(self, indices, values, k, s, dtype=tf.float32):
-        self.indices = to_tensor_cast(indices, tf.int64)
-        self.values = to_tensor_cast(values, dtype)
-        self.k = k
-        self.s = s
-
-        indices_shape = self.indices.get_shape().with_rank(2)
-        values_shape = self.values.get_shape().with_rank(2)
-
-        # Assert number of rows in indices match the number of rows in values.
-        indices_shape[0].merge_with(values_shape[0])
-
-    @staticmethod
-    def from_ri_list(ri_list, k, s, dtype=tf.float32):
-        iv = [(ri.positive + ri.negative, [1] * len(ri.positive) + [-1] * len(ri.negative)) for ri in ri_list]
-        indices, values = zip(*iv)
-        return RandomIndexTensor(indices, values, k, s, dtype)
-
-    def to_sparse_tensor(self):
-        with tf.name_scope("to_sparse"):
-            indices = tx.column_indices_to_matrix_indices(self.indices, dtype=tf.int64)
-            values = tf.reshape(self.values, [-1])
-
-            num_rows = tf.shape(self.indices)[0]
-
-            dense_shape = tf.cast(tf.stack([num_rows, self.k]), tf.int64)
-            sp = tf.SparseTensor(indices, values, dense_shape)
-            sp = tf.sparse_reorder(sp)
-        return sp
-
-    def gather(self, ids):
-        with tf.name_scope("gather"):
-            ids = to_tensor_cast(ids, tf.int64)
-            ids = tf.reshape(ids, [-1])
-            indices = tf.gather(self.indices, ids)
-            values = tf.gather(self.values, ids)
-
-        return RandomIndexTensor(indices, values, self.k, self.s)
+from deepsign.rp.tf_utils import RandomIndexTensor
 
 
 class LBLNRP(tx.Model):
@@ -161,7 +121,8 @@ class LBLNRP(tx.Model):
 
             run_logits = tx.Linear(f_prediction,
                                    n_units=vocab_size,
-                                   shared_weights=tf.transpose(all_embeddings.tensor),
+                                   shared_weights=all_embeddings.tensor,
+                                   transpose_weights=True,
                                    bias=True)
 
             if not embed_share:
@@ -315,6 +276,7 @@ class NNLMNRP(tx.Model):
             var_reg.append(f_prediction.weights)
 
             # RI DECODING ===============================================
+
             shared_weights = feature_lookup.weights if embed_share else None
             logit_init = logit_init if not embed_share else None
 
@@ -323,13 +285,12 @@ class NNLMNRP(tx.Model):
             if ri_to_dense:
                 ri_layer = tx.ToDense(ri_layer)
 
-            all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="logits", bias=False)
+            all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features", bias=False)
 
             # dot product of f_predicted . all_embeddings with bias for each target word
-            run_logits = tx.Linear(f_prediction,
-                                   n_units=vocab_size,
-                                   shared_weights=tf.transpose(all_embeddings.tensor),
-                                   bias=True)
+            run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
+                                   transpose_weights=True,
+                                   bias=True, name="logits")
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -442,13 +403,21 @@ class NNLMNRP_NCE(tx.Model):
             # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
             # ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
             with tf.name_scope("ri_encode"):
-                # used to compute logits
                 if isinstance(ri_tensor, RandomIndexTensor):
-                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+                    sp_ri_tensor = ri_tensor.to_sparse_tensor()
+                    if ri_to_dense:
+                        ri_tensor = tf.sparse_tensor_to_dense(sp_ri_tensor)
+                        ri_layer = tx.TensorLayer(ri_tensor, k_dim)
 
-                    ri_inputs = ri_tensor.gather(run_inputs.tensor)
-                    ri_inputs = ri_inputs.to_sparse_tensor()
-                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                        ri_inputs = tx.Linear()
+                    else:
+                        ri_layer = tx.TensorLayer(sp_ri_tensor, k_dim)
+                        ri_inputs = ri_tensor.gather(run_inputs.tensor)
+                        ri_inputs = ri_inputs.to_sparse_tensor()
+                        ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+
+
+
                 # ri_tensor is a sparse tensor
                 else:
                     ri_layer = tx.TensorLayer(ri_tensor, k_dim)
@@ -488,7 +457,8 @@ class NNLMNRP_NCE(tx.Model):
             # dot product of f_predicted . all_embeddings with bias for each target word
             run_logits = tx.Linear(f_prediction,
                                    n_units=vocab_size,
-                                   shared_weights=tf.transpose(all_embeddings.tensor),
+                                   shared_weights=all_embeddings.tensor,
+                                   transpose_weights=True,
                                    bias=True)
 
             if not embed_share:
@@ -519,7 +489,7 @@ class NNLMNRP_NCE(tx.Model):
             logit_weights = all_embeddings.weights
             logit_bias = run_logits.bias
 
-            train_loss = ri_nce_loss(ri_tensors=ri_inputs.tensor,
+            train_loss = ri_nce_loss(ri_tensors=ri_layer.tensor,
                                      weights=logit_weights,
                                      biases=logit_bias,
                                      inputs=f_prediction.tensor,

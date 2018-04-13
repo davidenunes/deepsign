@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorx as tx
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
-from deepsign.models.nrp import LBLNRP, RandomIndexTensor, NNLMNRP_NCE
+from deepsign.models.nrp import LBLNRP, RandomIndexTensor, NNLMNRP_NCE, NNLMNRP
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -20,44 +20,108 @@ class TestModels(unittest.TestCase):
     def tearDown(self):
         self.ss.close()
 
-    def test_nce_nnlm_nrp(self):
+    def test_nnlm(self):
         vocab_size = 10000
-        k = 10000
-        s = 100
+
+        embed_dim = 512
+
+        model = NNLM(ctx_size=3,
+                     vocab_size=vocab_size,
+                     embed_dim=embed_dim,
+                     embed_share=False,
+                     use_f_predict=True,
+                     h_dim=500,
+                     use_dropout=True,
+                     embed_dropout=True
+                     )
+        runner = tx.ModelRunner(model)
+
+        options = None
+        runner.set_session(runtime_stats=True)
+        runner.set_logdir("/tmp/")
+        runner.log_graph()
+        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
+
+        for _ in tqdm(range(100)):
+            # result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
+            result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
+
+    def test_nnlm_nrp(self):
+        vocab_size = 10000
+        embed_dim = 100
+        k = 4000
+        s = 10
 
         generator = Generator(k, s)
         ris = [generator.generate() for _ in range(vocab_size)]
         ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
         # ri_tensor = to_sparse_tensor_value(ris, k)
+        # ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
+
+        model = NNLMNRP(ctx_size=3,
+                        vocab_size=vocab_size,
+                        k_dim=k,
+                        ri_tensor=ri_tensor,
+                        embed_dim=embed_dim,
+                        embed_share=False,
+                        h_dim=100,
+                        use_dropout=True,
+                        embed_dropout=True
+                        )
+        runner = tx.ModelRunner(model)
+        # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        options = None
+        runner.set_session(runtime_stats=True)
+        runner.set_logdir("/tmp/")
+        runner.log_graph()
+        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
+
+        for _ in tqdm(range(10)):
+            result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
+            # result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
+            # result = runner.run(np.array([[0, 2, 1]]))
+
+    def test_nce_nnlm_nrp(self):
+        vocab_size = 10000
+        k = 10000
+        s = 300
+
+        generator = Generator(k, s)
+        ris = [generator.generate() for _ in range(vocab_size)]
+        # ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
+        ri_tensor = to_sparse_tensor_value(ris, k)
+        ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
         model = NNLMNRP_NCE(ctx_size=3,
                             vocab_size=vocab_size,
                             k_dim=k,
                             ri_tensor=ri_tensor,
                             embed_dim=100,
-                            embed_share=True,
+                            embed_share=False,
                             h_dim=200,
                             use_dropout=True,
                             embed_dropout=True,
-                            n_samples=1
+                            n_samples=300
                             )
 
         runner = tx.ModelRunner(model)
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         options = None
-        runner.set_session(runtime_stats=True, run_options=options)
+        runner.set_session(runtime_stats=True)
         runner.set_logdir("/tmp/")
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
 
-        for _ in tqdm(range(1000)):
-            result = runner.run(np.array([[0, 2, 1]]))
+        for _ in tqdm(range(100)):
+            result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
+            #result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
+
         print(np.shape(result))
 
     def test_lbl_nrp(self):
         vocab_size = 10000
         k = 10000
-        s = 100
+        s = 1000
 
         generator = Generator(k, s)
         ris = [generator.generate() for _ in range(vocab_size)]

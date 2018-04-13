@@ -72,9 +72,27 @@ class NNLM(tx.Model):
                 var_reg.append(last_layer.weights)
                 f_predict = last_layer
 
-            shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
+            #if embed_share:
+            #    def logit_prod(input_tensor):
+            #        return tf.matmul(input_tensor, feature_lookup.weights, transpose_b=True)
+
+                # use wrap layer so that the whole op can be reused
+            #    y = tx.WrapLayer(last_layer, vocab_size, logit_prod)
+            #    y_b = tx.Bias(y)
+            #    run_logits = tx.Compose([y, y_b])
+            #else:
+
+            #run_logits = tx.Linear(last_layer, n_units=vocab_size, init=logit_init, name="logits")
+
+            shared_weights = feature_lookup.weights if embed_share else None
+            transpose_weights = embed_share
             logit_init = logit_init if not embed_share else None
-            run_logits = tx.Linear(last_layer, vocab_size, logit_init, shared_weights, name="logits")
+            run_logits = tx.Linear(last_layer,
+                                   n_units=vocab_size,
+                                   init=logit_init,
+                                   shared_weights=shared_weights,
+                                   transpose_weights=transpose_weights,
+                                   name="logits")
 
             if not embed_share:
                 var_reg.append(run_logits.weights)
