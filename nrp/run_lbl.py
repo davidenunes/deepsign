@@ -41,7 +41,7 @@ default_out_dir = os.getcwd()
 # experiment ID
 param("id", int, 0)
 param("corpus", str, default_corpus)
-param("ngram_size", int, 4)
+param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
@@ -103,6 +103,7 @@ param("keep_prob", float, 0.95)
 
 param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
+
 
 args = parser.parse_args()
 # ======================================================================================

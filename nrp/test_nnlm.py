@@ -74,7 +74,7 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.001)
+param("lr", float, 0.0001)
 param("lr_decay", str2bool, False)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold

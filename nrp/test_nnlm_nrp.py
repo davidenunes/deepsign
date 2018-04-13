@@ -49,10 +49,10 @@ param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 4000)
-param("s_active", int, 10)
+param("k_dim", int, 10000)
+param("s_active", int, 4)
 
-param("embed_dim", int, 128)
+param("embed_dim", int, 64)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
@@ -60,11 +60,11 @@ param("embed_init_val", float, 0.01)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("embed_share", str2bool, False)
+param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
-param("h_dim", int, 256)
-param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
+param("h_dim", int, 128)
+param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
 param("batch_size", int, 128)
@@ -77,8 +77,8 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.001)
-param("lr_decay", str2bool, False)
+param("lr", float, 0.5)
+param("lr_decay", str2bool, True)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
 param("lr_decay_threshold", float, 1e-6)
@@ -100,7 +100,7 @@ param("clip_value", float, 1.0)
 
 param("dropout", str2bool, True)
 param("embed_dropout", str2bool, True)
-param("keep_prob", float, 0.95)
+param("keep_prob", float, 0.85)
 
 param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
@@ -121,8 +121,8 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
 
-ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
-# ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+#ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================
@@ -204,7 +204,8 @@ model = NNLMNRP(ctx_size=args.ngram_size - 1,
                 embed_dropout=args.embed_dropout,
                 l2_loss=args.l2_loss,
                 l2_loss_coef=args.l2_loss_coef,
-                f_init=f_init)
+                f_init=f_init,
+                ri_to_dense=False)
 
 model_runner = tx.ModelRunner(model)
 
@@ -295,8 +296,8 @@ progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
 # first eval just to make sure it is something like 9999
-# ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
-# progress.write("val perplexity {}".format(ppl))
+ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
+progress.write("val perplexity {}".format(ppl))
 
 for ngram_batch in training_data:
     epoch = progress.n // len(training_dataset) + 1

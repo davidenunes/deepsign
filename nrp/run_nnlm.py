@@ -55,27 +55,28 @@ param("embed_share", str2bool, False)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-
 param("num_h", int, 1)
-param("h_dim", int, 256)
+param("h_dim", int, 128)
 param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
-param("epochs", int, 2)
-param("batch_size", int, 128)
+param("epochs", int, 10)
+param("batch_size", int, 256)
 param("shuffle", str2bool, True)
 param("shuffle_buffer_size", int, 128 * 10000)
 
-param("optimizer", str, "ams", valid=["sgd", "adam", "ams"])
+param("optimizer", str, "sgd", valid=["sgd", "adam", "ams"])
 # only needed for adam and ams
 param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 5e-4)
-param("lr_decay", str2bool, False)
+param("lr", float, 0.25)
+param("lr_decay", str2bool, True)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
 param("lr_decay_threshold", float, 1e-6)
+param("lr_restore", str2bool, False)
+param("lr_restore_rate", float, 0.4)
 # lr decay when last_ppl - current_ppl < eval_threshold
 param("eval_threshold", float, 1.0)
 
@@ -96,6 +97,7 @@ param("clip_value", float, 1.0)
 param("dropout", str2bool, True)
 param("embed_dropout", str2bool, True)
 param("keep_prob", float, 0.95)
+param("eval_test", str2bool, True)
 
 param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
@@ -179,7 +181,6 @@ if args.logit_init == "normal":
 elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
-
 
 f_init = None
 if args.use_f_predict:
@@ -276,7 +277,7 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
 
 
 def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
-    pb.write("[Eval Validation]")
+    pb.write("[Eval Validation Set]")
 
     val_data = corpus["validation"]
     ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
@@ -285,17 +286,21 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
                "perplexity": ppl_validation}
     ppl_writer.writerow(res_row)
 
-    pb.write("Eval Test")
-    test_data = corpus["test"]
-    ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
+    if args.eval_test:
+        pb.write("[Eval Test Set]")
+        test_data = corpus["test"]
+        ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
-               "perplexity": ppl_test}
-    ppl_writer.writerow(res_row)
+        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+                   "perplexity": ppl_test}
+        ppl_writer.writerow(res_row)
 
     ppl_file.flush()
 
-    pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
+    if args.eval_test:
+        pb.write("test. ppl = {}".format(ppl_test))
+
+    pb.write("valid. ppl = {}".format(ppl_validation))
     return ppl_validation
 
 
@@ -343,13 +348,17 @@ for ngram_batch in training_data:
                         break
                     patience += 1
                 else:
+                    # restart patience and adjust lr
                     patience = 0
+                    if args.lr_restore:
+                        lr_param.value = min(lr_param.value * (1.0 / args.lr_restore_rate), args.lr)
+                        progress.write("lr increased to {}".format(lr_param.value))
 
             # lr decay only at the start of each epoch
             if args.lr_decay and len(evals) > 0:
                 if evals[-2] - evals[-1] < args.eval_threshold:
                     lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                    progress.write("lr changed to {}".format(lr_param.value))
+                    progress.write("lr decreased to {}".format(lr_param.value))
 
     # ================================================
     # TRAIN MODEL
