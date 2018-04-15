@@ -33,7 +33,8 @@ class NNLM(tx.Model):
                  l2_loss_coef=1e-5,
                  use_f_predict=False,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 embed_share=False
+                 embed_share=False,
+                 logit_biases=False,
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -72,17 +73,15 @@ class NNLM(tx.Model):
                 var_reg.append(last_layer.weights)
                 f_predict = last_layer
 
-            #if embed_share:
+            # if embed_share:
             #    def logit_prod(input_tensor):
             #        return tf.matmul(input_tensor, feature_lookup.weights, transpose_b=True)
-
-                # use wrap layer so that the whole op can be reused
+            # Use wrap layer so that the whole op can be reused
             #    y = tx.WrapLayer(last_layer, vocab_size, logit_prod)
             #    y_b = tx.Bias(y)
             #    run_logits = tx.Compose([y, y_b])
-            #else:
-
-            #run_logits = tx.Linear(last_layer, n_units=vocab_size, init=logit_init, name="logits")
+            # else:
+            # run_logits = tx.Linear(last_layer, n_units=vocab_size, init=logit_init, name="logits")
 
             shared_weights = feature_lookup.weights if embed_share else None
             transpose_weights = embed_share
@@ -92,6 +91,7 @@ class NNLM(tx.Model):
                                    init=logit_init,
                                    shared_weights=shared_weights,
                                    transpose_weights=transpose_weights,
+                                   bias=logit_biases,
                                    name="logits")
 
             if not embed_share:

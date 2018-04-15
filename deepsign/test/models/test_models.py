@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorx as tx
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
-from deepsign.models.nrp import LBLNRP, RandomIndexTensor, NNLMNRP_NCE, NNLMNRP
+from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLMNRP_NCE, NNLM_NRP
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -58,16 +58,16 @@ class TestModels(unittest.TestCase):
         # ri_tensor = to_sparse_tensor_value(ris, k)
         # ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
-        model = NNLMNRP(ctx_size=3,
-                        vocab_size=vocab_size,
-                        k_dim=k,
-                        ri_tensor=ri_tensor,
-                        embed_dim=embed_dim,
-                        embed_share=False,
-                        h_dim=100,
-                        use_dropout=True,
-                        embed_dropout=True
-                        )
+        model = NNLM_NRP(ctx_size=3,
+                         vocab_size=vocab_size,
+                         k_dim=k,
+                         ri_tensor=ri_tensor,
+                         embed_dim=embed_dim,
+                         embed_share=False,
+                         h_dim=100,
+                         use_dropout=True,
+                         embed_dropout=True
+                         )
         runner = tx.ModelRunner(model)
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         options = None
@@ -128,18 +128,18 @@ class TestModels(unittest.TestCase):
         ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
         # ri_tensor = to_sparse_tensor_value(ris, k)
 
-        model = LBLNRP(ctx_size=3,
-                       vocab_size=vocab_size,
-                       k_dim=k,
-                       ri_tensor=ri_tensor,
-                       embed_dim=10,
-                       embed_share=True,
-                       use_gate=True,
-                       use_hidden=True,
-                       h_dim=4,
-                       use_dropout=True,
-                       embed_dropout=True
-                       )
+        model = LBL_NRP(ctx_size=3,
+                        vocab_size=vocab_size,
+                        k_dim=k,
+                        ri_tensor=ri_tensor,
+                        embed_dim=10,
+                        embed_share=True,
+                        use_gate=True,
+                        use_hidden=True,
+                        h_dim=4,
+                        use_dropout=True,
+                        embed_dropout=True
+                        )
 
         runner = tx.ModelRunner(model)
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)

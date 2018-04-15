@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, take_it
-from deepsign.models.nrp import LBLNRP, RandomIndexTensor
+from deepsign.models.nrp import LBL_NRP, RandomIndexTensor
 from tensorx.layers import Input
 
 from deepsign.rp.ri import Generator, RandomIndex
@@ -47,7 +47,7 @@ default_out_dir = os.getcwd()
 # experiment ID
 param("id", int, 0)
 param("corpus", str, default_corpus)
-param("ngram_size", int, 4)
+param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
@@ -200,27 +200,27 @@ if args.x_to_f_init == "normal":
 elif args.h_to_f_init == "uniform":
     x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
 
-model = LBLNRP(ctx_size=args.ngram_size - 1,
-               vocab_size=len(vocab),
-               k_dim=args.k_dim,
-               ri_tensor=ri_tensor,
-               embed_dim=args.embed_dim,
-               embed_init=embed_init,
-               x_to_f_init=x_to_f_init,
-               logit_init=logit_init,
-               embed_share=args.embed_share,
-               use_gate=args.use_gate,
-               use_hidden=args.use_hidden,
-               h_dim=args.h_dim,
-               h_activation=h_act,
-               h_init=h_init,
-               h_to_f_init=h_to_f_init,
-               use_dropout=args.dropout,
-               embed_dropout=args.embed_dropout,
-               keep_prob=args.keep_prob,
-               l2_loss=args.l2_loss,
-               l2_loss_coef=args.l2_loss_coef
-               )
+model = LBL_NRP(ctx_size=args.ngram_size - 1,
+                vocab_size=len(vocab),
+                k_dim=args.k_dim,
+                ri_tensor=ri_tensor,
+                embed_dim=args.embed_dim,
+                embed_init=embed_init,
+                x_to_f_init=x_to_f_init,
+                logit_init=logit_init,
+                embed_share=args.embed_share,
+                use_gate=args.use_gate,
+                use_hidden=args.use_hidden,
+                h_dim=args.h_dim,
+                h_activation=h_act,
+                h_init=h_init,
+                h_to_f_init=h_to_f_init,
+                use_dropout=args.dropout,
+                embed_dropout=args.embed_dropout,
+                keep_prob=args.keep_prob,
+                l2_loss=args.l2_loss,
+                l2_loss_coef=args.l2_loss_coef
+                )
 
 model_runner = tx.ModelRunner(model)
 

@@ -11,7 +11,7 @@ from deepsign.models.ri_nce import ri_nce_loss
 from deepsign.rp.tf_utils import RandomIndexTensor
 
 
-class LBLNRP(tx.Model):
+class LBL_NRP(tx.Model):
     """ LBL with NRP
 
     Log BiLinear Model with gating and hidden non-linear layer extensions using the random
@@ -44,6 +44,7 @@ class LBLNRP(tx.Model):
                  x_to_f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=True,
+                 logit_biases=False,
                  use_gate=True,
                  use_hidden=False,
                  h_dim=100,
@@ -123,7 +124,7 @@ class LBLNRP(tx.Model):
                                    n_units=vocab_size,
                                    shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=True)
+                                   bias=logit_biases)
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -185,7 +186,7 @@ class LBLNRP(tx.Model):
                          eval_tensors=eval_loss, eval_tensors_in=eval_inputs)
 
 
-class NNLMNRP(tx.Model):
+class NNLM_NRP(tx.Model):
     """ Neural Probabilistic Language Model with NRP
 
 
@@ -218,7 +219,7 @@ class NNLMNRP(tx.Model):
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
-                 ri_to_dense=False
+                 logit_biases=False
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -280,17 +281,12 @@ class NNLMNRP(tx.Model):
             shared_weights = feature_lookup.weights if embed_share else None
             logit_init = logit_init if not embed_share else None
 
-            # this is computationally expensive, I'm trying to see what happens
-            # with dense ri_layer
-            if ri_to_dense:
-                ri_layer = tx.ToDense(ri_layer)
-
             all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features", bias=False)
 
             # dot product of f_predicted . all_embeddings with bias for each target word
             run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=True, name="logits")
+                                   bias=logit_biases, name="logits")
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -377,8 +373,9 @@ class NNLMNRP_NCE(tx.Model):
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
+                 logit_biases=False,
                  ri_to_dense=False,
-                 n_samples=100,
+                 n_samples=100
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -415,8 +412,6 @@ class NNLMNRP_NCE(tx.Model):
                         ri_inputs = ri_tensor.gather(run_inputs.tensor)
                         ri_inputs = ri_inputs.to_sparse_tensor()
                         ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
-
-
 
                 # ri_tensor is a sparse tensor
                 else:
@@ -459,7 +454,7 @@ class NNLMNRP_NCE(tx.Model):
                                    n_units=vocab_size,
                                    shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=True)
+                                   bias=logit_biases)
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -487,11 +482,11 @@ class NNLMNRP_NCE(tx.Model):
             f_prediction = f_prediction.reuse_with(last_layer)
 
             logit_weights = all_embeddings.weights
-            logit_bias = run_logits.bias
+            logit_biases = run_logits.bias
 
             train_loss = ri_nce_loss(ri_tensors=ri_layer.tensor,
                                      weights=logit_weights,
-                                     biases=logit_bias,
+                                     biases=logit_biases,
                                      inputs=f_prediction.tensor,
                                      labels=loss_inputs.tensor,
                                      num_sampled=n_samples,

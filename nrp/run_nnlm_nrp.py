@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorx as tx
 
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.nrp import NNLMNRP, RandomIndexTensor
+from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 
 from deepsign.rp.ri import Generator
 from deepsign.rp.tf_utils import to_sparse_tensor_value
@@ -208,24 +208,24 @@ if args.f_init == "normal":
 elif args.f_init == "uniform":
     f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-model = NNLMNRP(ctx_size=args.ngram_size - 1,
-                vocab_size=len(vocab),
-                k_dim=args.k_dim,
-                ri_tensor=ri_tensor,
-                embed_dim=args.embed_dim,
-                embed_init=embed_init,
-                embed_share=args.embed_share,
-                logit_init=logit_init,
-                h_dim=args.h_dim,
-                num_h=args.num_h,
-                h_activation=h_act,
-                h_init=h_init,
-                use_dropout=args.dropout,
-                keep_prob=args.keep_prob,
-                embed_dropout=args.embed_dropout,
-                l2_loss=args.l2_loss,
-                l2_loss_coef=args.l2_loss_coef,
-                f_init=f_init)
+model = NNLM_NRP(ctx_size=args.ngram_size - 1,
+                 vocab_size=len(vocab),
+                 k_dim=args.k_dim,
+                 ri_tensor=ri_tensor,
+                 embed_dim=args.embed_dim,
+                 embed_init=embed_init,
+                 embed_share=args.embed_share,
+                 logit_init=logit_init,
+                 h_dim=args.h_dim,
+                 num_h=args.num_h,
+                 h_activation=h_act,
+                 h_init=h_init,
+                 use_dropout=args.dropout,
+                 keep_prob=args.keep_prob,
+                 embed_dropout=args.embed_dropout,
+                 l2_loss=args.l2_loss,
+                 l2_loss_coef=args.l2_loss_coef,
+                 f_init=f_init)
 
 model_runner = tx.ModelRunner(model)
 
