@@ -1,12 +1,17 @@
 import tensorflow as tf
 import tensorx as tx
+from tensorx.layers import Layer
+from tensorx.layers import layer_scope
 import numpy as np
 from tqdm import tqdm
+
+
+
 
 n_hidden = 20
 embed_dim = 10
 seq_size = 2
-vocab_size = 100
+vocab_size = 10000
 feature_shape = [vocab_size, embed_dim]
 
 loss_inputs = tx.Input(1, dtype=tf.int32)
@@ -54,7 +59,7 @@ runner.init_vars()
 data = np.array([[0, 1], [1, 0]])
 targets = np.array([[2], [3]])
 
-for i in tqdm(range(100000)):
+for i in tqdm(range(10000)):
     runner.train(data=data, loss_input_data=targets)
 
     if i % 1000 == 0:

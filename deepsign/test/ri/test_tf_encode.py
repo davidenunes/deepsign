@@ -25,6 +25,24 @@ class MyTestCase(unittest.TestCase):
         result = to_sparse_tensor_value(ris,self.sign_index.feature_dim())
         print(result)
 
+    def test_encode_sp_positive(self):
+        """
+        Testing encoding for positive-only sparse random vectors
+
+        """
+        sentence = ["A", "B"]
+
+        for word in sentence:
+            self.sign_index.add(word)
+
+        ris = []
+        for word in sentence:
+            ri = self.sign_index.get_ri(word)
+            ris.append(ri)
+
+        result = to_sparse_tensor_value(ris, self.sign_index.feature_dim(),all_positive=True)
+        print(result)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,12 +4,14 @@ from tensorx.utils import to_tensor_cast
 import tensorx as tx
 
 
-def to_sparse_tensor_value(ri_seq, dim):
+def to_sparse_tensor_value(ri_seq, dim, all_positive=False):
     """
 
     Args:
         dim: dimension for the sparse representation should all be the same in ri_seq
         ri_seq: a list of RandomIndex instances
+        all_positive: converts the random indices to sparse random vectors with positive entries only (to be used
+        as a counter example to random indexing)
     """
     ri_seq = list(ri_seq)
     sp_indices = []
@@ -17,6 +19,9 @@ def to_sparse_tensor_value(ri_seq, dim):
     for i, ri in enumerate(ri_seq):
         indices, values = ri.sorted_indices_values()
         sp_indices.extend(zip([i] * len(indices), indices))
+        if all_positive:
+            values = list(map(abs, values))
+
         sp_values.extend(values)
 
     sp_indices = np.array(sp_indices, np.int64)

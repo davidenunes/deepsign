@@ -53,6 +53,8 @@ param("out_dir", str, default_out_dir)
 param("k_dim", int, 9999)
 param("s_active", int, 100)
 
+param("ri_all_positive", str2bool, False)
+
 param("embed_dim", int, 64)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
@@ -150,8 +152,8 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
-#ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim, all_positive=args.ri_all_positive)
+# ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
 
 print("done")
 
