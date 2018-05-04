@@ -50,14 +50,14 @@ param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 9999)
-param("s_active", int, 100)
+param("k_dim", int, 5000)
+param("s_active", int, 8)
 
 param("ri_all_positive", str2bool, False)
 
-param("embed_dim", int, 64)
+param("embed_dim", int, 128)
 
-param("embed_init", str, "uniform", valid=["normal", "uniform"])
+param("embed_init", str, "normal", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
 
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
@@ -67,7 +67,7 @@ param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
-param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
+param("h_act", str, "tanh", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
 param("batch_size", int, 128)
@@ -80,7 +80,7 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.001)
+param("lr", float, 0.0005)
 param("lr_decay", str2bool, False)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
@@ -344,56 +344,63 @@ progress = tqdm(total=len(training_dset) * args.epochs)
 training_data = data_pipeline(training_dset, epochs=args.epochs, shuffle=True)
 
 evals = []
+try:
+    for ngram_batch in training_data:
+        epoch = progress.n // len(training_dset) + 1
+        # Start New Epoch
+        if epoch != current_epoch:
+            current_epoch = epoch
+            epoch_step = 0
+            progress.write("epoch: {}".format(current_epoch))
 
-for ngram_batch in training_data:
-    epoch = progress.n // len(training_dset) + 1
-    # Start New Epoch
-    if epoch != current_epoch:
-        current_epoch = epoch
-        epoch_step = 0
-        progress.write("epoch: {}".format(current_epoch))
+        # Eval Time
+        if epoch_step == 0:
+            current_eval = evaluation(model_runner, progress, epoch, global_step)
+            evals.append(current_eval)
 
-    # Eval Time
-    if epoch_step == 0:
-        current_eval = evaluation(model_runner, progress, epoch, global_step)
-        evals.append(current_eval)
+            if global_step > 0:
+                if args.early_stop:
+                    if evals[-2] - evals[-1] < args.eval_threshold:
+                        if patience >= 3:
+                            progress.write("early stop")
+                            break
+                        patience += 1
+                    else:
+                        patience = 0
 
-        if global_step > 0:
-            if args.early_stop:
-                if evals[-2] - evals[-1] < args.eval_threshold:
-                    if patience >= 3:
-                        progress.write("early stop")
-                        break
-                    patience += 1
-                else:
-                    patience = 0
+                # lr decay only at the start of each epoch
+                if args.lr_decay and len(evals) > 0:
+                    if evals[-2] - evals[-1] < args.eval_threshold:
+                        lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
+                        progress.write("lr changed to {}".format(lr_param.value))
 
-            # lr decay only at the start of each epoch
-            if args.lr_decay and len(evals) > 0:
-                if evals[-2] - evals[-1] < args.eval_threshold:
-                    lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                    progress.write("lr changed to {}".format(lr_param.value))
+        # ================================================
+        # TRAIN MODEL
+        # ================================================
+        ngram_batch = np.array(ngram_batch, dtype=np.int64)
+        ctx_ids = ngram_batch[:, :-1]
+        word_ids = ngram_batch[:, -1:]
 
-    # ================================================
-    # TRAIN MODEL
-    # ================================================
-    ngram_batch = np.array(ngram_batch, dtype=np.int64)
-    ctx_ids = ngram_batch[:, :-1]
-    word_ids = ngram_batch[:, -1:]
+        model_runner.train(ctx_ids, word_ids)
+        progress.update(args.batch_size)
 
-    model_runner.train(ctx_ids, word_ids)
-    progress.update(args.batch_size)
+        epoch_step += 1
+        global_step += 1
 
-    epoch_step += 1
-    global_step += 1
+    # if not early stop, evaluate last state of the model
+    if not args.early_stop or patience < 3:
+        evaluation(model_runner, progress, epoch, epoch_step)
+    ppl_file.close()
 
-# if not early stop, evaluate last state of the model
-if not args.early_stop or patience < 3:
-    evaluation(model_runner, progress, epoch, epoch_step)
-ppl_file.close()
+    if args.save_model:
+        model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
 
-if args.save_model:
-    model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
+    model_runner.close_session()
+    progress.close()
 
-model_runner.close_session()
-progress.close()
+
+except Exception as e:
+    os.remove(ppl_file.name)
+    os.remove(param_file.name)
+
+    raise e
