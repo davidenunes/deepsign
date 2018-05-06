@@ -1,4 +1,4 @@
-h5py>=2.6.0
+h5py>=2.8.0rc1
 numpy>=1.11.1
 spacy>=1.6
 scipy>=0.18.1

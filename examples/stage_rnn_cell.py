@@ -5,10 +5,29 @@ import numpy as np
 
 
 class RNNCell(Layer):
-    def __init__(self, layer, n_units, previous_output=None, activation=tx.tanh, use_bias=True,
+    """ Recurrent Cell
+    Corresponds to a single step on an unrolled RNN network
+
+    Args:
+            layer: the input layer to the RNN Cell
+            n_units: number of output units for this RNN Cell
+            previous_state: a RNNCell from which we can extract output
+            activation: activation function to be used in the cell
+            use_bias: if True adds biases before the activation
+            init: weight initialisation function
+            recurrent_init: initialisation function for the recurrent weights
+            share_state_with: a ``Layer`` with the same number of units than this Cell
+            name: name for the RNN cell
+    """
+
+    def __init__(self, layer, n_units,
+                 previous_state=None,
+                 activation=tx.tanh,
+                 use_bias=True,
                  init=tx.xavier_init(),
                  recurrent_init=tx.xavier_init(),
-                 name="lstm_cell"):
+                 share_state_with=None,
+                 name="rnn_cell"):
         self.activation = activation
         self.use_bias = use_bias
         self.init = init
@@ -16,24 +35,58 @@ class RNNCell(Layer):
         self.recurrent_init = recurrent_init
         super().__init__(layer, n_units, [layer.n_units, n_units], tf.float32, name)
 
-        self.tensor = self._build_graph(layer, previous_output)
+        if previous_state is not None:
+            if previous_state.n_units != self.n_units:
+                raise ValueError(
+                    "previous state n_units ({}) != current n_units ({})".format(previous_state.n_units, self.n_units))
+        self.previous_state = previous_state
 
-    def _build_graph(self, layer, previous_output):
-        with layer_scope(self, var_scope=True):
-            self.previous_output = previous_output
-            if self.previous_output is None:
+        if share_state_with is not None and not isinstance(share_state_with, RNNCell):
+            raise TypeError("shared_gate must be of type {} got {} instead".format(RNNCell, type(share_state_with)))
+        self.share_state_with = share_state_with
+
+        self.tensor = self._build_graph(layer, previous_state)
+
+    def _build_graph(self, layer, previous_state):
+        with layer_scope(self):
+
+            if previous_state is None:
                 input_batch = tf.shape(layer.tensor)[0]
-                # print(input_batch)
-                self.previous_output = tf.zeros([input_batch, self.n_units])
+                zero_state = tf.zeros([input_batch, self.n_units])
+                self.previous_state = tx.TensorLayer(zero_state, self.n_units)
 
-            self.kernel = tx.Linear(layer, self.n_units, bias=True, init=self.init)
-            self.kernel = tx.Activation(self.kernel, self.activation)
+            if self.share_state_with is None:
+                kernel_linear = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="linear_kernel")
+                kernel_act = tx.Activation(kernel_linear, self.activation)
+                self.kernel = tx.Compose([kernel_linear, kernel_act])
 
-            self.recurrent_kernel = tx.Linear(tx.TensorLayer(self.previous_output, self.n_units),
-                                              self.n_units,
-                                              bias=False, init=self.recurrent_init)
+                self.recurrent_kernel = tx.Linear(self.previous_state,
+                                                  self.n_units,
+                                                  bias=False,
+                                                  init=self.recurrent_init,
+                                                  name="recurrent_kernel")
+            else:
+                self.kernel = self.share_state_with.kernel.reuse_with(layer)
+                self.recurrent_kernel = self.share_state_with.recurrent_kernel.reuse_with(self.previous_state)
 
             return self.kernel.tensor + self.recurrent_kernel.tensor
+
+    def reuse_with(self, layer, state=None, name=None):
+        if state is None:
+            state = self.previous_state
+
+        if name is None:
+            name = self.name
+
+        return RNNCell(
+            layer=layer,
+            n_units=self.n_units,
+            previous_state=state,
+            activation=self.activation,
+            use_bias=self.use_bias,
+            share_state_with=self,
+            name=name
+        )
 
 
 """
@@ -54,19 +107,29 @@ lookup = tx.Lookup(in_layer, seq_size=seq_size,
 
 # reshape to [batch x seq_size x feature_shape[1]]
 # lookup_to_seq =
+# I was thinking that this reshape could be done automatically based on the input share of
+# the tensor fed to the RNN cell layer
 out = tx.WrapLayer(lookup, embed_dim, shape=[None, seq_size, embed_dim],
                    tf_fn=lambda tensor: tf.reshape(tensor, [-1, seq_size, embed_dim]))
 
 out = tx.WrapLayer(out, embed_dim, tf_fn=lambda tensor: tensor[0])
 # apply rnn cell to single input batch
 
-out_rnn = RNNCell(out, 4)
+with tf.name_scope("rnn"):
+    rnn1 = RNNCell(out, 4, name="rnn1")
+    rnn2 = rnn1.reuse_with(out, state=rnn1, name="rnn2")
+    rnn3 = rnn1.reuse_with(out, state=rnn2, name="rnn3")
 
 # setup optimizer
 optimizer = tx.AMSGrad(learning_rate=0.01)
 
-model = tx.Model(run_in_layers=in_layer, run_out_layers=out_rnn)
+model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2,rnn3])
 runner = tx.ModelRunner(model)
+
+runner.set_session(runtime_stats=True)
+runner.log_graph(logdir="/tmp")
+print("graph written")
+
 runner.init_vars()
 
 # need to fix the runner interface to allow for lists to be received
@@ -74,7 +137,10 @@ data = np.array([[0, 1], [1, 0]])
 targets = np.array([[2], [3]])
 
 result = runner.run(data)
-print(result)
+
+for i, r in enumerate(result):
+    print("rnn ", i)
+    print(r)
 
 # should be something like
 #
