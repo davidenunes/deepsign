@@ -4,8 +4,8 @@ from tensorx.layers import layer_scope, Layer
 import numpy as np
 
 
-class RNNCell(Layer):
-    """ Recurrent Cell
+class GRUCell(Layer):
+    """ Gated Recurrent Cell
     Corresponds to a single step on an unrolled RNN network
 
     Args:
@@ -18,6 +18,10 @@ class RNNCell(Layer):
             recurrent_init: initialisation function for the recurrent weights
             share_state_with: a ``Layer`` with the same number of units than this Cell
             name: name for the RNN cell
+
+            https://github.com/keras-team/keras/blob/master/keras/layers/recurrent.py#L1426
+            https://en.wikipedia.org/wiki/Gated_recurrent_unit
+            https://www.coursera.org/learn/nlp-sequence-models/lecture/agZiL/gated-recurrent-unit-gru
     """
 
     def __init__(self, layer, n_units,
@@ -56,22 +60,35 @@ class RNNCell(Layer):
                 self.previous_state = tx.TensorLayer(zero_state, self.n_units)
 
             if self.share_state_with is None:
-                kernel_linear = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="linear_kernel")
+                # determines the weight of the previous state
+                # we could add the bias at the end but this way we just define a single bias for the r unit
+                self.r_current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="r_current_w")
+                self.r_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                                               name="r_current_w")
+
+                self.u_current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="u_current_w")
+                self.u_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                                               name="u_current_w")
+
+                self.current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="current_w")
+                self.recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                                             name="recurrent_w")
+
+                # kernel_gate = tx.Activation()
+
                 kernel_act = tx.Activation(kernel_linear, self.activation)
                 self.kernel = tx.Compose([kernel_linear, kernel_act])
 
-                self.recurrent_kernel = tx.Linear(self.previous_state,
-                                                  self.n_units,
-                                                  bias=False,
-                                                  init=self.recurrent_init,
-                                                  name="recurrent_kernel")
+
             else:
                 self.kernel = self.share_state_with.kernel.reuse_with(layer)
                 self.recurrent_kernel = self.share_state_with.recurrent_kernel.reuse_with(self.previous_state)
 
-            # TODO this might be wrong, I might need to couple the activation: act(kernel + recurrent + bias)
-            # TODO it is wrong https://github.com/tensorflow/tensorflow/blob/r1.8/tensorflow/python/ops/rnn_cell_impl.py
-            # """Most basic RNN: output = new_state = act(W * input + U * state + B)."""
+            r_state = tx.Add([r_current_w, r_recurrent_w])
+            r_state = tx.Bias(r_state)
+            r_gate = tx.Activation(r_state, fn=tx.sigmoid, name="r_gate")
+
+            # """Gated recurrent unit (GRU) with nunits cells."""
             return self.kernel.tensor + self.recurrent_kernel.tensor
 
     def reuse_with(self, layer, state=None, name=None):
@@ -81,7 +98,7 @@ class RNNCell(Layer):
         if name is None:
             name = self.name
 
-        return RNNCell(
+        return GRUCell(
             layer=layer,
             n_units=self.n_units,
             previous_state=state,
@@ -126,7 +143,7 @@ with tf.name_scope("rnn"):
 # setup optimizer
 optimizer = tx.AMSGrad(learning_rate=0.01)
 
-model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2,rnn3])
+model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2, rnn3])
 runner = tx.ModelRunner(model)
 
 runner.set_session(runtime_stats=True)
