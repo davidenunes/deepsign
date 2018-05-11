@@ -206,7 +206,6 @@ def _compute_random_ri_sampled_logits(ri_tensors,
 
 def _compute_ri_sampled_logits(ri_tensors,
                                weights,
-                               biases,
                                labels,
                                inputs,
                                num_sampled,
@@ -224,7 +223,7 @@ def _compute_ri_sampled_logits(ri_tensors,
         weights = [weights]
 
     with ops.name_scope(name, "ri_sampled_logits",
-                        weights + [biases, inputs, labels]):
+                        weights + [inputs, labels]):
         if labels.dtype != dtypes.int64:
             labels = math_ops.cast(labels, dtypes.int64)
         labels_flat = array_ops.reshape(labels, [-1])
@@ -277,15 +276,7 @@ def _compute_ri_sampled_logits(ri_tensors,
         # Apply X*W', which yields [batch_size, num_sampled]
         sampled_logits = math_ops.matmul(inputs, sampled_w, transpose_b=True)
 
-        # Retrieve the true and sampled biases, compute the true logits, and
-        # add the biases to the true and sampled logits.
-        if biases is not None:
-            all_b = embedding_lookup(
-                biases, all_ids, partition_strategy=partition_strategy)
-        # true_b is a [batch_size * num_true] tensor
-        # sampled_b is a [num_sampled] float tensor
-        true_b = array_ops.slice(all_b, [0], array_ops.shape(labels_flat))
-        sampled_b = array_ops.slice(all_b, array_ops.shape(labels_flat), [-1])
+
 
         # inputs shape is [batch_size, dim]
         # true_w shape is [batch_size * num_true, dim]
@@ -300,9 +291,6 @@ def _compute_ri_sampled_logits(ri_tensors,
         dots_as_matrix = array_ops.reshape(row_wise_dots,
                                            array_ops.concat([[-1], dim], 0))
         true_logits = array_ops.reshape(_sum_rows(dots_as_matrix), [-1, num_true])
-        true_b = array_ops.reshape(true_b, [-1, num_true])
-        true_logits += true_b
-        sampled_logits += sampled_b
 
         if remove_accidental_hits:
             acc_hits = candidate_sampling_ops.compute_accidental_hits(
@@ -349,7 +337,6 @@ def _compute_ri_sampled_logits(ri_tensors,
 
 def ri_nce_loss(ri_tensors,
                 weights,
-                biases,
                 labels,
                 inputs,
                 num_sampled,
@@ -363,7 +350,6 @@ def ri_nce_loss(ri_tensors,
         logits, labels = _compute_ri_sampled_logits(
             ri_tensors=ri_tensors,
             weights=weights,
-            biases=biases,
             labels=labels,
             inputs=inputs,
             num_sampled=num_sampled,

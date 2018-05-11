@@ -63,7 +63,7 @@ class TestModels(unittest.TestCase):
                          k_dim=k,
                          ri_tensor=ri_tensor,
                          embed_dim=embed_dim,
-                         embed_share=False,
+                         embed_share=True,
                          h_dim=100,
                          use_dropout=True,
                          embed_dropout=True
@@ -76,8 +76,12 @@ class TestModels(unittest.TestCase):
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
 
-        for _ in tqdm(range(10)):
-            result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
+        data = np.array([[0, 2, 1]])
+        labels = np.array([[0]])
+
+        for _ in tqdm(range(1000)):
+            runner.train(data, labels)
+            print(runner.eval(data, labels))
             # result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
             # result = runner.run(np.array([[0, 2, 1]]))
 
@@ -101,7 +105,7 @@ class TestModels(unittest.TestCase):
                             h_dim=200,
                             use_dropout=True,
                             embed_dropout=True,
-                            n_samples=300
+                            n_samples=10
                             )
 
         runner = tx.ModelRunner(model)
@@ -112,11 +116,13 @@ class TestModels(unittest.TestCase):
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
 
-        for _ in tqdm(range(100)):
-            result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
-            #result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
+        data = np.array([[0, 2, 1]])
+        labels = np.array([[0]])
 
-        print(np.shape(result))
+        for _ in tqdm(range(10)):
+            runner.train(data, labels)
+            print(runner.eval(data, labels))
+
 
     def test_lbl_nrp(self):
         vocab_size = 10000

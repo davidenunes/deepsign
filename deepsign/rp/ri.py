@@ -97,13 +97,14 @@ class Generator:
     their positive and negative indexes.
     """
 
-    def __init__(self, dim, num_active, seed=None):
+    def __init__(self, dim, num_active, seed=None, symmetric=True):
         # system time is used if seed not supplied
         if seed:
             random.seed(seed)
 
         self.dim = dim
         self.num_active = int(num_active)
+        self.symmetric = symmetric
 
     def generate(self):
         # ensure that you can make other calls to random
@@ -111,9 +112,13 @@ class Generator:
 
         active_indexes = random.sample(range(self.dim), self.num_active)
 
-        num_positive = self.num_active // 2
-        positive = active_indexes[0:num_positive]
-        negative = active_indexes[num_positive:len(active_indexes)]
+        if self.symmetric:
+            num_positive = self.num_active // 2
+            positive = active_indexes[0:num_positive]
+            negative = active_indexes[num_positive:len(active_indexes)]
+        else:
+            positive = active_indexes
+            negative = []
 
         # ensure that you can make other calls to random
         # self.random_state = random.getstate()

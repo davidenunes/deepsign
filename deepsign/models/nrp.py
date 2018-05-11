@@ -372,8 +372,7 @@ class NNLMNRP_NCE(tx.Model):
                  l2_loss=False,
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 embed_share=False,
-                 logit_biases=False,
+                 embed_share=True,
                  ri_to_dense=False,
                  n_samples=100
                  ):
@@ -454,7 +453,7 @@ class NNLMNRP_NCE(tx.Model):
                                    n_units=vocab_size,
                                    shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=logit_biases)
+                                   bias=False)
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -482,11 +481,9 @@ class NNLMNRP_NCE(tx.Model):
             f_prediction = f_prediction.reuse_with(last_layer)
 
             logit_weights = all_embeddings.weights
-            logit_biases = run_logits.bias
 
             train_loss = ri_nce_loss(ri_tensors=ri_layer.tensor,
                                      weights=logit_weights,
-                                     biases=logit_biases,
                                      inputs=f_prediction.tensor,
                                      labels=loss_inputs.tensor,
                                      num_sampled=n_samples,
