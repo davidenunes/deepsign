@@ -4,12 +4,13 @@ import tensorflow as tf
 import tensorx as tx
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
-from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLMNRP_NCE, NNLM_NRP
+from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
 import deepsign.data.views as views
 import marisa_trie
+from deepsign.models.ri_nce import ri_nce_loss
 from tqdm import tqdm
 
 
@@ -61,6 +62,7 @@ class TestModels(unittest.TestCase):
         model = NNLM_NRP(ctx_size=3,
                          vocab_size=vocab_size,
                          k_dim=k,
+                         s_active=s,
                          ri_tensor=ri_tensor,
                          embed_dim=embed_dim,
                          embed_share=True,
@@ -96,19 +98,23 @@ class TestModels(unittest.TestCase):
         ri_tensor = to_sparse_tensor_value(ris, k)
         ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
-        model = NNLMNRP_NCE(ctx_size=3,
-                            vocab_size=vocab_size,
-                            k_dim=k,
-                            ri_tensor=ri_tensor,
-                            embed_dim=100,
-                            embed_share=False,
-                            h_dim=200,
-                            use_dropout=True,
-                            embed_dropout=True,
-                            n_samples=10
-                            )
+        model = NNLM_NRP(ctx_size=3,
+                         vocab_size=vocab_size,
+                         k_dim=k,
+                         s_active=s,
+                         ri_tensor=ri_tensor,
+                         embed_dim=128,
+                         embed_share=False,
+                         h_dim=128,
+                         use_dropout=True,
+                         embed_dropout=True,
+                         use_nce=True,
+                         nce_samples=10
+                         )
 
+        model.eval_tensors = model.train_loss_tensors
         runner = tx.ModelRunner(model)
+
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         options = None
         runner.set_session(runtime_stats=True)
@@ -122,7 +128,6 @@ class TestModels(unittest.TestCase):
         for _ in tqdm(range(10)):
             runner.train(data, labels)
             print(runner.eval(data, labels))
-
 
     def test_lbl_nrp(self):
         vocab_size = 10000
@@ -327,6 +332,49 @@ class TestModels(unittest.TestCase):
             # res = runner.session.run(model.lookup.tensor,{model.run_inputs.placeholder: ris})
             # print(res)
             # res = runner.run(ris)
+
+    def test_nce_ri(self):
+
+        vocab_size = 4000
+        k = 1000
+        s = 4
+
+        embed_dim = 100
+
+        generator = Generator(k, s)
+        ris = [generator.generate() for _ in range(vocab_size)]
+        ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s).to_sparse_tensor()
+
+        inputs = tx.Input(n_units=2, dtype=tf.int32)
+        labels = tx.Input(n_units=1, dtype=tf.int32)
+        lookup = tx.Lookup(inputs, seq_size=2, feature_shape=[k, embed_dim])
+        features = tx.Linear(lookup, n_units=embed_dim)
+
+        nce_bias = tf.Variable(tf.zeros([k]), name='nce_bias', trainable=False)
+        loss_base = tf.nn.nce_loss(lookup.weights, biases=nce_bias, labels=labels.tensor, inputs=features.tensor,
+                                   num_sampled=1, num_classes=k, num_true=1)
+        loss_base = tf.reduce_mean(loss_base)
+
+        loss = ri_nce_loss(ri_tensor, weights=lookup.weights, inputs=features.tensor, labels=labels.tensor,
+                           num_sampled=10,
+                           num_classes=4000, num_true=1)
+        loss = tf.reduce_mean(loss)
+
+        learning = tf.train.GradientDescentOptimizer(learning_rate=0.005) #momentum=0.8
+        learning = learning.minimize(loss)
+
+        tf.global_variables_initializer().run()
+
+        data = np.array([[1, 3], [2, 3]])
+        target = np.array([[0], [1]])
+        feed = {inputs.placeholder: data, labels.placeholder: target}
+
+        #print(loss_base.eval(feed))
+        print(loss.eval(feed))
+
+        for _ in range(5000):
+            learning.run(feed)
+            print(loss.eval(feed))
 
 
 if __name__ == '__main__':

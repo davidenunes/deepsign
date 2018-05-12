@@ -190,6 +190,7 @@ elif args.f_init == "uniform":
 model = NNLM_NRP(ctx_size=args.ngram_size - 1,
                  vocab_size=len(vocab),
                  k_dim=args.k_dim,
+                 s_active=args.s_active,
                  ri_tensor=ri_tensor,
                  embed_dim=args.embed_dim,
                  embed_init=embed_init,

@@ -74,9 +74,9 @@ def sample_ri(k, s, n, true_ri):
 
     sampled_ids, true_expected, sampled_expected = tx.sample_with_expected(k, s, true_ri_indices, num_true=s,
                                                                            batch_size=n, unique=True)
-
     sampled_ri_indices = tx.column_indices_to_matrix_indices(sampled_ids, dtype=dtypes.int64)
-    ri_values = array_ops.tile([1., -1.], [n])
+
+    ri_values = array_ops.tile([1., -1.], [n * (s // 2)])
 
     sp = sparse_tensor.SparseTensor(sampled_ri_indices, ri_values, [n, k])
     sp = sparse_ops.sparse_reorder(sp)
@@ -140,13 +140,6 @@ def _compute_random_ri_sampled_logits(ri_tensors,
         if labels.dtype != dtypes.int64:
             labels = math_ops.cast(labels, dtypes.int64)
         labels_flat = array_ops.reshape(labels, [-1])
-
-        # sampled_ris = generate_ri(k_dim, s_active, num_sampled)
-
-        # true_ris = tx.gather_sparse(ri_tensors, labels_flat)
-        # another way is to sample from ri_tensor
-        # sampled_ris = generate_ri(k, s, num_sampled)
-        # all_ris = sparse_ops.sparse_concat(0, [true_ris, sampled_ris])
 
         true_ris = tx.gather_sparse(sp_tensor=ri_tensors, ids=labels_flat)
         sampled_ris, expected_true_ris, expected_sampled_ris = sample_ri(k_dim, s_active, num_sampled, true_ris)
@@ -273,10 +266,9 @@ def _compute_ri_sampled_logits(ri_tensors,
             all_w, array_ops.stack([array_ops.shape(labels_flat)[0], 0]), [-1, -1])
         # inputs has shape [batch_size, dim]
         # sampled_w has shape [num_sampled, dim]
-        # Apply X*W', which yields [batch_size, num_sampled]
+        # Apply X*W', which yields [batch_size, num_sampled]inputs
+        # for energy based models the inputs are the predicted feature vectors
         sampled_logits = math_ops.matmul(inputs, sampled_w, transpose_b=True)
-
-
 
         # inputs shape is [batch_size, dim]
         # true_w shape is [batch_size * num_true, dim]
@@ -360,12 +352,13 @@ def ri_nce_loss(ri_tensors,
             remove_accidental_hits=remove_accidental_hits,
             partition_strategy=partition_strategy,
             name=name)
-        sampled_losses = sigmoid_cross_entropy_with_logits(
-            labels=labels, logits=logits, name="sampled_losses")
+        sampled_losses = sigmoid_cross_entropy_with_logits(labels=labels, logits=logits, name="sampled_losses")
         # sampled_losses is batch_size x {true_loss, sampled_losses...}
         # We sum out true and sampled losses.
 
         return _sum_rows(sampled_losses)
+        # return sampled_losses
+        #return math_ops.reduce_sum(sampled_losses, axis=-1)
 
 
 def random_ri_nce_loss(ri_tensors,
@@ -388,12 +381,11 @@ def random_ri_nce_loss(ri_tensors,
             labels=labels,
             inputs=inputs,
             num_sampled=num_sampled,
-            num_classes=num_classes,
             num_true=num_true,
             subtract_log_q=True,
             partition_strategy=partition_strategy,
             name=name)
-        sampled_losses = sigmoid_cross_entropy_with_logits(
+        sampled_losses = tx.binary_cross_entropy(
             labels=labels, logits=logits, name="sampled_losses")
         # sampled_losses is batch_size x {true_loss, sampled_losses...}
         # We sum out true and sampled losses.
