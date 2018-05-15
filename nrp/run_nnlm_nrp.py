@@ -50,12 +50,12 @@ param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 5000)
-param("s_active", int, 8)
+param("k_dim", int, 1000)
+param("s_active", int, 1)
 
-param("ri_all_positive", str2bool, False)
+param("ri_all_positive", str2bool, True)
 
-param("embed_dim", int, 128)
+param("embed_dim", int, 64)
 
 param("embed_init", str, "normal", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
@@ -66,7 +66,7 @@ param("logit_init_val", float, 0.01)
 param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
-param("h_dim", int, 256)
+param("h_dim", int, 128)
 param("h_act", str, "tanh", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
@@ -147,12 +147,13 @@ vocab = marisa_trie.Trie(corpus["vocabulary"])
 
 print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
-ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
+all_positive = args.ri_all_positive
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active,symmetric=not all_positive)
 
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim, all_positive=args.ri_all_positive)
+ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
 # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
 
 print("done")

@@ -356,9 +356,11 @@ def ri_nce_loss(ri_tensors,
         # sampled_losses is batch_size x {true_loss, sampled_losses...}
         # We sum out true and sampled losses.
 
+        # TODO I was getting NAN VALUES HERE, reducing the lr solved it but I must investigate the cause, sigmoid
+        # cross entropy returns NaNs
         return _sum_rows(sampled_losses)
         # return sampled_losses
-        #return math_ops.reduce_sum(sampled_losses, axis=-1)
+        #return math_ops.reduce_sum(sampled_losses, ax is=-1)
 
 
 def random_ri_nce_loss(ri_tensors,
