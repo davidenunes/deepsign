@@ -26,6 +26,10 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+def str2int(v):
+    return int(float(v))
+
+
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
@@ -45,13 +49,14 @@ default_out_dir = os.getcwd()
 
 # experiment ID
 param("id", int, 0)
+param("run", str2int, 1)
 param("corpus", str, default_corpus)
 param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 1000)
-param("s_active", int, 1)
+param("k_dim", str2int, 1000)
+param("s_active", str2int, 1)
 
 param("ri_all_positive", str2bool, True)
 
@@ -132,7 +137,7 @@ if args.save_model:
     model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
 
 # start perplexity file
-ppl_header = ["id", "epoch", "step", "lr", "dataset", "perplexity"]
+ppl_header = ["id", "run", "epoch", "step", "lr", "dataset", "perplexity"]
 ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.id))
 
 ppl_file = open(ppl_fname, "w")
@@ -148,7 +153,7 @@ vocab = marisa_trie.Trie(corpus["vocabulary"])
 print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
 all_positive = args.ri_all_positive
-ri_generator = Generator(dim=args.k_dim, num_active=args.s_active,symmetric=not all_positive)
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
 
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
@@ -306,7 +311,8 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
     val_data = corpus["validation"]
     ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                 display_progress)
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
+    res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+               "dataset": "validation",
                "perplexity": ppl_validation}
     ppl_writer.writerow(res_row)
 
@@ -314,7 +320,8 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
     test_data = corpus["test"]
     ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+    res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+               "dataset": "test",
                "perplexity": ppl_test}
     ppl_writer.writerow(res_row)
 
