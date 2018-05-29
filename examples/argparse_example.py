@@ -18,7 +18,6 @@ def str2int(v):
     return int(float(v))
 
 
-
 parser = argparse.ArgumentParser(description="LBL base experiment")
 
 
@@ -32,11 +31,9 @@ def param(name, argtype, default, valid=None):
 
 parser = argparse.ArgumentParser(description="testing argparse")
 
-param("run",str2int,1)
+param("run", str2int, 1)
 
-args = parser.parse_args(["-run","2.3"])
-
-
+args = parser.parse_args(["-run", "2.3"])
 arg_dict = vars(args)
 
 print(arg_dict)

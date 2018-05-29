@@ -46,7 +46,7 @@ param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("embed_dim", int, 64)
+param("embed_dim", int, 128)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
@@ -56,11 +56,11 @@ param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
 param("num_h", int, 1)
-param("h_dim", int, 128)
+param("h_dim", int, 256)
 param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 10)
-param("batch_size", int, 256)
+param("batch_size", int, 128)
 param("shuffle", str2bool, True)
 param("shuffle_buffer_size", int, 128 * 10000)
 
@@ -70,7 +70,7 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.25)
+param("lr", float, 0.5)
 param("lr_decay", str2bool, True)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
@@ -96,7 +96,7 @@ param("clip_value", float, 1.0)
 
 param("dropout", str2bool, True)
 param("embed_dropout", str2bool, True)
-param("keep_prob", float, 0.95)
+param("keep_prob", float, 0.75)
 param("eval_test", str2bool, True)
 
 param("l2_loss", str2bool, False)

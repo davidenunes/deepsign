@@ -49,6 +49,7 @@ default_out_dir = os.getcwd()
 
 # experiment ID
 param("id", int, 0)
+param("gpu", int, 3)
 param("run", str2int, 1)
 param("corpus", str, default_corpus)
 param("ngram_size", int, 5)
@@ -60,7 +61,7 @@ param("s_active", str2int, 1)
 
 param("ri_all_positive", str2bool, True)
 
-param("embed_dim", int, 64)
+param("embed_dim", int, 128)
 
 param("embed_init", str, "normal", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
@@ -71,7 +72,7 @@ param("logit_init_val", float, 0.01)
 param("embed_share", str2bool, True)
 
 param("num_h", int, 1)
-param("h_dim", int, 128)
+param("h_dim", int, 256)
 param("h_act", str, "tanh", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
@@ -118,7 +119,7 @@ args = parser.parse_args()
 # ======================================================================================
 # Load Params, Prepare results files
 # ======================================================================================
-
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 print(args.corpus)
 
 # Experiment parameter summary
@@ -216,6 +217,10 @@ if args.f_init == "normal":
 elif args.f_init == "uniform":
     f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
+#sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+#                                        log_device_placement=True))
+#with tf.device('/gpu:{}'.format(args.gpu)):
+
 model = NNLM_NRP(ctx_size=args.ngram_size - 1,
                  vocab_size=len(vocab),
                  k_dim=args.k_dim,
@@ -237,6 +242,14 @@ model = NNLM_NRP(ctx_size=args.ngram_size - 1,
                  f_init=f_init)
 
 model_runner = tx.ModelRunner(model)
+
+#sess = tf.Session(config=tf.ConfigProto(
+#      allow_soft_placement=True, log_device_placement=True))
+#model_runner.set_session(sess)
+
+# sess = tf.Session(config=tf.ConfigProto(
+#    allow_soft_placement=True, log_device_placement=True))
+# model_runner.set_session(sess)
 
 # we use an InputParam because we might want to change it during training
 lr_param = tx.InputParam(init_value=args.lr)
@@ -277,6 +290,7 @@ else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
 
+#assert(model_runner.session == sess)
 # ======================================================================================
 # EVALUATION
 # ======================================================================================
