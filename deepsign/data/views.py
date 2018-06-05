@@ -3,6 +3,10 @@ import itertools
 from collections import deque
 
 
+def repeat_it(iterable, n):
+    return itertools.chain.from_iterable(itertools.repeat(x, n) for x in iterable)
+
+
 def _pairwise(iterable):
     """
     Example:

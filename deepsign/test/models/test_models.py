@@ -12,11 +12,15 @@ import deepsign.data.views as views
 import marisa_trie
 from deepsign.models.ri_nce import ri_nce_loss
 from tqdm import tqdm
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class TestModels(unittest.TestCase):
     def setUp(self):
         self.ss = tf.InteractiveSession()
+        self.logdir = os.path.join(os.getenv("HOME"), "tmp")
 
     def tearDown(self):
         self.ss.close()
@@ -39,7 +43,7 @@ class TestModels(unittest.TestCase):
 
         options = None
         runner.set_session(runtime_stats=True)
-        runner.set_logdir("/tmp/")
+        runner.set_logdir(self.logdir)
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
 
@@ -49,9 +53,9 @@ class TestModels(unittest.TestCase):
 
     def test_nnlm_nrp(self):
         vocab_size = 10000
-        embed_dim = 100
-        k = 4000
-        s = 10
+        embed_dim = 128
+        k = 5000
+        s = 8
 
         generator = Generator(k, s)
         ris = [generator.generate() for _ in range(vocab_size)]
@@ -71,19 +75,19 @@ class TestModels(unittest.TestCase):
                          embed_dropout=True
                          )
         runner = tx.ModelRunner(model)
-        # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        options = None
-        runner.set_session(runtime_stats=True)
-        runner.set_logdir("/tmp/")
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = None
+        runner.set_session(runtime_stats=True, run_options=options)
+        runner.set_logdir(self.logdir)
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
 
         data = np.array([[0, 2, 1]])
         labels = np.array([[0]])
 
-        for _ in tqdm(range(1000)):
+        for _ in tqdm(range(10)):
             runner.train(data, labels)
-            print(runner.eval(data, labels))
+            # print(runner.eval(data, labels))
             # result = runner.eval(np.array([[0, 2, 1]]), np.array([[0]]))
             # result = runner.run(np.array([[0, 2, 1]]))
 
@@ -360,7 +364,7 @@ class TestModels(unittest.TestCase):
                            num_classes=4000, num_true=1)
         loss = tf.reduce_mean(loss)
 
-        learning = tf.train.GradientDescentOptimizer(learning_rate=0.005) #momentum=0.8
+        learning = tf.train.GradientDescentOptimizer(learning_rate=0.005)  # momentum=0.8
         learning = learning.minimize(loss)
 
         tf.global_variables_initializer().run()
@@ -369,7 +373,7 @@ class TestModels(unittest.TestCase):
         target = np.array([[0], [1]])
         feed = {inputs.placeholder: data, labels.placeholder: target}
 
-        #print(loss_base.eval(feed))
+        # print(loss_base.eval(feed))
         print(loss.eval(feed))
 
         for _ in range(5000):

@@ -7,29 +7,28 @@ import h5py
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
-
+import traceback
 import tensorx as tx
-
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
-from exp.args import defargs
-
-from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.models.lbl import LBL
+from exp.args import ParamDict
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 defaults = {
     'id': (int, 0),
     'run': (int, 1),
+    'run_id': (int, 0),  # run id
     'corpus': (str, default_corpus),
     'ngram_size': (int, 5),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
     # RP default params
-    'k_dim': (int, 1000),
-    's_active': (int, 1),
+    'k_dim': (int, 5000),
+    's_active': (int, 8),
     'ri_all_positive': (bool, True),
     # network architecture
     'embed_dim': (int, 128),
@@ -38,9 +37,20 @@ defaults = {
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
-    'num_h': (int, 1),
     'h_dim': (int, 256),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
+
+    # lbl parameters
+    'use_gate': (bool, True),
+    'use_hidden': (bool, True),
+    'embed_share': (bool, True),
+
+    'x_to_f_init': (str, "uniform", ["normal", "uniform"]),
+    'x_to_f_init_val': (float, 0.01),
+    'h_to_f_init': (str, "uniform", ["normal", "uniform"]),
+    'h_to_f_init_val': (float, 0.01),
+
+    # training
     'epochs': (int, 2),
     'batch_size': (int, 128),
     'shuffle': (bool, True),
@@ -74,24 +84,24 @@ defaults = {
     'keep_prob': (float, 0.95),
 
     'l2_loss': (bool, False),
-    'l2_loss_coef': (float, 1e-5)
+    'l2_loss_coef': (float, 1e-5),
 }
-args = defargs(defaults)
+arg_dict = ParamDict(defaults)
 
 
 def run(**kwargs):
-    args.from_dict(kwargs)
+    arg_dict.from_dict(kwargs)
+    args = arg_dict.to_namespace()
 
     # ======================================================================================
     # Load Params, Prepare results files
     # ======================================================================================
     # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    print(args.corpus)
+    # print(args.corpus)
 
     # Experiment parameter summary
-    res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.id))
+    res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.run_id))
     with open(res_param_filename, "w") as param_file:
-        arg_dict = vars(args)
         writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
         writer.writeheader()
         writer.writerow(arg_dict)
@@ -99,38 +109,23 @@ def run(**kwargs):
 
     # make dir for model checkpoints
     if args.save_model:
-        model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.id))
+        model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.run_id))
         os.makedirs(model_ckpt_dir, exist_ok=True)
-        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
+        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.run_id))
 
     # start perplexity file
     ppl_header = ["id", "run", "epoch", "step", "lr", "dataset", "perplexity"]
-    ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.id))
+    ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.run_id))
 
     ppl_file = open(ppl_fname, "w")
     ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
     ppl_writer.writeheader()
 
     # ======================================================================================
-    # CORPUS, Vocab and RIs
+    # Load Corpus & Vocab
     # ======================================================================================
     corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
     vocab = marisa_trie.Trie(corpus["vocabulary"])
-
-    print("generating random indexes")
-    # generates k-dimensional random indexes with s_active units
-    all_positive = args.ri_all_positive
-    ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
-
-    # pre-gen indices for vocab
-    # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
-    ris = [ri_generator.generate() for i in range(len(vocab))]
-    ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
-    # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
-
-    print("done")
-
-    # ======================================================================================
 
     def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         def chunk_fn(x):
@@ -176,44 +171,37 @@ def run(**kwargs):
         logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                        maxval=args.logit_init_val)
 
-    if args.f_init == "normal":
-        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-    elif args.f_init == "uniform":
-        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+    if args.h_to_f_init == "normal":
+        h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
+    elif args.h_to_f_init == "uniform":
+        h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
 
-    # sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
-    #                                        log_device_placement=True))
-    # with tf.device('/gpu:{}'.format(args.gpu)):
+    if args.x_to_f_init == "normal":
+        x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
+    elif args.h_to_f_init == "uniform":
+        x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
 
-    model = NNLM_NRP(ctx_size=args.ngram_size - 1,
-                     vocab_size=len(vocab),
-                     k_dim=args.k_dim,
-                     s_active=args.s_active,
-                     ri_tensor=ri_tensor,
-                     embed_dim=args.embed_dim,
-                     embed_init=embed_init,
-                     embed_share=args.embed_share,
-                     logit_init=logit_init,
-                     h_dim=args.h_dim,
-                     num_h=args.num_h,
-                     h_activation=h_act,
-                     h_init=h_init,
-                     use_dropout=args.dropout,
-                     keep_prob=args.keep_prob,
-                     embed_dropout=args.embed_dropout,
-                     l2_loss=args.l2_loss,
-                     l2_loss_coef=args.l2_loss_coef,
-                     f_init=f_init)
+    model = LBL(ctx_size=args.ngram_size - 1,
+                vocab_size=len(vocab),
+                embed_dim=args.embed_dim,
+                embed_init=embed_init,
+                x_to_f_init=x_to_f_init,
+                logit_init=logit_init,
+                embed_share=args.embed_share,
+                use_gate=args.use_gate,
+                use_hidden=args.use_hidden,
+                h_dim=args.h_dim,
+                h_activation=h_act,
+                h_init=h_init,
+                h_to_f_init=h_to_f_init,
+                use_dropout=args.dropout,
+                embed_dropout=args.embed_dropout,
+                keep_prob=args.keep_prob,
+                l2_loss=args.l2_loss,
+                l2_loss_coef=args.l2_loss_coef,
+                use_nce=False)
 
     model_runner = tx.ModelRunner(model)
-
-    # sess = tf.Session(config=tf.ConfigProto(
-    #      allow_soft_placement=True, log_device_placement=True))
-    # model_runner.set_session(sess)
-
-    # sess = tf.Session(config=tf.ConfigProto(
-    #    allow_soft_placement=True, log_device_placement=True))
-    # model_runner.set_session(sess)
 
     # we use an InputParam because we might want to change it during training
     lr_param = tx.InputParam(init_value=args.lr)
@@ -250,7 +238,6 @@ def run(**kwargs):
     else:
         model_runner.config_optimizer(optimizer, params=lr_param)
 
-    # assert(model_runner.session == sess)
     # ======================================================================================
     # EVALUATION
     # ======================================================================================
@@ -283,8 +270,7 @@ def run(**kwargs):
         val_data = corpus["validation"]
         ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                     display_progress)
-        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
-                   "dataset": "validation",
+        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
                    "perplexity": ppl_validation}
         ppl_writer.writerow(res_row)
 
@@ -293,8 +279,7 @@ def run(**kwargs):
         ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
                               display_progress)
 
-        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
-                   "dataset": "test",
+        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
                    "perplexity": ppl_test}
         ppl_writer.writerow(res_row)
 
@@ -378,14 +363,14 @@ def run(**kwargs):
 
         model_runner.close_session()
         progress.close()
-
     except Exception as e:
+        traceback.print_exc()
         os.remove(ppl_file.name)
         os.remove(param_file.name)
-
         raise e
 
 
 if __name__ == "__main__":
+    # test with single gpu
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     run()

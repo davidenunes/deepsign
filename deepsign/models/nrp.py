@@ -284,8 +284,8 @@ class NNLM_NRP(tx.Model):
             shared_weights = feature_lookup.weights if embed_share else None
             logit_init = logit_init if not embed_share else None
 
-            ri_layer_dense = tx.ToDense(ri_layer)
-            all_embeddings = tx.Linear(ri_layer_dense, embed_dim, logit_init, shared_weights, name="all_features",
+            #ri_dense = tx.ToDense(ri_layer)
+            all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features",
                                        bias=False)
 
             # dot product of f_predicted . all_embeddings with bias for each target word
