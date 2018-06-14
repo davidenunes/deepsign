@@ -7,11 +7,14 @@ import h5py
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
-import traceback
+
 import tensorx as tx
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.lbl import LBL
+from deepsign.models.nrp import LBL_NRP
+from deepsign.rp.ri import Generator
+from deepsign.rp.tf_utils import to_sparse_tensor_value
 from exp.args import ParamDict
+import traceback
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
@@ -26,6 +29,10 @@ defaults = {
     'ngram_size': (int, 5),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
+    # RP default params
+    'k_dim': (int, 5000),
+    's_active': (int, 8),
+    'ri_all_positive': (bool, False),
     # network architecture
     'embed_dim': (int, 128),
     'embed_init': (str, 'normal', ["normal", "uniform"]),
@@ -89,12 +96,6 @@ def run(**kwargs):
     arg_dict.from_dict(kwargs)
     args = arg_dict.to_namespace()
 
-    # ======================================================================================
-    # Load Params, Prepare results files
-    # ======================================================================================
-    # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
-    # print(args.corpus)
-
     # Experiment parameter summary
     res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.run_id))
     with open(res_param_filename, "w") as param_file:
@@ -118,10 +119,22 @@ def run(**kwargs):
     ppl_writer.writeheader()
 
     # ======================================================================================
-    # Load Corpus & Vocab
+    # CORPUS, Vocab and RIs
     # ======================================================================================
     corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
     vocab = marisa_trie.Trie(corpus["vocabulary"])
+
+    # generates k-dimensional random indexes with s_active units
+    all_positive = args.ri_all_positive
+    ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
+
+    # pre-gen indices for vocab
+    # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+    ris = [ri_generator.generate() for i in range(len(vocab))]
+    ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+    # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+    # ======================================================================================
 
     def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         def chunk_fn(x):
@@ -177,25 +190,27 @@ def run(**kwargs):
     elif args.h_to_f_init == "uniform":
         x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
 
-    model = LBL(ctx_size=args.ngram_size - 1,
-                vocab_size=len(vocab),
-                embed_dim=args.embed_dim,
-                embed_init=embed_init,
-                x_to_f_init=x_to_f_init,
-                logit_init=logit_init,
-                embed_share=args.embed_share,
-                use_gate=args.use_gate,
-                use_hidden=args.use_hidden,
-                h_dim=args.h_dim,
-                h_activation=h_act,
-                h_init=h_init,
-                h_to_f_init=h_to_f_init,
-                use_dropout=args.dropout,
-                embed_dropout=args.embed_dropout,
-                keep_prob=args.keep_prob,
-                l2_loss=args.l2_loss,
-                l2_loss_coef=args.l2_loss_coef,
-                use_nce=False)
+    model = LBL_NRP(ctx_size=args.ngram_size - 1,
+                    vocab_size=len(vocab),
+                    k_dim=args.k_dim,
+                    ri_tensor=ri_tensor,
+                    embed_dim=args.embed_dim,
+                    embed_init=embed_init,
+                    x_to_f_init=x_to_f_init,
+                    logit_init=logit_init,
+                    embed_share=args.embed_share,
+                    use_gate=args.use_gate,
+                    use_hidden=args.use_hidden,
+                    h_dim=args.h_dim,
+                    h_activation=h_act,
+                    h_init=h_init,
+                    h_to_f_init=h_to_f_init,
+                    use_dropout=args.dropout,
+                    embed_dropout=args.embed_dropout,
+                    keep_prob=args.keep_prob,
+                    l2_loss=args.l2_loss,
+                    l2_loss_coef=args.l2_loss_coef
+                    )
 
     model_runner = tx.ModelRunner(model)
 
@@ -266,7 +281,8 @@ def run(**kwargs):
         val_data = corpus["validation"]
         ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                     display_progress)
-        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
+        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                   "dataset": "validation",
                    "perplexity": ppl_validation}
         ppl_writer.writerow(res_row)
 
@@ -275,7 +291,8 @@ def run(**kwargs):
         ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
                               display_progress)
 
-        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                   "dataset": "test",
                    "perplexity": ppl_test}
         ppl_writer.writerow(res_row)
 
@@ -287,7 +304,6 @@ def run(**kwargs):
     # ======================================================================================
     # TRAINING LOOP
     # ======================================================================================
-    print("starting TF")
 
     # preparing evaluation steps
     # I use ceil because I make sure we have padded batches at the end
@@ -359,6 +375,7 @@ def run(**kwargs):
 
         model_runner.close_session()
         progress.close()
+        tf.reset_default_graph()
     except Exception as e:
         traceback.print_exc()
         os.remove(ppl_file.name)

@@ -8,10 +8,15 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 import traceback
+
 import tensorx as tx
+
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
-from deepsign.models.lbl import LBL
+from deepsign.models.nrp import NNLM_NRP_RNN, RandomIndexTensor
 from exp.args import ParamDict
+
+from deepsign.rp.ri import Generator
+from deepsign.rp.tf_utils import to_sparse_tensor_value
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
@@ -26,6 +31,10 @@ defaults = {
     'ngram_size': (int, 5),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
+    # RP default params
+    'k_dim': (int, 5000),
+    's_active': (int, 4),
+    'ri_all_positive': (bool, True),
     # network architecture
     'embed_dim': (int, 128),
     'embed_init': (str, 'normal', ["normal", "uniform"]),
@@ -33,22 +42,11 @@ defaults = {
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
-    'h_dim': (int, 256),
+    'num_h': (int, 1),
+    'h_dim': (int, 128),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-
-    # lbl parameters
-    'use_gate': (bool, True),
-    'use_hidden': (bool, True),
-    'embed_share': (bool, True),
-
-    'x_to_f_init': (str, "uniform", ["normal", "uniform"]),
-    'x_to_f_init_val': (float, 0.01),
-    'h_to_f_init': (str, "uniform", ["normal", "uniform"]),
-    'h_to_f_init_val': (float, 0.01),
-
-    # training
-    'epochs': (int, 2),
-    'batch_size': (int, 128),
+    'epochs': (int, 20),
+    'batch_size': (int, 512),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
     'optimizer': (str, 'sgd', ['sgd', 'adam', 'ams']),
@@ -72,12 +70,12 @@ defaults = {
     # regularisation
     'clip_grads': (bool, True),
     # if true clips by local norm, else clip by norm of all gradients
-    'clip_local': (bool, True),
+    'clip_local': (bool, False),
     'clip_value': (float, 1.0),
 
     'dropout': (bool, True),
-    'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.95),
+    'embed_dropout': (bool, False),
+    'keep_prob': (float, 0.6),
 
     'l2_loss': (bool, False),
     'l2_loss_coef': (float, 1e-5),
@@ -118,10 +116,23 @@ def run(**kwargs):
     ppl_writer.writeheader()
 
     # ======================================================================================
-    # Load Corpus & Vocab
+    # CORPUS, Vocab and RIs
     # ======================================================================================
     corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
     vocab = marisa_trie.Trie(corpus["vocabulary"])
+
+    # generates k-dimensional random indexes with s_active units
+    all_positive = args.ri_all_positive
+    ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
+
+    # pre-gen indices for vocab
+    # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+    ris = [ri_generator.generate() for i in range(len(vocab))]
+    ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+
+    # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+
+    # ======================================================================================
 
     def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         def chunk_fn(x):
@@ -167,37 +178,42 @@ def run(**kwargs):
         logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                        maxval=args.logit_init_val)
 
-    if args.h_to_f_init == "normal":
-        h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
-    elif args.h_to_f_init == "uniform":
-        h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
+    if args.f_init == "normal":
+        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+    elif args.f_init == "uniform":
+        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-    if args.x_to_f_init == "normal":
-        x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
-    elif args.h_to_f_init == "uniform":
-        x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+    # sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+    #                                        log_device_placement=True))
+    # with tf.device('/gpu:{}'.format(args.gpu)):
 
-    model = LBL(ctx_size=args.ngram_size - 1,
-                vocab_size=len(vocab),
-                embed_dim=args.embed_dim,
-                embed_init=embed_init,
-                x_to_f_init=x_to_f_init,
-                logit_init=logit_init,
-                embed_share=args.embed_share,
-                use_gate=args.use_gate,
-                use_hidden=args.use_hidden,
-                h_dim=args.h_dim,
-                h_activation=h_act,
-                h_init=h_init,
-                h_to_f_init=h_to_f_init,
-                use_dropout=args.dropout,
-                embed_dropout=args.embed_dropout,
-                keep_prob=args.keep_prob,
-                l2_loss=args.l2_loss,
-                l2_loss_coef=args.l2_loss_coef,
-                use_nce=False)
+    model = NNLM_NRP_RNN(ctx_size=args.ngram_size - 1,
+                         vocab_size=len(vocab),
+                         k_dim=args.k_dim,
+                         s_active=args.s_active,
+                         ri_tensor=ri_tensor,
+                         embed_dim=args.embed_dim,
+                         embed_init=embed_init,
+                         embed_share=args.embed_share,
+                         logit_init=logit_init,
+                         h_dim=args.h_dim,
+                         num_h=args.num_h,
+                         use_dropout=args.dropout,
+                         keep_prob=args.keep_prob,
+                         embed_dropout=args.embed_dropout,
+                         l2_loss=args.l2_loss,
+                         l2_loss_coef=args.l2_loss_coef,
+                         f_init=f_init)
 
     model_runner = tx.ModelRunner(model)
+
+    # sess = tf.Session(config=tf.ConfigProto(
+    #      allow_soft_placement=True, log_device_placement=True))
+    # model_runner.set_session(sess)
+
+    # sess = tf.Session(config=tf.ConfigProto(
+    #    allow_soft_placement=True, log_device_placement=True))
+    # model_runner.set_session(sess)
 
     # we use an InputParam because we might want to change it during training
     lr_param = tx.InputParam(init_value=args.lr)
@@ -234,6 +250,7 @@ def run(**kwargs):
     else:
         model_runner.config_optimizer(optimizer, params=lr_param)
 
+    # assert(model_runner.session == sess)
     # ======================================================================================
     # EVALUATION
     # ======================================================================================
@@ -266,7 +283,8 @@ def run(**kwargs):
         val_data = corpus["validation"]
         ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                     display_progress)
-        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
+        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                   "dataset": "validation",
                    "perplexity": ppl_validation}
         ppl_writer.writerow(res_row)
 
@@ -275,7 +293,8 @@ def run(**kwargs):
         ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
                               display_progress)
 
-        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                   "dataset": "test",
                    "perplexity": ppl_test}
         ppl_writer.writerow(res_row)
 
@@ -287,8 +306,6 @@ def run(**kwargs):
     # ======================================================================================
     # TRAINING LOOP
     # ======================================================================================
-    print("starting TF")
-
     # preparing evaluation steps
     # I use ceil because I make sure we have padded batches at the end
 
@@ -297,7 +314,9 @@ def run(**kwargs):
     current_epoch = 0
     patience = 0
 
-    sess = tf.Session()
+    cfg = tf.ConfigProto()
+    cfg.gpu_options.allow_growth = True
+    sess = tf.Session(config=cfg)
     model_runner.set_session(sess)
     model_runner.init_vars()
 
@@ -359,6 +378,8 @@ def run(**kwargs):
 
         model_runner.close_session()
         progress.close()
+        tf.reset_default_graph()
+
     except Exception as e:
         traceback.print_exc()
         os.remove(ppl_file.name)

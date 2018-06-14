@@ -2,7 +2,9 @@ import tensorflow as tf
 import tensorx as tx
 from tensorx.layers import layer_scope, Layer
 import numpy as np
+import os
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 class RNNCell(Layer):
     """ Recurrent Cell
@@ -96,7 +98,7 @@ class RNNCell(Layer):
 Test staged implementation
 """
 n_hidden = 20
-embed_dim = 10
+embed_dim = 3
 seq_size = 2
 vocab_size = 10000
 feature_shape = [vocab_size, embed_dim]
@@ -104,29 +106,23 @@ feature_shape = [vocab_size, embed_dim]
 loss_inputs = tx.Input(1, dtype=tf.int32)
 in_layer = tx.Input(seq_size, dtype=tf.int32)
 
-lookup = tx.Lookup(in_layer, seq_size=seq_size,
-                   feature_shape=feature_shape)
-# [batch x seq_size * feature_shape[1]]
+lookup = tx.Lookup(in_layer,
+                   seq_size=seq_size,
+                   feature_shape=feature_shape,
+                   as_sequence=True)
 
-# reshape to [batch x seq_size x feature_shape[1]]
-# lookup_to_seq =
-# I was thinking that this reshape could be done automatically based on the input share of
-# the tensor fed to the RNN cell layer
-out = tx.WrapLayer(lookup, embed_dim, shape=[None, seq_size, embed_dim],
-                   tf_fn=lambda tensor: tf.reshape(tensor, [-1, seq_size, embed_dim]))
+lookup_flat = lookup.reuse_with(in_layer,as_sequence=False)
 
-out = tx.WrapLayer(out, embed_dim, tf_fn=lambda tensor: tensor[0])
-# apply rnn cell to single input batch
 
 with tf.name_scope("rnn"):
-    rnn1 = RNNCell(out, 4, name="rnn1")
-    rnn2 = rnn1.reuse_with(out, state=rnn1, name="rnn2")
-    rnn3 = rnn1.reuse_with(out, state=rnn2, name="rnn3")
+    rnn1 = RNNCell(lookup[0], 4, name="rnn1")
+    rnn2 = rnn1.reuse_with(lookup[1], state=rnn1, name="rnn2")
+
 
 # setup optimizer
 optimizer = tx.AMSGrad(learning_rate=0.01)
 
-model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2,rnn3])
+model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2])
 runner = tx.ModelRunner(model)
 
 runner.set_session(runtime_stats=True)
@@ -136,8 +132,14 @@ print("graph written")
 runner.init_vars()
 
 # need to fix the runner interface to allow for lists to be received
-data = np.array([[0, 1], [1, 0]])
+data = np.array([[1, 3], [1, 0]])
 targets = np.array([[2], [3]])
+
+flat_lookup = runner.session.run(lookup_flat.tensor, feed_dict={in_layer.placeholder: data})
+seq_lookup = runner.session.run(lookup.tensor, feed_dict={in_layer.placeholder: data})
+print("flat \n", flat_lookup)
+print("seq \n", seq_lookup)
+
 
 result = runner.run(data)
 

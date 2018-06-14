@@ -86,6 +86,7 @@ class LBL(tx.Model):
                 var_reg.append(h_to_f.weights)
                 f_prediction = tx.Add([x_to_f, h_to_f], name="f_predicted")
 
+            # RI DECODING ===============================================
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
             logit_init = logit_init if not embed_share else None
             run_logits = tx.Linear(f_prediction, vocab_size, logit_init, shared_weights, name="logits")

@@ -33,7 +33,7 @@ defaults = {
     'out_dir': (str, default_out_dir),
     # RP default params
     'k_dim': (int, 5000),
-    's_active': (int, 8),
+    's_active': (int, 4),
     'ri_all_positive': (bool, True),
     # network architecture
     'embed_dim': (int, 128),
@@ -44,9 +44,9 @@ defaults = {
     'embed_share': (bool, True),
     'num_h': (int, 1),
     'h_dim': (int, 256),
-    'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-    'epochs': (int, 2),
-    'batch_size': (int, 128),
+    'h_act': (str, "tanh", ['relu', 'tanh', 'elu']),
+    'epochs': (int, 30),
+    'batch_size': (int, 512),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
     'optimizer': (str, 'sgd', ['sgd', 'adam', 'ams']),
@@ -55,7 +55,7 @@ defaults = {
     'optimizer_beta2': (float, 0.999),
     'optimizer_epsilon': (float, 1e-8),
     # training
-    'lr': (float, 0.5),
+    'lr': (float, 0.25),
     'lr_decay': (bool, True),
     'lr_decay_rate': (float, 0.5),
     # annealing
@@ -73,12 +73,12 @@ defaults = {
     'clip_local': (bool, True),
     'clip_value': (float, 1.0),
 
-    'dropout': (bool, True),
-    'embed_dropout': (bool, True),
+    'dropout': (bool, False),
+    'embed_dropout': (bool, False),
     'keep_prob': (float, 0.95),
 
-    'l2_loss': (bool, False),
-    'l2_loss_coef': (float, 1e-5),
+    'l2_loss': (bool, True),
+    'l2_loss_coef': (float, 1e-6),
 }
 arg_dict = ParamDict(defaults)
 
