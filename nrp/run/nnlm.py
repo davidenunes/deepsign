@@ -58,6 +58,7 @@ defaults = {
     'use_f_predict': (bool, True),
     'f_init': (str, "uniform", ["normal", "uniform"]),
     'f_init_val': (float, 0.01),
+    'logit_bias': (bool, False),
 
     # regularisation
     'clip_grads': (bool, True),
@@ -180,7 +181,8 @@ def run(progress=False, **kwargs):
                  l2_loss=args.l2_loss,
                  l2_loss_coef=args.l2_loss_coef,
                  use_f_predict=args.use_f_predict,
-                 f_init=f_init)
+                 f_init=f_init,
+                 logit_bias=args.logit_bias)
 
     model_runner = tx.ModelRunner(model)
 

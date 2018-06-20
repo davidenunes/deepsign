@@ -206,7 +206,7 @@ model = NNLM_NRP(ctx_size=args.ngram_size - 1,
                  l2_loss=args.l2_loss,
                  l2_loss_coef=args.l2_loss_coef,
                  f_init=f_init,
-                 logit_biases=False)
+                 logit_bias=False)
 
 model_runner = tx.ModelRunner(model)
 

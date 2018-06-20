@@ -66,6 +66,7 @@ defaults = {
     'patience': (int, 3),
     'f_init': (str, "uniform", ["normal", "uniform"]),
     'f_init_val': (float, 0.01),
+    'logit_bias': (bool, False),
 
     # regularisation
     'clip_grads': (bool, True),
@@ -74,7 +75,7 @@ defaults = {
     'clip_value': (float, 1.0),
 
     'dropout': (bool, False),
-    'embed_dropout': (bool, False),
+    'embed_dropout': (bool, True),
     'keep_prob': (float, 0.95),
 
     'l2_loss': (bool, True),
@@ -196,6 +197,7 @@ def run(**kwargs):
                      embed_init=embed_init,
                      embed_share=args.embed_share,
                      logit_init=logit_init,
+                     logit_bias=args.logit_bias,
                      h_dim=args.h_dim,
                      num_h=args.num_h,
                      h_activation=h_act,

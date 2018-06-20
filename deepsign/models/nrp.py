@@ -44,7 +44,7 @@ class LBL_NRP(tx.Model):
                  x_to_f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=True,
-                 logit_biases=False,
+                 logit_bias=False,
                  use_gate=True,
                  use_hidden=False,
                  h_dim=100,
@@ -124,7 +124,7 @@ class LBL_NRP(tx.Model):
                                    n_units=vocab_size,
                                    shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=logit_biases)
+                                   bias=logit_bias)
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -219,8 +219,8 @@ class NNLM_NRP(tx.Model):
                  l2_loss=False,
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 embed_share=False,
-                 logit_biases=False,
+                 embed_share=True,
+                 logit_bias=False,
                  use_nce=False,
                  nce_samples=100
                  ):
@@ -281,20 +281,24 @@ class NNLM_NRP(tx.Model):
 
             # RI DECODING ===============================================
 
-            shared_weights = feature_lookup.weights if embed_share else None
-            logit_init = logit_init if not embed_share else None
+            # Shared Embeddings
+            if embed_share:
+                shared_weights = feature_lookup.weights if embed_share else None
+                logit_init = logit_init if not embed_share else None
 
-            # ri_dense = tx.ToDense(ri_layer)
-            all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features",
-                                       bias=False)
+                # ri_dense = tx.ToDense(ri_layer)
+                all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features",
+                                           bias=False)
 
-            # dot product of f_predicted . all_embeddings with bias for each target word
-            run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
-                                   transpose_weights=True,
-                                   bias=logit_biases, name="logits")
+                # dot product of f_predicted . all_embeddings with bias for each target word
+                run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
+                                       transpose_weights=True,
+                                       bias=logit_bias, name="logits")
+            else:
+                run_logits = tx.Linear(f_prediction, vocab_size, bias=logit_bias, name="logits")
 
             if not embed_share:
-                var_reg.append(all_embeddings.weights)
+                var_reg.append(run_logits.weights)
             # ===========================================================
 
             embed_prob = tx.Activation(run_logits, tx.softmax, name="run_output")
@@ -388,7 +392,7 @@ class NNLM_NRP_RNN(tx.Model):
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
-                 logit_biases=False,
+                 logit_bias=False,
                  use_nce=False,
                  nce_samples=100
                  ):
@@ -444,7 +448,7 @@ class NNLM_NRP_RNN(tx.Model):
             # recurrent context
             h_layers = []
             for i in range(ctx_size):
-                rnn_cell = tx.RNNCell(lookup[i],h_dim,previous_state=state)
+                rnn_cell = tx.RNNCell(lookup[i], h_dim, previous_state=state)
                 state = rnn_cell
                 h_layers.append(state)
             last_layer = state
@@ -476,7 +480,7 @@ class NNLM_NRP_RNN(tx.Model):
             # dot product of f_predicted . all_embeddings with bias for each target word
             run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
                                    transpose_weights=True,
-                                   bias=logit_biases, name="logits")
+                                   bias=logit_bias, name="logits")
 
             if not embed_share:
                 var_reg.append(all_embeddings.weights)
@@ -499,7 +503,7 @@ class NNLM_NRP_RNN(tx.Model):
             # or variational dropout
             state = None
             for i in range(ctx_size):
-                rnn_cell = h_layers[i].reuse_with(last_layer[i],previous_state=state)
+                rnn_cell = h_layers[i].reuse_with(last_layer[i], previous_state=state)
                 if use_dropout:
                     rnn_cell = tx.Dropout(rnn_cell, keep_prob=keep_prob)
 

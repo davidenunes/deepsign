@@ -34,7 +34,7 @@ class NNLM(tx.Model):
                  use_f_predict=False,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
-                 logit_biases=False,
+                 logit_bias=False,
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -91,7 +91,7 @@ class NNLM(tx.Model):
                                    init=logit_init,
                                    shared_weights=shared_weights,
                                    transpose_weights=transpose_weights,
-                                   bias=logit_biases,
+                                   bias=logit_bias,
                                    name="logits")
 
             if not embed_share:
