@@ -92,46 +92,115 @@ class TestModels(unittest.TestCase):
             # result = runner.run(np.array([[0, 2, 1]]))
 
     def test_nce_nnlm_nrp(self):
-        vocab_size = 10000
-        k = 10000
-        s = 300
+        # ok for vocab bigger than 1000 with 10 samples, the eval keeps getting worse
+        # gradient clipping too high also damages performance
+        # lower dimensional k also turns the problem more challenging
+        # so this depends more on k than on number of samples ?
+        # also seems sensible to value of s, a bigger s makes the problem more difficult?
+        # I know what it is: it's the fucking function that is malformed
+        # I need to use tensorx lookup for the noise lookup otherwise I end up with a single vector
+        # when using lookup sparse
+        # when what I weant is multiple vectors, one for each noise sample
+        vocab_size = 100
+        k = 100
+        s = 2
+        embed_size = 100
+        nce_samples = 2
 
         generator = Generator(k, s)
         ris = [generator.generate() for _ in range(vocab_size)]
-        # ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
+
         ri_tensor = to_sparse_tensor_value(ris, k)
         ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
         model = NNLM_NRP(ctx_size=3,
                          vocab_size=vocab_size,
                          k_dim=k,
+                         num_h=2,
                          s_active=s,
+                         h_activation=tx.relu,
                          ri_tensor=ri_tensor,
-                         embed_dim=128,
-                         embed_share=False,
-                         h_dim=128,
+                         embed_dim=embed_size,
+                         embed_share=True,
+                         h_dim=256,
                          use_dropout=True,
                          embed_dropout=True,
+                         keep_prob=0.75,
                          use_nce=True,
-                         nce_samples=10
+                         nce_samples=nce_samples,
                          )
 
-        model.eval_tensors = model.train_loss_tensors
+        # model.eval_tensors.append(model.train_loss_tensors[0])
         runner = tx.ModelRunner(model)
 
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        options = None
-        runner.set_session(runtime_stats=True)
+        # options = None
+        # runner.set_session(runtime_stats=True,run_options=options)
+
         runner.set_logdir("/tmp/")
         runner.log_graph()
-        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
+        # runner.config_optimizer(tx.AMSGrad(learning_rate=0.00025))
+        runner.config_optimizer(tf.train.RMSPropOptimizer(learning_rate=0.05)
+                                #, gradient_op=lambda grad: tf.clip_by_norm(tf.Print(grad, [tf.reduce_mean(grad)]), 1.0))
+                                ,gradient_op=lambda grad: tf.clip_by_norm(grad, 1.0))
 
-        data = np.array([[0, 2, 1]])
-        labels = np.array([[0]])
+        data = np.array([[0, 2, 1], [0, 2, 1]])
+        labels = np.array([[1], [0]])
+        # perplexity should be 2 on average
 
-        for _ in tqdm(range(10)):
-            runner.train(data, labels)
-            print(runner.eval(data, labels))
+        for i in tqdm(range(3000)):
+            res = runner.train(data, labels, output_loss=True)
+            # print(res)
+            if i % 30 == 0:
+                #print(res)
+                res = runner.eval(data, labels)
+                print(res)
+                #print("ppl ",np.exp(res))
+
+    def test_nce_nnlm(self):
+        vocab_size = 100
+        k = 5000
+        s = 2
+
+        model = NNLM(ctx_size=3,
+                     vocab_size=vocab_size,
+                     h_activation=tx.relu,
+                     embed_dim=64,
+                     embed_share=True,
+                     num_h=1,
+                     h_dim=128,
+                     use_f_predict=True,
+                     use_dropout=True,
+                     embed_dropout=True,
+                     use_nce=True,
+                     nce_samples=100
+                     )
+
+        # model.eval_tensors.append(model.train_loss_tensors[0])
+        runner = tx.ModelRunner(model)
+
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = None
+        # runner.set_session(runtime_stats=True,run_options=options)
+        runner.set_logdir("/tmp/")
+        runner.log_graph()
+        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.4),
+                                gradient_op=lambda grad: tf.clip_by_norm(grad, 1.0))
+
+        data = np.array([[0, 1, 1]])
+        labels = np.array([[2]])
+
+        n = 1000
+        for i in tqdm(range(n)):
+            res = runner.train(data, labels, output_loss=True)
+            # print(res)
+            # print(res)
+            #res = 0
+            if i % 30 == 0:
+                res = runner.eval(data, labels)
+                print(res)
+                #print("ppl ", np.exp(res / 30))
+                #res = 0
 
     def test_lbl_nrp(self):
         vocab_size = 10000

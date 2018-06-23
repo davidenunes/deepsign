@@ -1,5 +1,6 @@
 import tensorx as tx
 import tensorflow as tf
+from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
 
 
 class NNLM(tx.Model):
@@ -35,6 +36,8 @@ class NNLM(tx.Model):
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
                  logit_bias=False,
+                 use_nce =False,
+                 nce_samples=10,
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -86,6 +89,8 @@ class NNLM(tx.Model):
             shared_weights = feature_lookup.weights if embed_share else None
             transpose_weights = embed_share
             logit_init = logit_init if not embed_share else None
+            print("last layer ", last_layer)
+            print("last layer ", last_layer.n_units)
             run_logits = tx.Linear(last_layer,
                                    n_units=vocab_size,
                                    init=logit_init,
@@ -122,10 +127,25 @@ class NNLM(tx.Model):
             train_logits = run_logits.reuse_with(last_layer, name="train_logits")
             train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
 
-            one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
-            train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
+            if use_nce:
+                # uniform gets good enough results if enough samples are used
+                # but we can load the empirical unigram distribution
+                # or learn the unigram distribution during training
+                b = tx.Bias(feature_lookup)
+                sampled_values = uniform_sampler(loss_inputs.tensor, 1, nce_samples, True, vocab_size)
+                train_loss = tf.nn.nce_loss(weights=feature_lookup.weights,
+                                            biases=b.bias,
+                                            inputs=last_layer.tensor,
+                                            labels=loss_inputs.tensor,
+                                            num_sampled=nce_samples,
+                                            num_classes=vocab_size,
+                                            num_true=1,
+                                            sampled_values=sampled_values)
+            else:
+                one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
+                train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
 
-            train_loss = tf.reduce_mean(train_loss)
+                train_loss = tf.reduce_mean(train_loss)
 
             if l2_loss:
                 losses = [tf.nn.l2_loss(var) for var in var_reg]

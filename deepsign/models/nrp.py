@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
 import numpy as np
 
-from deepsign.models.ri_nce import ri_nce_loss, random_ri_nce_loss
+from deepsign.models.ri_nce import ri_nce_loss, random_ri_nce_loss, nce_loss
 from deepsign.rp.tf_utils import RandomIndexTensor
 
 
@@ -326,19 +326,25 @@ class NNLM_NRP(tx.Model):
             train_embed_prob = tx.Activation(train_logits, tx.softmax, name="train_output")
 
             if use_nce:
-                train_loss = random_ri_nce_loss(ri_tensors=ri_layer.tensor, k_dim=k_dim, s_active=s_active,
-                                                weights=feature_lookup.weights,
-                                                labels=loss_inputs.tensor,
-                                                inputs=f_prediction.tensor,
-                                                num_sampled=nce_samples,
-                                                num_classes=vocab_size,
-                                                num_true=1,
-                                                )
+                # TODO I should have a dedicated NCE layer to avoid creating weights
+                # in a different layer
+                # w = tx.Linear(ri_inputs, embed_dim, bias=True)
+                # if I don't remove accidental hits the loss gets huge sometimes
+                train_loss = nce_loss(ri_tensors=ri_layer.tensor,
+                                      weights=feature_lookup.weights,
+                                      bias=None,
+                                      labels=loss_inputs.tensor,
+                                      inputs=f_prediction.tensor,
+                                      num_sampled=nce_samples,
+                                      num_classes=vocab_size,
+                                      num_true=1,
+                                      remove_accidental_hits=True
+                                      )
             else:
                 one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
                 train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
 
-            train_loss = tf.reduce_mean(train_loss)
+                train_loss = tf.reduce_mean(train_loss)
 
             if l2_loss:
                 losses = [tf.nn.l2_loss(var) for var in var_reg]
