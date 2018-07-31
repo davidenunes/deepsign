@@ -13,12 +13,12 @@ loss_inputs = tx.Input(1, dtype=tf.int32)
 in_layer = tx.Input(seq_size, dtype=tf.int32)
 
 lookup = tx.Lookup(in_layer, seq_size=seq_size,
-                   feature_shape=feature_shape)
+                   lookup_shape=feature_shape)
 # [batch x seq_size * feature_shape[1]]
 
 h = tx.Linear(lookup, n_hidden)
 ha = tx.Activation(h, tx.elu)
-h = tx.Compose([h, ha])
+h = tx.Compose(h, ha)
 
 
 logits = tx.Linear(h, vocab_size)
@@ -46,7 +46,7 @@ runner.init_vars()
 data = np.array([[0, 1], [1, 0]])
 targets = np.array([[2], [3]])
 
-for i in tqdm(range(100000)):
+for i in tqdm(range(100)):
     runner.train(data=data, loss_input_data=targets)
 
     if i % 1000 == 0:

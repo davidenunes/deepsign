@@ -87,12 +87,13 @@ class LBL_NRP(tx.Model):
             # use those sparse indexes to lookup a set of features based on the ri values
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
             var_reg.append(feature_lookup.weights)
+            feature_lookup = feature_lookup.as_concat()
             # ===========================================================
 
             if use_gate or use_hidden:
                 hl = tx.Linear(feature_lookup, h_dim, h_init, name="h_linear")
                 ha = tx.Activation(hl, h_activation, name="h_activation")
-                h = tx.Compose([hl, ha], name="hidden")
+                h = tx.Compose(hl, ha, name="hidden")
                 var_reg.append(hl.weights)
 
             features = feature_lookup
@@ -108,7 +109,7 @@ class LBL_NRP(tx.Model):
             if use_hidden:
                 h_to_f = tx.Linear(h, embed_dim, h_to_f_init, name="h_to_f")
                 var_reg.append(h_to_f.weights)
-                f_prediction = tx.Add([x_to_f, h_to_f], name="f_predicted")
+                f_prediction = tx.Add(x_to_f, h_to_f, name="f_predicted")
 
             # RI DECODING ===============================================
             shared_weights = feature_lookup.weights if embed_share else None
@@ -154,7 +155,7 @@ class LBL_NRP(tx.Model):
                     h_to_f = h_to_f.reuse_with(h)
                     if use_dropout:
                         h_to_f = tx.Dropout(h_to_f, keep_prob=keep_prob)
-                    f_prediction = tx.Add([f_prediction, h_to_f])
+                    f_prediction = tx.Add(f_prediction, h_to_f)
             else:
                 f_prediction = f_prediction.reuse_with(features)
 
@@ -262,6 +263,7 @@ class NNLM_NRP(tx.Model):
 
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
             var_reg.append(feature_lookup.weights)
+            feature_lookup = feature_lookup.as_concat()
             # ===========================================================
 
             last_layer = feature_lookup
@@ -269,7 +271,7 @@ class NNLM_NRP(tx.Model):
             for i in range(num_h):
                 h_i = tx.Linear(last_layer, h_dim, h_init, bias=True, name="h_{i}_linear".format(i=i))
                 h_a = tx.Activation(h_i, h_activation)
-                h = tx.Compose([h_i, h_a], name="h_{i}".format(i=i))
+                h = tx.Compose(h_i, h_a, name="h_{i}".format(i=i))
                 h_layers.append(h)
                 last_layer = h
                 var_reg.append(h_i.weights)
@@ -442,9 +444,10 @@ class NNLM_NRP_RNN(tx.Model):
                                ctx_size,
                                [k_dim, embed_dim],
                                embed_init,
-                               name="lookup",
-                               as_sequence=True)
+                               name="lookup")
+
             var_reg.append(lookup.weights)
+            lookup = lookup.as_seq()
 
             # reshape to [batch x seq_size x feature_shape[1]]
             # lookup_to_seq = tf.reshape(feature_lookup.tensor, [-1, seq_size, embed_dim])

@@ -64,18 +64,23 @@ class LBL(tx.Model):
         with tf.name_scope("run"):
             feature_lookup = tx.Lookup(run_inputs, ctx_size, [vocab_size, embed_dim], embed_init, name="lookup")
             var_reg.append(feature_lookup.weights)
+            feature_lookup = feature_lookup.as_concat()
 
             if use_gate or use_hidden:
                 hl = tx.Linear(feature_lookup, h_dim, h_init, name="h_linear")
                 ha = tx.Activation(hl, h_activation, name="h_activation")
-                h = tx.Compose([hl, ha], name="hidden")
+                h = tx.Compose(hl, ha, name="hidden")
                 var_reg.append(hl.weights)
 
             features = feature_lookup
             if use_gate:
-                features = tx.Gate(features, ctx_size, gate_input=h)
-                gate = features
-                var_reg.append(features.gate_weights)
+                gate_w = tx.Linear(h, ctx_size, bias=True)
+                gate = tx.Gate(features, gate_input=gate_w)
+
+                # gate = tx.Module([h, features], gate)
+
+                features = gate
+                var_reg.append(gate_w.weights)
 
             x_to_f = tx.Linear(features, embed_dim, x_to_f_init, name="x_to_f")
             var_reg.append(x_to_f.weights)
@@ -84,7 +89,7 @@ class LBL(tx.Model):
             if use_hidden:
                 h_to_f = tx.Linear(h, embed_dim, h_to_f_init, name="h_to_f")
                 var_reg.append(h_to_f.weights)
-                f_prediction = tx.Add([x_to_f, h_to_f], name="f_predicted")
+                f_prediction = tx.Add(x_to_f, h_to_f, name="f_predicted")
 
             # RI DECODING ===============================================
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
@@ -108,7 +113,8 @@ class LBL(tx.Model):
                     h = tx.Dropout(h, keep_prob=keep_prob)
 
                 if use_gate:
-                    features = gate.reuse_with(features, gate_input=h)
+                    gate_w = gate_w.reuse_with(h)
+                    features = gate.reuse_with(layer=features, gate_input=gate_w)
 
                 f_prediction = x_to_f.reuse_with(features)
 
@@ -116,7 +122,7 @@ class LBL(tx.Model):
                     h_to_f = h_to_f.reuse_with(h)
                     if use_dropout:
                         h_to_f = tx.Dropout(h_to_f, keep_prob=keep_prob)
-                    f_prediction = tx.Add([f_prediction, h_to_f])
+                    f_prediction = tx.Add(f_prediction, h_to_f)
             else:
                 f_prediction = f_prediction.reuse_with(features)
 

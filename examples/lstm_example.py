@@ -18,7 +18,7 @@ loss_inputs = tx.Input(1, dtype=tf.int32)
 in_layer = tx.Input(seq_size, dtype=tf.int32)
 
 lookup = tx.Lookup(in_layer, seq_size=seq_size,
-                   feature_shape=feature_shape)
+                   lookup_shape=feature_shape)
 # [batch x seq_size * feature_shape[1]]
 
 # reshape to [batch x seq_size x feature_shape[1]]

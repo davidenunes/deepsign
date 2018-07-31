@@ -20,7 +20,7 @@ sp = ri_input.to_sparse_tensor()
 sp = tx.TensorLayer(sp, k)
 print(sp.tensor.eval())
 
-embed = tx.Lookup(sp, seq_size=3, feature_shape=[k, 3])
+embed = tx.Lookup(sp, seq_size=3, lookup_shape=[k, 3])
 
 
 tf.global_variables_initializer().run()

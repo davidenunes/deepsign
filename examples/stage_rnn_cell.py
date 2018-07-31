@@ -108,7 +108,7 @@ in_layer = tx.Input(seq_size, dtype=tf.int32)
 
 lookup = tx.Lookup(in_layer,
                    seq_size=seq_size,
-                   feature_shape=feature_shape,
+                   lookup_shape=feature_shape,
                    as_sequence=True)
 
 lookup_flat = lookup.reuse_with(in_layer,as_sequence=False)

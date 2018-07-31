@@ -148,7 +148,7 @@ class TestModels(unittest.TestCase):
         labels = np.array([[1], [0]])
         # perplexity should be 2 on average
 
-        for i in tqdm(range(3000)):
+        for i in tqdm(range(10)):
             res = runner.train(data, labels, output_loss=True)
             # print(res)
             if i % 30 == 0:
@@ -420,7 +420,7 @@ class TestModels(unittest.TestCase):
 
         inputs = tx.Input(n_units=2, dtype=tf.int32)
         labels = tx.Input(n_units=1, dtype=tf.int32)
-        lookup = tx.Lookup(inputs, seq_size=2, feature_shape=[k, embed_dim])
+        lookup = tx.Lookup(inputs, seq_size=2, lookup_shape=[k, embed_dim])
         features = tx.Linear(lookup, n_units=embed_dim)
 
         nce_bias = tf.Variable(tf.zeros([k]), name='nce_bias', trainable=False)

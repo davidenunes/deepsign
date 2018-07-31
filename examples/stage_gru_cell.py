@@ -77,14 +77,14 @@ class GRUCell(Layer):
                 # kernel_gate = tx.Activation()
 
                 kernel_act = tx.Activation(kernel_linear, self.activation)
-                self.kernel = tx.Compose([kernel_linear, kernel_act])
+                self.kernel = tx.Compose(kernel_linear, kernel_act)
 
 
             else:
                 self.kernel = self.share_state_with.kernel.reuse_with(layer)
                 self.recurrent_kernel = self.share_state_with.recurrent_kernel.reuse_with(self.previous_state)
 
-            r_state = tx.Add([r_current_w, r_recurrent_w])
+            r_state = tx.Add(r_current_w, r_recurrent_w)
             r_state = tx.Bias(r_state)
             r_gate = tx.Activation(r_state, fn=tx.sigmoid, name="r_gate")
 
@@ -122,7 +122,7 @@ loss_inputs = tx.Input(1, dtype=tf.int32)
 in_layer = tx.Input(seq_size, dtype=tf.int32)
 
 lookup = tx.Lookup(in_layer, seq_size=seq_size,
-                   feature_shape=feature_shape)
+                   lookup_shape=feature_shape)
 # [batch x seq_size * feature_shape[1]]
 
 # reshape to [batch x seq_size x feature_shape[1]]

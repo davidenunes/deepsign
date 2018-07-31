@@ -2,7 +2,7 @@ from tensorflow.python.ops import array_ops, math_ops, variables, candidate_samp
 from tensorflow.python.framework import dtypes, ops, sparse_tensor
 from tensorflow.python.ops.nn import embedding_lookup_sparse, embedding_lookup, sigmoid_cross_entropy_with_logits
 import tensorx as tx
-from deepsign.rp.tf_atils import RandomIndexTensor
+from deepsign.rp.tf_utils import RandomIndexTensor
 
 
 def _sum_rows(x):
@@ -447,7 +447,7 @@ def _compute_sampled_logits(ri_tensors,
                                          combiner="sum",
                                          partition_strategy=partition_strategy)
 
-        sampled_w = embedding_lookup_sparse(params=weights,
+        noise_w = embedding_lookup_sparse(params=weights,
                                             sp_ids=tx.sparse_indices(sampled_ris),
                                             sp_weights=sampled_ris,
                                             combiner="sum",
@@ -468,13 +468,14 @@ def _compute_sampled_logits(ri_tensors,
                 combiner="sum",
                 partition_strategy=partition_strategy)
 
-        sampled_logits = math_ops.matmul(inputs, sampled_w, transpose_b=True)
+        noise_logits = math_ops.matmul(inputs, noise_w, transpose_b=True)
 
         dim = array_ops.shape(true_w)[1:2]
         new_true_w_shape = array_ops.concat([[-1, num_true], dim], 0)
-        row_wise_dots = math_ops.multiply(
-            array_ops.expand_dims(inputs, 1),
-            array_ops.reshape(true_w, new_true_w_shape))
+        true_w_e = array_ops.reshape(true_w, new_true_w_shape)
+
+        row_wise_dots = math_ops.multiply(array_ops.expand_dims(inputs, 1),
+                                          true_w_e)
         # We want the row-wise dot plus biases which yields a
         # [batch_size, num_true] tensor of true_logits.
         dots_as_matrix = array_ops.reshape(row_wise_dots,
@@ -484,7 +485,7 @@ def _compute_sampled_logits(ri_tensors,
         if bias is not None:
             true_b = array_ops.reshape(true_b, [-1, num_true])
             true_logits += true_b
-            sampled_logits += sampled_b
+            noise_logits += sampled_b
 
         if remove_accidental_hits:
             acc_hits = candidate_sampling_ops.compute_accidental_hits(
@@ -501,9 +502,9 @@ def _compute_sampled_logits(ri_tensors,
             sampled_logits_shape = array_ops.concat(
                 [array_ops.shape(labels)[:1],
                  array_ops.expand_dims(num_sampled, 0)], 0)
-            if sampled_logits.dtype != acc_weights.dtype:
-                acc_weights = math_ops.cast(acc_weights, sampled_logits.dtype)
-            sampled_logits += sparse_ops.sparse_to_dense(
+            if noise_logits.dtype != acc_weights.dtype:
+                acc_weights = math_ops.cast(acc_weights, noise_logits.dtype)
+            noise_logits += sparse_ops.sparse_to_dense(
                 sparse_indices,
                 sampled_logits_shape,
                 acc_weights,
@@ -513,17 +514,17 @@ def _compute_sampled_logits(ri_tensors,
         if subtract_log_q:
             # Subtract log of Q(l), prior probability that l appears in sampled.
             true_logits -= math_ops.log(true_expected_count)
-            sampled_logits -= math_ops.log(sampled_expected_count)
+            noise_logits -= math_ops.log(sampled_expected_count)
 
         # Construct output logits and labels. The true labels/logits start at col 0.
-        out_logits = array_ops.concat([true_logits, sampled_logits], 1)
+        out_logits = array_ops.concat([true_logits, noise_logits], 1)
 
         # true_logits is a float tensor, ones_like(true_logits) is a float
         # tensor of ones. We then divide by num_true to ensure the per-example
         # labels sum to 1.0, i.e. form a proper probability distribution.
         out_labels = array_ops.concat([
             array_ops.ones_like(true_logits) / num_true,
-            array_ops.zeros_like(sampled_logits)
+            array_ops.zeros_like(noise_logits)
         ], 1)
 
         return out_logits, out_labels

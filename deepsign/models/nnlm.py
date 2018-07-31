@@ -59,13 +59,14 @@ class NNLM(tx.Model):
             # feature lookup
             feature_lookup = tx.Lookup(run_inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
             var_reg.append(feature_lookup.weights)
+            feature_lookup = feature_lookup.as_concat()
 
             last_layer = feature_lookup
             h_layers = []
             for i in range(num_h):
                 h_i = tx.Linear(last_layer, h_dim, h_init, bias=True, name="h_{i}_linear".format(i=i))
                 h_a = tx.Activation(h_i, h_activation)
-                h = tx.Compose([h_i, h_a], name="h_{i}".format(i=i))
+                h = tx.Compose(h_i, h_a, name="h_{i}".format(i=i))
                 h_layers.append(h)
                 last_layer = h
                 var_reg.append(h_i.weights)

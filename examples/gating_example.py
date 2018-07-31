@@ -14,7 +14,7 @@ v2 = tf.constant(np.random.uniform(-1., 1., [v_dim, m_dim]))
 
 inputs = tx.Input(2, dtype=tf.int32)
 
-lookup = tx.Lookup(inputs, 2, feature_shape=[v_dim, m_dim])
+lookup = tx.Lookup(inputs, 2, lookup_shape=[v_dim, m_dim])
 
 # GATING MECHANISM
 # I can call this a seq gate, takes the parameters and divides by seq_size
