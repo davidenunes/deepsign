@@ -62,16 +62,16 @@ class GRUCell(Layer):
             if self.share_state_with is None:
                 # determines the weight of the previous state
                 # we could add the bias at the end but this way we just define a single bias for the r unit
-                self.r_current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="r_current_w")
-                self.r_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                self.r_current_w = tx.Linear(layer, self.n_units, bias=True, weight_init=self.init, name="r_current_w")
+                self.r_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, weight_init=self.recurrent_init,
                                                name="r_current_w")
 
-                self.u_current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="u_current_w")
-                self.u_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                self.u_current_w = tx.Linear(layer, self.n_units, bias=True, weight_init=self.init, name="u_current_w")
+                self.u_recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, weight_init=self.recurrent_init,
                                                name="u_current_w")
 
-                self.current_w = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="current_w")
-                self.recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, init=self.recurrent_init,
+                self.current_w = tx.Linear(layer, self.n_units, bias=True, weight_init=self.init, name="current_w")
+                self.recurrent_w = tx.Linear(self.previous_state, self.n_units, bias=False, weight_init=self.recurrent_init,
                                              name="recurrent_w")
 
                 # kernel_gate = tx.Activation()

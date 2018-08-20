@@ -94,7 +94,7 @@ class NNLM(tx.Model):
             print("last layer ", last_layer.n_units)
             run_logits = tx.Linear(last_layer,
                                    n_units=vocab_size,
-                                   init=logit_init,
+                                   weight_init=logit_init,
                                    shared_weights=shared_weights,
                                    transpose_weights=transpose_weights,
                                    bias=logit_bias,

@@ -58,14 +58,14 @@ class RNNCell(Layer):
                 self.previous_state = tx.TensorLayer(zero_state, self.n_units)
 
             if self.share_state_with is None:
-                kernel_linear = tx.Linear(layer, self.n_units, bias=True, init=self.init, name="linear_kernel")
+                kernel_linear = tx.Linear(layer, self.n_units, bias=True, weight_init=self.init, name="linear_kernel")
                 kernel_act = tx.Activation(kernel_linear, self.activation)
                 self.kernel = tx.Compose([kernel_linear, kernel_act])
 
                 self.recurrent_kernel = tx.Linear(self.previous_state,
                                                   self.n_units,
                                                   bias=False,
-                                                  init=self.recurrent_init,
+                                                  weight_init=self.recurrent_init,
                                                   name="recurrent_kernel")
             else:
                 self.kernel = self.share_state_with.kernel.reuse_with(layer)

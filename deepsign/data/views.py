@@ -282,12 +282,13 @@ def chain_it(*data_it):
 def repeat_fn(fn, data, n):
     """ Repeats the iter_fn on the given data, n times
 
-    Warning: this intended to create iterators that cycle multiple times though
-    data without having to copy the elements to cycle through them. If the
-    fn returns a generator that iterates in a certain manner, this re-applies
-    that same generator to the data. If however, data is an iterable that gets
-    exhausted the first time it runs, this will return all the elements in the iterable
-    just once.
+    Note:
+        this intended to create iterators that cycle multiple times though
+        data without having to copy the elements to cycle through them. If the
+        fn returns a generator that iterates in a certain manner, this re-applies
+        that same generator to the data. If however, data is an iterable that gets
+        exhausted the first time it runs, this will return all the elements in the iterable
+        just once.
 
     Args:
         data: the data to which the iter fn is to be applied

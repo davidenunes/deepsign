@@ -44,7 +44,7 @@ all_ris = tx.gather_sparse(ri_tensor, all_ids)
 
 # weights shape is [num_classes, dim]
 ri_layer = tx.TensorLayer(ri_tensor, k)
-l = tx.Linear(ri_layer, embed_size, init=tx.random_normal(0, 1))
+l = tx.Linear(ri_layer, embed_size, weight_init=tx.random_normal(0, 1))
 weights = l.weights
 
 sp_values = all_ris

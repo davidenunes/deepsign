@@ -9,8 +9,8 @@ from tqdm import tqdm
 import time
 
 home = os.getenv("HOME")
-result_path = home+"/data/gold_standards/"
-vocab_fname = "wacky_vocab_1M.hdf5"
+result_path = home+"/data/datasets/wikitext-103/"
+vocab_fname = "wiki103.hdf5"
 vocab_file = result_path + vocab_fname
 
 h5v = h5py.File(vocab_file, 'r')
