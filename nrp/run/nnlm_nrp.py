@@ -11,7 +11,7 @@ import traceback
 
 import tensorx as tx
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
 from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 from exp.args import ParamDict
 
@@ -140,7 +140,7 @@ def run(**kwargs):
             return chunk_it(x, chunk_size=batch_size * 1000)
 
         if epochs > 1:
-            data = repeat_fn(chunk_fn, data, epochs)
+            data = repeat_apply(chunk_fn, data, epochs)
         else:
             data = chunk_fn(data)
 

@@ -90,8 +90,6 @@ class NNLM(tx.Model):
             shared_weights = feature_lookup.weights if embed_share else None
             transpose_weights = embed_share
             logit_init = logit_init if not embed_share else None
-            print("last layer ", last_layer)
-            print("last layer ", last_layer.n_units)
             run_logits = tx.Linear(last_layer,
                                    n_units=vocab_size,
                                    weight_init=logit_init,

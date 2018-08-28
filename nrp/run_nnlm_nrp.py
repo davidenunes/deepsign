@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import tensorx as tx
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
 from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 
 from deepsign.rp.ri import Generator
@@ -172,7 +172,7 @@ def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
         return chunk_it(x, chunk_size=batch_size * 1000)
 
     if epochs > 1:
-        data = repeat_fn(chunk_fn, data, epochs)
+        data = repeat_apply(chunk_fn, data, epochs)
     else:
         data = chunk_fn(data)
 

@@ -3,15 +3,17 @@ import itertools
 
 
 class PTBIterator:
+    EOS_MARK = "<eos>"
     """
     Simple iterator, the file since the file has one sentence per line
     """
 
-    def __init__(self, path, max_samples=None):
+    def __init__(self, path, max_samples=None, mark_eos=False):
         assert os.path.exists(path)
         self.path = path
         self.current_sentence = None
         self.source = open(path, 'r')
+        self.mark_eos = mark_eos
 
         self.max_samples = max_samples
         self.num_samples = 0
@@ -33,7 +35,10 @@ class PTBIterator:
             raise StopIteration
 
         self.num_samples += 1
-        return self.current_sentence.split()
+        tokens = self.current_sentence.split()
+        if self.mark_eos:
+            tokens.append(PTBIterator.EOS_MARK)
+        return tokens
 
 
 class PTBReader:
@@ -63,7 +68,8 @@ class PTBReader:
             path: path to the directory containing the dataset files
     """
 
-    def __init__(self, path):
+    def __init__(self, path, mark_eos=False):
+        self.mark_eos = mark_eos
         self.train_file = os.path.join(path, 'train.txt')
         self.valid_file = os.path.join(path, 'valid.txt')
         self.test_file = os.path.join(path, 'test.txt')
@@ -79,13 +85,13 @@ class PTBReader:
         """
         :param n_samples: max number of sentences
         """
-        return PTBIterator(path=self.train_file, max_samples=n_samples)
+        return PTBIterator(path=self.train_file, max_samples=n_samples, mark_eos=self.mark_eos)
 
     def validation_set(self):
-        return PTBIterator(path=self.valid_file)
+        return PTBIterator(path=self.valid_file, mark_eos=self.mark_eos)
 
     def test_set(self):
-        return PTBIterator(path=self.test_file)
+        return PTBIterator(path=self.test_file, mark_eos=self.mark_eos)
 
     def full(self):
         return itertools.chain(self.training_set(),

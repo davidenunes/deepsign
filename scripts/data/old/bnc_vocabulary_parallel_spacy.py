@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from deepsign.data.corpora.pipe import BNCPipe
-from deepsign.data.views import subset_chunk_it, divide_slice
+from deepsign.data.views import subset_chunk_it, divide_slices
 
 
 def word_frequencies(args):
@@ -52,7 +52,7 @@ def parallel_word_count(corpus_file, output_file,lemmatize, max_rows=None, n_pro
     if max_rows !=-1 and max_rows < nrows:
         nrows = max_rows
 
-    data_slices = divide_slice(nrows, n_processes, 0)
+    data_slices = divide_slices(nrows, n_processes, 0)
 
     args = [(corpus_file, data_slice, lemmatize) for data_slice in data_slices]
     pool = Pool(n_processes)

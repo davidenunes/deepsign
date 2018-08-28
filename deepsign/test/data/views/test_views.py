@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
 from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slice, window_it, batch_it, shuffle_it, flatten_it, repeat_fn, chain_it
+from deepsign.data.views import divide_slices, window_it, batch_it, shuffle_it, flatten_it, repeat_apply, chain_it
 import itertools
 
 
@@ -33,7 +33,7 @@ class TestViews(TestCase):
         subset = range(51, 100)
 
         sub_size = len(subset)
-        divide_sub = divide_slice(sub_size, 3, subset.start)
+        divide_sub = divide_slices(sub_size, 3, subset.start)
 
         self.assertEqual(3, len(divide_sub))
 
@@ -103,7 +103,7 @@ class TestViews(TestCase):
         # for chunk in data_it:
         #    print(chunk)
         # print(data_it)
-        data_it = repeat_fn(chunk_fn, v, repeat)
+        data_it = repeat_apply(chunk_fn, v, repeat)
 
         self.assertEqual(len(list(data_it)), n_samples * repeat)
 
@@ -116,9 +116,9 @@ class TestViews(TestCase):
         def chunk_fn(x): return chunk_it(x, chunk_size=2)
 
         # first chain is normal, second is shuffled from the two repetitions
-        data_it = repeat_fn(chunk_fn, v, repeat)
+        data_it = repeat_apply(chunk_fn, v, repeat)
 
-        data_it = chain_it(data_it, shuffle_it(repeat_fn(chunk_fn, v, repeat), buffer_size=8))
+        data_it = chain_it(data_it, shuffle_it(repeat_apply(chunk_fn, v, repeat), buffer_size=8))
 
         data = list(data_it)
 
@@ -138,7 +138,7 @@ class TestViews(TestCase):
         def it_fn(x): return iter(x)
 
         # data it will get exhausted so it will not repeat
-        data_it = repeat_fn(it_fn, data_it, repeat)
+        data_it = repeat_apply(it_fn, data_it, repeat)
 
         # only return 4 items
         self.assertEqual(len(list(data_it)), n_samples)

@@ -12,7 +12,7 @@ from mpi4py import MPI
 from tqdm import tqdm
 
 from deepsign.data.corpora.pipe import BNCPipe
-from deepsign.data.views import divide_slice, subset_chunk_it
+from deepsign.data.views import divide_slices, subset_chunk_it
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -48,7 +48,7 @@ if comm.rank == 0:
 
     print("Master Node: preparing data, processing [ %d of %d ]"%(num_rows,len(corpus_dataset)))
 
-    subset_slices = divide_slice(n=num_rows, n_slices=num_slaves)
+    subset_slices = divide_slices(n=num_rows, n_slices=num_slaves)
 
     print("Sending Tasks to %d nodes"%(num_slaves))
     # send slices

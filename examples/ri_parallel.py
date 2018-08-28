@@ -9,7 +9,7 @@ from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.data.views import windows, np_to_sparse, divide_slice
+from deepsign.data.views import windows, np_to_sparse, divide_slices
 from deepsign.data.views import subset_chunk_it
 
 # global for sign index
@@ -72,7 +72,7 @@ def parallel_ri(corpus_file, max_rows=None, window_size=3, n_processes=8):
     if max_rows is not None and max_rows < nrows:
         nrows = max_rows
 
-    data_slices = divide_slice(max_rows, n_processes, 0)
+    data_slices = divide_slices(max_rows, n_processes, 0)
 
     args = [(corpus_file, data_slice, window_size) for data_slice in data_slices]
 

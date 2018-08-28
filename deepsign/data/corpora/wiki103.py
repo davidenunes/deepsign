@@ -7,13 +7,13 @@ class WikiTextIterator:
     Simple iterator, the file since the file has one sentence per line
     """
 
-    def __init__(self, path, max_samples=None, eos=False):
+    def __init__(self, path, max_samples=None, mark_eos=False):
         assert os.path.exists(path)
         self.path = path
         self.current_sentence = None
         self.source = open(path, 'r', encoding="utf-8")
 
-        self.eos = eos
+        self.mark_eos = mark_eos
         self.max_samples = max_samples
         self.num_samples = 0
 
@@ -40,7 +40,7 @@ class WikiTextIterator:
             return self.__next__()
         else:
             self.num_samples += 1
-            if self.eos:
+            if self.mark_eos:
                 tokens.append("<eos>")
             return tokens
 
@@ -54,8 +54,8 @@ class WikiText103:
             path: path to the directory containing the dataset files
     """
 
-    def __init__(self, path, eos_token=False):
-        self.eos_token = eos_token
+    def __init__(self, path, mark_eos=False):
+        self.mark_eos = mark_eos
         self.train_file = os.path.join(path, 'wiki.train.tokens')
         self.valid_file = os.path.join(path, 'wiki.valid.tokens')
         self.test_file = os.path.join(path, 'wiki.test.tokens')
@@ -71,13 +71,13 @@ class WikiText103:
         """
         :param n_samples: max number of sentences
         """
-        return WikiTextIterator(path=self.train_file, max_samples=n_samples,eos=self.eos_token)
+        return WikiTextIterator(path=self.train_file, max_samples=n_samples, mark_eos=self.mark_eos)
 
     def validation_set(self, n_samples=None):
-        return WikiTextIterator(path=self.valid_file, max_samples=n_samples, eos=self.eos_token)
+        return WikiTextIterator(path=self.valid_file, max_samples=n_samples, mark_eos=self.mark_eos)
 
     def test_set(self, n_samples=None):
-        return WikiTextIterator(path=self.test_file, max_samples=n_samples, eos=self.eos_token)
+        return WikiTextIterator(path=self.test_file, max_samples=n_samples, mark_eos=self.mark_eos)
 
     def full(self):
         return itertools.chain(self.training_set(),

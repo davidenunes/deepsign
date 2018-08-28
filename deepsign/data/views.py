@@ -4,10 +4,25 @@ from collections import deque
 
 
 def repeat_it(iterable, n):
+    """ Extends the iterable by repeating it n times
+
+    Example:
+        v = (1,2,3)
+        s = repeat_it(v,2)
+
+        s -> (1,2,3,1,2,3)
+
+    Args:
+        iterable:
+        n:
+
+    Returns: a new iterable with n chained original iterables
+
+    """
     return itertools.chain.from_iterable(itertools.repeat(x, n) for x in iterable)
 
 
-def _pairwise(iterable):
+def pairwise(iterable):
     """
     Example:
         s -> (s0,s1), (s1,s2), (s2, s3), ...
@@ -20,7 +35,7 @@ def _pairwise(iterable):
     return zip(a, b)
 
 
-def divide_slice(n, n_slices=1, offset=0):
+def divide_slices(n, n_slices=1, offset=0):
     """ Splits a vector with ngram_size elements equally into n_slices
     returning a list of index ranges for that vector, each range corresponds
     to a slice.
@@ -40,7 +55,7 @@ def divide_slice(n, n_slices=1, offset=0):
         ss.append(s)
 
     ss.append(n)
-    ranges = [range(s[0] + offset, s[1] + offset) for s in _pairwise(ss)]
+    ranges = [range(s[0] + offset, s[1] + offset) for s in pairwise(ss)]
 
     return ranges
 
@@ -166,7 +181,7 @@ def chunk_it(dataset, n_rows=None, chunk_size=1):
         chunk_size = n_rows
 
     n_chunks = n_rows // chunk_size
-    chunk_slices = divide_slice(n_rows, n_chunks)
+    chunk_slices = divide_slices(n_rows, n_chunks)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
     # row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
@@ -188,7 +203,7 @@ def subset_chunk_it(dataset, data_range, chunk_size=1):
         chunk_size = n_rows
 
     n_chunks = n_rows // chunk_size
-    chunk_slices = divide_slice(n_rows, n_chunks, data_range.start)
+    chunk_slices = divide_slices(n_rows, n_chunks, data_range.start)
     chunk_gen = (dataset[slice(s.start, s.stop, 1)] for s in chunk_slices)
 
     row_gen = itertools.chain.from_iterable((c[i] for i in range(len(c))) for c in chunk_gen)
@@ -207,7 +222,7 @@ def consume_it(iterator, n):
 
 
 def window_it(iterable, n, as_list=True):
-    """ Creates fixed sized slidding windows from iterable
+    """ Creates fixed sized sliding windows from iterable
     s -> (s0, ...,s(n-1)), (s1, ...,sn), (s2, ..., s(n+1)), ...
     """
     iters = itertools.tee(iterable, n)
@@ -279,7 +294,7 @@ def chain_it(*data_it):
     return itertools.chain(*data_it)
 
 
-def repeat_fn(fn, data, n):
+def repeat_apply(fn, data, n):
     """ Repeats the iter_fn on the given data, n times
 
     Note:

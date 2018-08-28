@@ -11,7 +11,7 @@ import h5py
 import os.path
 from spacy.en import English
 
-from deepsign.data.views import divide_slice
+from deepsign.data.views import divide_slices
 from deepsign.rp.index import SignIndex
 from deepsign.rp.ri import Generator
 
@@ -109,7 +109,7 @@ def do_work(slice_range):
 def parallel_process_corpus():
     n_workers = 4
     pool = Pool(n_workers)
-    dataset_slices = divide_slice(max_sentences, n_workers)
+    dataset_slices = divide_slices(max_sentences, n_workers)
     t0 = time.time()
     pool.map(func=do_work, iterable=dataset_slices)
     pool.close()

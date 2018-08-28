@@ -5,7 +5,7 @@ import tensorx as tx
 from deepsign.rp import ri, tf_utils
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.rp.tf_utils import to_sparse_tensor_value
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_fn, window_it
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply, window_it
 import marisa_trie
 from deepsign.nlp.tokenization import Tokenizer
 from deepsign.nlp import is_token

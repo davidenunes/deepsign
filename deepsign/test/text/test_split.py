@@ -7,7 +7,7 @@ class TestSplit(unittest.TestCase):
         v = range(0, 16, 1)
         num_splits = 5
 
-        slices = split.divide_slice(len(v), num_splits)
+        slices = split.divide_slices(len(v), num_splits)
         self.assertEqual(len(slices), num_splits)
 
         print(slices)
