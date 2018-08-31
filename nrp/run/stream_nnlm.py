@@ -81,7 +81,7 @@ defaults = {
 arg_dict = ParamDict(defaults)
 
 
-def run(progress=False, **kwargs):
+def run(**kwargs):
     arg_dict.from_dict(kwargs)
     args = arg_dict.to_namespace()
 
@@ -98,9 +98,12 @@ def run(progress=False, **kwargs):
                         batch_size=args.batch_size,
                         shuffle=args.shuffle,
                         flatten=False):
-        """ Corpus processing pipeline
+        """ Corpus Processing Pipeline.
+
+        Transforms the corpus reader -a stream of sentences or words- into a stream of n-gram batches.
 
         Args:
+            n_gram_size: the size of the n-gram window
             corpus_stream: the stream of sentences of words
             epochs: number of epochs we want to iterate over this corpus
             batch_size: batch size for the n-gram batch
@@ -161,7 +164,7 @@ def run(progress=False, **kwargs):
     # ======================================================================================
     # MODEL
     # ======================================================================================
-    # Activation functions
+    # Configure weight initializers based on activation functions
     if args.h_act == "relu":
         h_act = tx.relu
         h_init = tx.he_normal_init()
@@ -172,7 +175,7 @@ def run(progress=False, **kwargs):
         h_act = tx.elu
         h_init = tx.he_normal_init()
 
-    # Parameter Init
+    # Configure embedding and logit weight initializers
     if args.embed_init == "normal":
         embed_init = tx.random_normal(mean=0.,
                                       stddev=args.embed_init_val)
@@ -215,7 +218,7 @@ def run(progress=False, **kwargs):
 
     model_runner = tx.ModelRunner(model)
 
-    # we use an InputParam because we might want to change it during training
+    # Input params can be changed during training by setting their value
     lr_param = tx.InputParam(init_value=args.lr)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
