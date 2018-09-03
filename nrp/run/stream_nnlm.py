@@ -39,7 +39,7 @@ defaults = {
     'num_h': (int, 1),
     'h_dim': (int, 256),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-    'epochs': (int, 2),
+    'epochs': (int, 15),
     'batch_size': (int, 128),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
@@ -219,7 +219,12 @@ def run(**kwargs):
     model_runner = tx.ModelRunner(model)
 
     # Input params can be changed during training by setting their value
-    lr_param = tx.InputParam(init_value=args.lr)
+    # lr_param = tx.InputParam(init_value=args.lr)
+    lr_param = tx.EvalStepDecayParam(init_value=args.lr,
+                                     improvement_threshold=args.eval_threshold,
+                                     less_is_better=True,
+                                     decay_rate=args.lr_decay_rate,
+                                     decay_threshold=args.lr_decay_threshold)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":
@@ -353,23 +358,18 @@ def run(**kwargs):
             # Eval Time
             if epoch_step == 0:
                 current_eval = evaluation(model_runner, progress, epoch, global_step)
-                evals.append(current_eval)
+                lr_param.update(current_eval)
+                print(lr_param.eval_history)
+                print("improvement ", lr_param.eval_improvement())
 
                 if global_step > 0:
-                    if args.early_stop:
-                        if evals[-2] - evals[-1] < args.eval_threshold:
+                    if args.early_stop and epoch > 1:
+                        if lr_param.eval_improvement() < lr_param.improvement_threshold:
                             if patience >= 3:
                                 break
                             patience += 1
                         else:
-                            # restart patience and adjust lr
                             patience = 0
-                    # lr decay only at the start of each epoch
-                    if args.lr_decay and len(evals) > 0:
-                        if evals[-2] - evals[-1] < args.eval_threshold:
-                            lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                            if progress:
-                                progress.write("lr decreased to {}".format(lr_param.value))
 
             # ================================================
             # TRAIN MODEL
