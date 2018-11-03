@@ -16,7 +16,7 @@ from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 from exp.args import ParamDict
 
 from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
@@ -44,7 +44,7 @@ defaults = {
     'embed_share': (bool, True),
     'num_h': (int, 1),
     'h_dim': (int, 256),
-    'h_act': (str, "tanh", ['relu', 'tanh', 'elu']),
+    'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
     'epochs': (int, 30),
     'batch_size': (int, 512),
     'shuffle': (bool, True),
@@ -72,7 +72,7 @@ defaults = {
     'clip_grads': (bool, True),
     # if true clips by local norm, else clip by norm of all gradients
     'clip_local': (bool, True),
-    'clip_value': (float, 1.0),
+    'clip_value': (float, 0.25),
 
     'dropout': (bool, False),
     'embed_dropout': (bool, True),
@@ -89,7 +89,7 @@ def run(**kwargs):
     args = arg_dict.to_namespace()
 
     # ======================================================================================
-    # Load Params, Prepare results files
+    # Load Params, Prepare results assets
     # ======================================================================================
     # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     # print(args.corpus)
@@ -129,7 +129,7 @@ def run(**kwargs):
     # pre-gen indices for vocab
     # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
     ris = [ri_generator.generate() for i in range(len(vocab))]
-    ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+    ri_tensor = ris_to_sp_tensor_value(ris, dim=args.k_dim)
 
     # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
 
@@ -207,7 +207,9 @@ def run(**kwargs):
                      embed_dropout=args.embed_dropout,
                      l2_loss=args.l2_loss,
                      l2_loss_coef=args.l2_loss_coef,
-                     f_init=f_init)
+                     f_init=f_init,
+                     use_nce=True,
+                     nce_samples=100)
 
     model_runner = tx.ModelRunner(model)
 

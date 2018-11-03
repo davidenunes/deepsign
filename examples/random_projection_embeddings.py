@@ -4,7 +4,7 @@ import tensorx as tx
 
 from deepsign.rp import ri, tf_utils
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply, window_it
 import marisa_trie
 from deepsign.nlp.tokenization import Tokenizer
@@ -32,7 +32,7 @@ data_it = window_it(tokens, seq_size)
 data_it = batch_it(data_it, batch_size)
 
 vocab_tensor = [ri_dict[i] for i in range(len(vocab))]
-sp_ri = tf_utils.to_sparse_tensor_value(vocab_tensor, dim=k)
+sp_ri = tf_utils.ris_to_sp_tensor_value(vocab_tensor, dim=k)
 
 inputs = tx.Input(n_units=2)
 ri_inputs = tx.gather_sparse(sp_ri, inputs.tensor)

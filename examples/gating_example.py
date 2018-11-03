@@ -18,10 +18,10 @@ lookup = tx.Lookup(inputs, 2, lookup_shape=[v_dim, m_dim])
 
 # GATING MECHANISM
 # I can call this a seq gate, takes the parameters and divides by seq_size
-h = tx.Linear(lookup, 100)
+h = tx.Linear(lookup, 100, bias=True)
 h = tx.Activation(h, tx.elu)
 
-gate = tx.Linear(h, 2)
+gate = tx.Linear(h, 2, bias=True)
 gate = tx.Activation(gate, tx.sigmoid)
 
 # lookup might output a sequence format with [batch,seq_size,m_dim]
@@ -37,7 +37,7 @@ gated_out = tf.reshape(gated_out, tf.shape(lookup.tensor))
 gated_out = tx.TensorLayer(gated_out, lookup.n_units)
 # END GATING MECHANISM
 
-y = tx.Linear(gated_out, m_dim)
+y = tx.Linear(gated_out, m_dim, bias=True)
 
 ss.run(tf.global_variables_initializer())
 

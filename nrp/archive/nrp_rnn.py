@@ -12,11 +12,11 @@ import traceback
 import tensorx as tx
 
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
-from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
+from deepsign.models.nrp import NNLM_NRP_RNN, RandomIndexTensor
 from exp.args import ParamDict
 
 from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
@@ -43,9 +43,9 @@ defaults = {
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
     'num_h': (int, 1),
-    'h_dim': (int, 256),
+    'h_dim': (int, 128),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-    'epochs': (int, 30),
+    'epochs': (int, 20),
     'batch_size': (int, 512),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
@@ -55,7 +55,7 @@ defaults = {
     'optimizer_beta2': (float, 0.999),
     'optimizer_epsilon': (float, 1e-8),
     # training
-    'lr': (float, 0.25),
+    'lr': (float, 0.5),
     'lr_decay': (bool, True),
     'lr_decay_rate': (float, 0.5),
     # annealing
@@ -66,20 +66,19 @@ defaults = {
     'patience': (int, 3),
     'f_init': (str, "uniform", ["normal", "uniform"]),
     'f_init_val': (float, 0.01),
-    'logit_bias': (bool, False),
 
     # regularisation
     'clip_grads': (bool, True),
     # if true clips by local norm, else clip by norm of all gradients
-    'clip_local': (bool, True),
-    'clip_value': (float, 0.25),
+    'clip_local': (bool, False),
+    'clip_value': (float, 1.0),
 
-    'dropout': (bool, False),
-    'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.95),
+    'dropout': (bool, True),
+    'embed_dropout': (bool, False),
+    'keep_prob': (float, 0.6),
 
-    'l2_loss': (bool, True),
-    'l2_loss_coef': (float, 1e-6),
+    'l2_loss': (bool, False),
+    'l2_loss_coef': (float, 1e-5),
 }
 arg_dict = ParamDict(defaults)
 
@@ -89,7 +88,7 @@ def run(**kwargs):
     args = arg_dict.to_namespace()
 
     # ======================================================================================
-    # Load Params, Prepare results files
+    # Load Params, Prepare results assets
     # ======================================================================================
     # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     # print(args.corpus)
@@ -129,7 +128,7 @@ def run(**kwargs):
     # pre-gen indices for vocab
     # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
     ris = [ri_generator.generate() for i in range(len(vocab))]
-    ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+    ri_tensor = ris_to_sp_tensor_value(ris, dim=args.k_dim)
 
     # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
 
@@ -188,28 +187,23 @@ def run(**kwargs):
     #                                        log_device_placement=True))
     # with tf.device('/gpu:{}'.format(args.gpu)):
 
-    model = NNLM_NRP(ctx_size=args.ngram_size - 1,
-                     vocab_size=len(vocab),
-                     k_dim=args.k_dim,
-                     s_active=args.s_active,
-                     ri_tensor=ri_tensor,
-                     embed_dim=args.embed_dim,
-                     embed_init=embed_init,
-                     embed_share=args.embed_share,
-                     logit_init=logit_init,
-                     logit_bias=args.logit_bias,
-                     h_dim=args.h_dim,
-                     num_h=args.num_h,
-                     h_activation=h_act,
-                     h_init=h_init,
-                     use_dropout=args.dropout,
-                     keep_prob=args.keep_prob,
-                     embed_dropout=args.embed_dropout,
-                     l2_loss=args.l2_loss,
-                     l2_loss_coef=args.l2_loss_coef,
-                     f_init=f_init,
-                     use_nce=True,
-                     nce_samples=100)
+    model = NNLM_NRP_RNN(ctx_size=args.ngram_size - 1,
+                         vocab_size=len(vocab),
+                         k_dim=args.k_dim,
+                         s_active=args.s_active,
+                         ri_tensor=ri_tensor,
+                         embed_dim=args.embed_dim,
+                         embed_init=embed_init,
+                         embed_share=args.embed_share,
+                         logit_init=logit_init,
+                         h_dim=args.h_dim,
+                         num_h=args.num_h,
+                         use_dropout=args.dropout,
+                         keep_prob=args.keep_prob,
+                         embed_dropout=args.embed_dropout,
+                         l2_loss=args.l2_loss,
+                         l2_loss_coef=args.l2_loss_coef,
+                         f_init=f_init)
 
     model_runner = tx.ModelRunner(model)
 

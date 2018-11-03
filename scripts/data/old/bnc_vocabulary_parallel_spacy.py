@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # all sentences
     max_sentences = None
 
-    # corpus and output files
+    # corpus and output assets
     home = os.getenv("HOME")
     corpus_file = home + args.data_dir + args.corpus_file
     index_filename = home + args.data_dir + args.out_file

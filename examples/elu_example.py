@@ -16,12 +16,12 @@ lookup = tx.Lookup(in_layer, seq_size=seq_size,
                    lookup_shape=feature_shape)
 # [batch x seq_size * feature_shape[1]]
 
-h = tx.Linear(lookup, n_hidden)
+h = tx.Linear(lookup, n_hidden, bias=True)
 ha = tx.Activation(h, tx.elu)
 h = tx.Compose(h, ha)
 
 
-logits = tx.Linear(h, vocab_size)
+logits = tx.Linear(h, vocab_size, bias=True)
 out = tx.Activation(logits, tx.softmax)
 
 labels = tx.dense_one_hot(loss_inputs.tensor, vocab_size)

@@ -9,13 +9,11 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import tensorx as tx
-from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply, take_it
-from deepsign.models.nrp import LBL_NRP, RandomIndexTensor
-from tensorx.layers import Input
+from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 
 def str2bool(v):
@@ -52,7 +50,7 @@ param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
 param("k_dim", int, 10000)
-param("s_active", int, 10)
+param("s_active", int, 16)
 
 param("embed_dim", int, 64)
 
@@ -62,18 +60,11 @@ param("embed_init_val", float, 0.01)
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
 
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, True)
 param("embed_share", str2bool, True)
 
-param("x_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("x_to_f_init_val", float, 0.01)
-param("h_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("h_to_f_init_val", float, 0.01)
-
 param("num_h", int, 1)
-param("h_dim", int, 100)
-param("h_act", str, "elu", valid=['relu', 'tanh', 'elu'])
+param("h_dim", int, 128)
+param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
 param("epochs", int, 2)
 param("batch_size", int, 128)
@@ -86,8 +77,8 @@ param("optimizer_beta1", float, 0.9)
 param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
-param("lr", float, 0.001)
-param("lr_decay", str2bool, False)
+param("lr", float, 0.5)
+param("lr_decay", str2bool, True)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
 param("lr_decay_threshold", float, 1e-6)
@@ -97,7 +88,8 @@ param("eval_threshold", float, 1.0)
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
+param("f_init", str, "uniform", valid=["normal", "uniform"])
+param("f_init_val", float, 0.01)
 
 # REGULARISATION
 # clip grads by norm
@@ -108,7 +100,7 @@ param("clip_value", float, 1.0)
 
 param("dropout", str2bool, True)
 param("embed_dropout", str2bool, True)
-param("keep_prob", float, 0.95)
+param("keep_prob", float, 0.85)
 
 param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
@@ -118,8 +110,8 @@ args = parser.parse_args()
 # ======================================================================================
 # CORPUS, Vocab and RIs
 # ======================================================================================
-corpus_hdf5 = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
-vocab = marisa_trie.Trie(corpus_hdf5["vocabulary"])
+corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
+vocab = marisa_trie.Trie(corpus["vocabulary"])
 
 print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
@@ -129,16 +121,16 @@ ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
 
-ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
-# ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
+#ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+ri_tensor = ris_to_sp_tensor_value(ris, dim=args.k_dim)
 
 print("done")
 # ======================================================================================
 
 # corpus
-training_dataset = corpus_hdf5["training"]
-test_dataset = corpus_hdf5["test"]
-validation_dataset = corpus_hdf5["validation"]
+training_dataset = corpus["training"]
+test_dataset = corpus["test"]
+validation_dataset = corpus["validation"]
 
 
 # data pipeline
@@ -190,37 +182,31 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-if args.h_to_f_init == "normal":
-    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
+if args.f_init == "normal":
+    f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+elif args.f_init == "uniform":
+    f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-if args.x_to_f_init == "normal":
-    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
-
-model = LBL_NRP(ctx_size=args.ngram_size - 1,
-                vocab_size=len(vocab),
-                k_dim=args.k_dim,
-                ri_tensor=ri_tensor,
-                embed_dim=args.embed_dim,
-                embed_init=embed_init,
-                x_to_f_init=x_to_f_init,
-                logit_init=logit_init,
-                embed_share=args.embed_share,
-                use_gate=args.use_gate,
-                use_hidden=args.use_hidden,
-                h_dim=args.h_dim,
-                h_activation=h_act,
-                h_init=h_init,
-                h_to_f_init=h_to_f_init,
-                use_dropout=args.dropout,
-                embed_dropout=args.embed_dropout,
-                keep_prob=args.keep_prob,
-                l2_loss=args.l2_loss,
-                l2_loss_coef=args.l2_loss_coef
-                )
+model = NNLM_NRP(ctx_size=args.ngram_size - 1,
+                 vocab_size=len(vocab),
+                 k_dim=args.k_dim,
+                 s_active=args.s_active,
+                 ri_tensor=ri_tensor,
+                 embed_dim=args.embed_dim,
+                 embed_init=embed_init,
+                 embed_share=args.embed_share,
+                 logit_init=logit_init,
+                 h_dim=args.h_dim,
+                 num_h=args.num_h,
+                 h_activation=h_act,
+                 h_init=h_init,
+                 use_dropout=args.dropout,
+                 keep_prob=args.keep_prob,
+                 embed_dropout=args.embed_dropout,
+                 l2_loss=args.l2_loss,
+                 l2_loss_coef=args.l2_loss_coef,
+                 f_init=f_init,
+                 logit_bias=False)
 
 model_runner = tx.ModelRunner(model)
 
@@ -310,6 +296,7 @@ model_runner.init_vars()
 progress = tqdm(total=len(training_dataset) * args.epochs)
 training_data = data_pipeline(training_dataset, epochs=args.epochs)
 
+# first eval just to make sure it is something like 9999
 ppl = eval_model(model_runner, data_pipeline(validation_dataset, epochs=1, shuffle=False), len(validation_dataset))
 progress.write("val perplexity {}".format(ppl))
 

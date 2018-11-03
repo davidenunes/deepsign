@@ -36,7 +36,7 @@ class NNLM(tx.Model):
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  embed_share=False,
                  logit_bias=False,
-                 use_nce =False,
+                 use_nce=False,
                  nce_samples=10,
                  ):
 
@@ -73,7 +73,7 @@ class NNLM(tx.Model):
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
-                last_layer = tx.Linear(last_layer, embed_dim, f_init, name="f_predict")
+                last_layer = tx.Linear(last_layer, embed_dim, f_init, bias=True, name="f_predict")
                 var_reg.append(last_layer.weights)
                 f_predict = last_layer
 

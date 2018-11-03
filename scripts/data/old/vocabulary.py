@@ -68,7 +68,7 @@ if __name__ == '__main__':
     # model parameters
     max_sentences = 10000
 
-    # corpus and output files
+    # corpus and output assets
     home = os.getenv("HOME")
     corpus_file = home + "/data/gold_standards/wacky_1M.hdf5"
     index_filename = home + "/data/results/wacky_vocab_1M.hdf5"

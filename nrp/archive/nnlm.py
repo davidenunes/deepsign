@@ -1,4 +1,8 @@
-import argparse
+""" Neural Network Language Model
+
+Baseline language model using a simple feedforward neural network and an energy layer for word prediction
+
+"""
 import csv
 import marisa_trie
 import os
@@ -83,7 +87,7 @@ def run(progress=False, **kwargs):
     args = arg_dict.to_namespace()
 
     # ======================================================================================
-    # Load Params, Prepare results files
+    # Load Params, Prepare results assets
     # ======================================================================================
 
     # Experiment parameter summary
@@ -260,8 +264,7 @@ def run(progress=False, **kwargs):
         ppl_writer.writerow(res_row)
 
         if args.eval_test:
-
-            #pb.write("[Eval Test Set]")
+            # pb.write("[Eval Test Set]")
             test_data = corpus["test"]
             ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
                                   display_progress)
@@ -276,8 +279,7 @@ def run(progress=False, **kwargs):
         if args.eval_test:
             pb.write("test. ppl = {}".format(ppl_test))
 
-
-        #pb.write("valid. ppl = {}".format(ppl_validation))
+        # pb.write("valid. ppl = {}".format(ppl_validation))
         return ppl_validation
 
     # ======================================================================================
@@ -368,7 +370,6 @@ def run(progress=False, **kwargs):
         os.remove(ppl_file.name)
         os.remove(param_file.name)
         raise e
-
 
 
 if __name__ == "__main__":

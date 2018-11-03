@@ -67,7 +67,7 @@ class LBL(tx.Model):
             feature_lookup = feature_lookup.as_concat()
 
             if use_gate or use_hidden:
-                hl = tx.Linear(feature_lookup, h_dim, h_init, name="h_linear")
+                hl = tx.Linear(feature_lookup, h_dim, h_init, bias=True, name="h_linear")
                 ha = tx.Activation(hl, h_activation, name="h_activation")
                 h = tx.Compose(hl, ha, name="hidden")
                 var_reg.append(hl.weights)
@@ -82,19 +82,19 @@ class LBL(tx.Model):
                 features = gate
                 var_reg.append(gate_w.weights)
 
-            x_to_f = tx.Linear(features, embed_dim, x_to_f_init, name="x_to_f")
+            x_to_f = tx.Linear(features, embed_dim, x_to_f_init, bias=True, name="x_to_f")
             var_reg.append(x_to_f.weights)
             f_prediction = x_to_f
 
             if use_hidden:
-                h_to_f = tx.Linear(h, embed_dim, h_to_f_init, name="h_to_f")
+                h_to_f = tx.Linear(h, embed_dim, h_to_f_init, bias=True, name="h_to_f")
                 var_reg.append(h_to_f.weights)
                 f_prediction = tx.Add(x_to_f, h_to_f, name="f_predicted")
 
             # RI DECODING ===============================================
             shared_weights = tf.transpose(feature_lookup.weights) if embed_share else None
             logit_init = logit_init if not embed_share else None
-            run_logits = tx.Linear(f_prediction, vocab_size, logit_init, shared_weights, name="logits")
+            run_logits = tx.Linear(f_prediction, vocab_size, logit_init, shared_weights, bias=True, name="logits")
             if not embed_share:
                 var_reg.append(run_logits.weights)
             y_prob = tx.Activation(run_logits, tx.softmax)

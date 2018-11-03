@@ -4,6 +4,7 @@ import numpy as np
 import h5py
 import random
 import pickle
+from hat_trie import Trie
 from deepsign.rp.ri import Generator, ri_from_indexes
 
 

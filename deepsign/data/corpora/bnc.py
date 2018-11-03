@@ -5,7 +5,7 @@ import os
 class BNCReader:
     """ BNC Corpus Reader
 
-        Implements a sentence iterator over BNC corpus files.
+        Implements a sentence iterator over BNC corpus assets.
         This allows for:
             Iterate over the corpus returning sentences in the form of lists of strings
     """
@@ -30,7 +30,7 @@ class BNCReader:
 
 
 def file_walker(source_dir):
-    """Iterates over xml files given a source directory (/Texts)
+    """Iterates over xml assets given a source directory (/Texts)
     doesn't do it by file name order
     adding sorted works but loads all file names
     """

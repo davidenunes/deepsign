@@ -34,7 +34,7 @@ val = tf.transpose(val, [1, 0, 2])
 last = val[-1]
 
 lstm_out = tx.TensorLayer(last, n_hidden)
-logits = tx.Linear(lstm_out, vocab_size)
+logits = tx.Linear(lstm_out, vocab_size, bias=True)
 out = tx.Activation(logits, tx.softmax)
 
 labels = tx.dense_one_hot(loss_inputs.tensor, vocab_size)

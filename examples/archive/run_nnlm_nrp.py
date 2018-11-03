@@ -11,10 +11,10 @@ from tqdm import tqdm
 import tensorx as tx
 
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
-from deepsign.models.nrp import NNLM_NRP,NNLMNRP_NCE, RandomIndexTensor
+from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 
 from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 
 def str2bool(v):
@@ -24,6 +24,10 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def str2int(v):
+    return int(float(v))
 
 
 # ======================================================================================
@@ -45,15 +49,17 @@ default_out_dir = os.getcwd()
 
 # experiment ID
 param("id", int, 0)
+param("gpu", int, 3)
+param("run", str2int, 1)
 param("corpus", str, default_corpus)
 param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 5000)
-param("s_active", int, 8)
+param("k_dim", str2int, 1000)
+param("s_active", str2int, 1)
 
-param("ri_all_positive", str2bool, False)
+param("ri_all_positive", str2bool, True)
 
 param("embed_dim", int, 128)
 
@@ -111,9 +117,9 @@ param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
 # ======================================================================================
-# Load Params, Prepare results files
+# Load Params, Prepare results assets
 # ======================================================================================
-
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 print(args.corpus)
 
 # Experiment parameter summary
@@ -132,7 +138,7 @@ if args.save_model:
     model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.id))
 
 # start perplexity file
-ppl_header = ["id", "epoch", "step", "lr", "dataset", "perplexity"]
+ppl_header = ["id", "run", "epoch", "step", "lr", "dataset", "perplexity"]
 ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.id))
 
 ppl_file = open(ppl_fname, "w")
@@ -147,12 +153,13 @@ vocab = marisa_trie.Trie(corpus["vocabulary"])
 
 print("generating random indexes")
 # generates k-dimensional random indexes with s_active units
-ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
+all_positive = args.ri_all_positive
+ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
 
 # pre-gen indices for vocab
 # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
 ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim, all_positive=args.ri_all_positive)
+ri_tensor = ris_to_sp_tensor_value(ris, dim=args.k_dim)
 # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
 
 print("done")
@@ -210,9 +217,14 @@ if args.f_init == "normal":
 elif args.f_init == "uniform":
     f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-model = NNLMNRP_NCE(ctx_size=args.ngram_size - 1,
+#sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+#                                        log_device_placement=True))
+#with tf.device('/gpu:{}'.format(args.gpu)):
+
+model = NNLM_NRP(ctx_size=args.ngram_size - 1,
                  vocab_size=len(vocab),
                  k_dim=args.k_dim,
+                 s_active=args.s_active,
                  ri_tensor=ri_tensor,
                  embed_dim=args.embed_dim,
                  embed_init=embed_init,
@@ -227,10 +239,17 @@ model = NNLMNRP_NCE(ctx_size=args.ngram_size - 1,
                  embed_dropout=args.embed_dropout,
                  l2_loss=args.l2_loss,
                  l2_loss_coef=args.l2_loss_coef,
-                 f_init=f_init,
-                 n_samples=100)
+                 f_init=f_init)
 
 model_runner = tx.ModelRunner(model)
+
+#sess = tf.Session(config=tf.ConfigProto(
+#      allow_soft_placement=True, log_device_placement=True))
+#model_runner.set_session(sess)
+
+# sess = tf.Session(config=tf.ConfigProto(
+#    allow_soft_placement=True, log_device_placement=True))
+# model_runner.set_session(sess)
 
 # we use an InputParam because we might want to change it during training
 lr_param = tx.InputParam(init_value=args.lr)
@@ -271,6 +290,7 @@ else:
     model_runner.config_optimizer(optimizer, params=lr_param)
 
 
+#assert(model_runner.session == sess)
 # ======================================================================================
 # EVALUATION
 # ======================================================================================
@@ -305,7 +325,8 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
     val_data = corpus["validation"]
     ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                 display_progress)
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "validation",
+    res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+               "dataset": "validation",
                "perplexity": ppl_validation}
     ppl_writer.writerow(res_row)
 
@@ -313,7 +334,8 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
     test_data = corpus["test"]
     ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+    res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+               "dataset": "test",
                "perplexity": ppl_test}
     ppl_writer.writerow(res_row)
 

@@ -35,7 +35,7 @@ file_number_re = re.compile('(\d{1,2})')
 if not os.path.isdir(dir):
     sys.exit("No such directory: {}".format(dir))
 
-print("Processing WaCKy corpus files in ",dir)
+print("Processing WaCKy corpus assets in ",dir)
 files = [f for f in os.listdir(dir) if fnmatch.fnmatch(f,"*.xml.gz")]
 
 

@@ -9,9 +9,11 @@ import tensorflow as tf
 from tqdm import tqdm
 import traceback
 import tensorx as tx
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
+from deepsign.data.views import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, flatten_it
 from deepsign.models.nnlm import NNLM
 from exp.args import ParamDict
+from deepsign.data.corpora.ptb import PTBReader
+from deepsign.data.corpora.wiki103 import WikiText103
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -19,24 +21,25 @@ default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
 
 defaults = {
-    'run_id': (int, 0),  # run id
-    'id': (int, 0),  # param id
+    'pid': (int, 0),
+    'id': (int, 0),  # param configuration id
     'run': (int, 1),  # run number within param id
     'corpus': (str, default_corpus),
     'ngram_size': (int, 5),
+    'mark_eos': (bool, True),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
     # network architecture
-    'embed_dim': (int, 128),
-    'embed_init': (str, 'normal', ["normal", "uniform"]),
+    'embed_dim': (int, 512),
+    'embed_init': (str, 'uniform', ["normal", "uniform"]),
     'embed_init_val': (float, 0.01),
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
     'num_h': (int, 1),
-    'h_dim': (int, 256),
-    'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-    'epochs': (int, 2),
+    'h_dim': (int, 512),
+    'h_act': (str, "relu", ['relu', 'tanh', 'elu', 'selu']),
+    'epochs': (int, 20),
     'batch_size': (int, 128),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
@@ -63,31 +66,90 @@ defaults = {
     # regularisation
     'clip_grads': (bool, True),
     # if true clips by local norm, else clip by norm of all gradients
-    'clip_local': (bool, True),
-    'clip_value': (float, 1.0),
+    'clip_local': (bool, False),
+    'clip_value': (float, 2.0),
 
     'dropout': (bool, True),
     'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.75),
+    'keep_prob': (float, 0.55),
 
     'l2_loss': (bool, False),
     'l2_loss_coef': (float, 1e-5),
 
-    "eval_test": (bool, True)
+    "eval_test": (bool, True),
+
+    # eval display progress:
+    "eval_progress": (bool, True),
+    "display_progress": (bool, True)
 }
 arg_dict = ParamDict(defaults)
 
 
-def run(progress=False, **kwargs):
+def run(**kwargs):
     arg_dict.from_dict(kwargs)
     args = arg_dict.to_namespace()
 
     # ======================================================================================
-    # Load Params, Prepare results files
+    # Load Corpus & Vocab
     # ======================================================================================
+    corpus = PTBReader(path=args.corpus, mark_eos=args.mark_eos)
+    corpus_stats = h5py.File(os.path.join(args.corpus, "ptb_stats.hdf5"), mode='r')
+    vocab = marisa_trie.Trie(corpus_stats["vocabulary"])
 
+    def corpus_pipeline(corpus_stream,
+                        n_gram_size=args.ngram_size,
+                        epochs=1,
+                        batch_size=args.batch_size,
+                        shuffle=args.shuffle,
+                        flatten=False):
+        """ Corpus Processing Pipeline.
+
+        Transforms the corpus reader -a stream of sentences or words- into a stream of n-gram batches.
+
+        Args:
+            n_gram_size: the size of the n-gram window
+            corpus_stream: the stream of sentences of words
+            epochs: number of epochs we want to iterate over this corpus
+            batch_size: batch size for the n-gram batch
+            shuffle: if true, shuffles the n-grams according to a buffer size
+            flatten: if true sliding windows are applied over a stream of words rather than within each sentence
+            (n-grams can cross sentence boundaries)
+        """
+
+        if flatten:
+            word_it = flatten_it(corpus_stream)
+            n_grams = window_it(word_it, n_gram_size)
+        else:
+            sentence_n_grams = (window_it(sentence, n_gram_size) for sentence in corpus_stream)
+            n_grams = flatten_it(sentence_n_grams)
+
+        # at this point this is an n_gram iterator
+        n_grams = ([vocab[w] for w in ngram] for ngram in n_grams)
+
+        if epochs > 1:
+            n_grams = repeat_it(n_grams, epochs)
+
+        if shuffle:
+            n_grams = shuffle_it(n_grams, args.shuffle_buffer_size)
+
+        n_grams = batch_it(n_grams, size=batch_size, padding=False)
+        return n_grams
+
+    # print("counting dataset samples...")
+    training_len = sum(1 for _ in corpus_pipeline(corpus.training_set(), batch_size=1, epochs=1, shuffle=False))
+    validation_len = None
+    test_len = None
+    if args.eval_progress:
+        validation_len = sum(1 for _ in corpus_pipeline(corpus.validation_set(), batch_size=1, epochs=1, shuffle=False))
+        test_len = sum(1 for _ in corpus_pipeline(corpus.test_set(), batch_size=1, epochs=1, shuffle=False))
+    # print("done")
+    # print("dset len ", training_len)
+
+    # ======================================================================================
+    # Load Params, Prepare results assets
+    # ======================================================================================
     # Experiment parameter summary
-    res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.run_id))
+    res_param_filename = os.path.join(args.out_dir, "params_{id}_{run}.csv".format(id=args.id, run=args.run))
     with open(res_param_filename, "w") as param_file:
         writer = csv.DictWriter(f=param_file, fieldnames=arg_dict.keys())
         writer.writeheader()
@@ -96,43 +158,22 @@ def run(progress=False, **kwargs):
 
     # make dir for model checkpoints
     if args.save_model:
-        model_ckpt_dir = os.path.join(args.out_dir, "model_{id}".format(id=args.run_id))
+        model_ckpt_dir = os.path.join(args.out_dir, "model_{id}_{run}".format(id=args.id, run=args.run))
         os.makedirs(model_ckpt_dir, exist_ok=True)
-        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}.ckpt".format(id=args.run_id))
+        model_path = os.path.join(model_ckpt_dir, "nnlm_{id}_{run}.ckpt".format(id=args.id, run=args.run))
 
     # start perplexity file
     ppl_header = ["id", "run", "epoch", "step", "lr", "dataset", "perplexity"]
-    ppl_fname = os.path.join(args.out_dir, "perplexity_{id}.csv".format(id=args.run_id))
+    ppl_fname = os.path.join(args.out_dir, "perplexity_{id}_{run}.csv".format(id=args.id, run=args.run))
 
     ppl_file = open(ppl_fname, "w")
     ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
     ppl_writer.writeheader()
 
     # ======================================================================================
-    # Load Corpus & Vocab
-    # ======================================================================================
-    corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
-    vocab = marisa_trie.Trie(corpus["vocabulary"])
-
-    def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
-        def chunk_fn(x):
-            return chunk_it(x, chunk_size=batch_size * 1000)
-
-        if epochs > 1:
-            data = repeat_apply(chunk_fn, data, epochs)
-        else:
-            data = chunk_fn(data)
-
-        if shuffle:
-            data = shuffle_it(data, args.shuffle_buffer_size)
-
-        data = batch_it(data, size=batch_size, padding=False)
-        return data
-
-    # ======================================================================================
     # MODEL
     # ======================================================================================
-    # Activation functions
+    # Configure weight initializers based on activation functions
     if args.h_act == "relu":
         h_act = tx.relu
         h_init = tx.he_normal_init()
@@ -142,8 +183,11 @@ def run(progress=False, **kwargs):
     elif args.h_act == "elu":
         h_act = tx.elu
         h_init = tx.he_normal_init()
+    elif args.h_act == "selu":
+        h_act = tf.nn.selu
+        h_init = tx.xavier_init()
 
-    # Parameter Init
+    # Configure embedding and logit weight initializers
     if args.embed_init == "normal":
         embed_init = tx.random_normal(mean=0.,
                                       stddev=args.embed_init_val)
@@ -182,12 +226,18 @@ def run(progress=False, **kwargs):
                  l2_loss_coef=args.l2_loss_coef,
                  use_f_predict=args.use_f_predict,
                  f_init=f_init,
-                 logit_bias=args.logit_bias)
+                 logit_bias=args.logit_bias,
+                 use_nce=False)
 
     model_runner = tx.ModelRunner(model)
 
-    # we use an InputParam because we might want to change it during training
-    lr_param = tx.InputParam(init_value=args.lr)
+    # Input params can be changed during training by setting their value
+    # lr_param = tx.InputParam(init_value=args.lr)
+    lr_param = tx.EvalStepDecayParam(init_value=args.lr,
+                                     improvement_threshold=args.eval_threshold,
+                                     less_is_better=True,
+                                     decay_rate=args.lr_decay_rate,
+                                     decay_threshold=args.lr_decay_threshold)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":
@@ -227,7 +277,7 @@ def run(progress=False, **kwargs):
 
     def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
         if display_progress:
-            pb = tqdm(total=len_dataset, ncols=60)
+            pb = tqdm(total=len_dataset, ncols=60,position=1)
         batches_processed = 0
         sum_loss = 0
         for batch in dataset_it:
@@ -247,12 +297,10 @@ def run(progress=False, **kwargs):
 
         return np.exp(sum_loss / batches_processed)
 
-    def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
+    def evaluation(runner: tx.ModelRunner, progress_bar, cur_epoch, step, display_progress=False):
 
-        ##pb.write("[Eval Validation Set]")
-
-        val_data = corpus["validation"]
-        ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
+        ppl_validation = eval_model(runner, corpus_pipeline(corpus.validation_set(), epochs=1, shuffle=False),
+                                    validation_len,
                                     display_progress)
         res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
                    "dataset": "validation",
@@ -260,10 +308,9 @@ def run(progress=False, **kwargs):
         ppl_writer.writerow(res_row)
 
         if args.eval_test:
+            # pb.write("[Eval Test Set]")
 
-            #pb.write("[Eval Test Set]")
-            test_data = corpus["test"]
-            ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
+            ppl_test = eval_model(runner, corpus_pipeline(corpus.test_set(), epochs=1, shuffle=False), test_len,
                                   display_progress)
 
             res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
@@ -274,16 +321,15 @@ def run(progress=False, **kwargs):
         ppl_file.flush()
 
         if args.eval_test:
-            pb.write("test. ppl = {}".format(ppl_test))
+            progress_bar.set_postfix({"test PPL ": ppl_test})
 
-
-        #pb.write("valid. ppl = {}".format(ppl_validation))
+        # pb.write("valid. ppl = {}".format(ppl_validation))
         return ppl_validation
 
     # ======================================================================================
     # TRAINING LOOP
     # ======================================================================================
-    print("starting TF")
+    # print("Starting TensorFlow Session")
 
     # preparing evaluation steps
     # I use ceil because I make sure we have padded batches at the end
@@ -299,43 +345,45 @@ def run(progress=False, **kwargs):
     model_runner.set_session(sess)
     model_runner.init_vars()
 
-    training_dset = corpus["training"]
-    progress = tqdm(total=len(training_dset) * args.epochs, position=1)
-    training_data = data_pipeline(training_dset, epochs=args.epochs, shuffle=True)
+    progress = tqdm(total=training_len * args.epochs, position=args.pid + 1, disable=not args.display_progress)
+    training_data = corpus_pipeline(corpus.training_set(),
+                                    batch_size=args.batch_size,
+                                    epochs=args.epochs,
+                                    shuffle=args.shuffle)
 
-    evals = []
+    evaluations = []
 
     try:
 
         for ngram_batch in training_data:
-            epoch = progress.n // len(training_dset) + 1
+            epoch = progress.n // training_len + 1
             # Start New Epoch
             if epoch != current_epoch:
                 current_epoch = epoch
                 epoch_step = 0
-                if progress:
-                    progress.write("epoch: {}".format(current_epoch))
+                if args.display_progress:
+                    progress.set_postfix({"epoch": current_epoch})
 
-            # Eval Time
+            # ================================================
+            # EVALUATION
+            # ================================================
             if epoch_step == 0:
-                current_eval = evaluation(model_runner, progress, epoch, global_step)
-                evals.append(current_eval)
+                current_eval = evaluation(model_runner, progress, epoch, global_step,
+                                          display_progress=args.eval_progress)
+
+                evaluations.append(current_eval)
+                lr_param.update(current_eval)
+                # print(lr_param.eval_history)
+                # print("improvement ", lr_param.eval_improvement())
 
                 if global_step > 0:
-                    if args.early_stop:
-                        if evals[-2] - evals[-1] < args.eval_threshold:
+                    if args.early_stop and epoch > 1:
+                        if lr_param.eval_improvement() < lr_param.improvement_threshold:
                             if patience >= 3:
                                 break
                             patience += 1
                         else:
-                            # restart patience and adjust lr
                             patience = 0
-                    # lr decay only at the start of each epoch
-                    if args.lr_decay and len(evals) > 0:
-                        if evals[-2] - evals[-1] < args.eval_threshold:
-                            lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                            if progress:
-                                progress.write("lr decreased to {}".format(lr_param.value))
 
             # ================================================
             # TRAIN MODEL
@@ -352,7 +400,8 @@ def run(progress=False, **kwargs):
 
         # if not early stop, evaluate last state of the model
         if not args.early_stop or patience < 3:
-            evaluation(model_runner, progress, epoch, epoch_step)
+            current_eval = evaluation(model_runner, progress, epoch, epoch_step)
+            evaluations.append(current_eval)
         ppl_file.close()
 
         if args.save_model:
@@ -362,13 +411,14 @@ def run(progress=False, **kwargs):
         progress.close()
         tf.reset_default_graph()
 
+        # return the best validation evaluation
+        return min(evaluations)
 
     except Exception as e:
         traceback.print_exc()
         os.remove(ppl_file.name)
         os.remove(param_file.name)
         raise e
-
 
 
 if __name__ == "__main__":

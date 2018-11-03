@@ -4,7 +4,7 @@ from tensorflow.python.ops.nn import embedding_lookup_sparse, embedding_lookup, 
 
 from deepsign.rp.tf_utils import RandomIndexTensor
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 import os
 import numpy as np
@@ -33,7 +33,7 @@ nce_samples = 1000
 generator = Generator(k, s)
 ris = [generator.generate() for _ in range(vocab_size)]
 
-ri_tensor = to_sparse_tensor_value(ris, k)
+ri_tensor = ris_to_sp_tensor_value(ris, k)
 ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
 # *************************************
@@ -56,7 +56,7 @@ ri_inputs = tx.gather_sparse(ri_layer.tensor, input_layer.tensor)
 ri_inputs = tx.TensorLayer(ri_inputs, k)
 lookup = tx.Lookup(ri_inputs, ctx_size, [k, embed_size],
                    weight_init=tx.random_normal(0, 0.1), name="lookup")
-feature_predict = tx.Linear(lookup, embed_size)
+feature_predict = tx.Linear(lookup, embed_size, bias=True)
 
 all_embeddings = tx.Linear(ri_layer,
                            embed_size,
@@ -78,7 +78,7 @@ val_loss = tf.reduce_mean(val_loss)
 # *************************************
 #   Testing adaptive noise
 # *************************************
-noise_logits = tx.Linear(lookup, k)
+noise_logits = tx.Linear(lookup, k, bias=True)
 adaptive_noise = tx.sample_sigmoid_from_logits(noise_logits.tensor, n=1)
 adaptive_noise = tx.TensorLayer(adaptive_noise, n_units=k)
 # adaptive_noise = tx.to_sparse(adaptive_noise)
@@ -201,7 +201,7 @@ for i in tqdm(range(n)):
         current_nce = []
         current_loss = []
 
-        #if n < 50:
+        # if n < 50:
         #    lr.value += 0.1
         # else:
         #    lr.value -= 0.01
@@ -218,7 +218,6 @@ plt.subplot(312)
 plt.plot(avg_loss)  # np.exp(y_eval)#)
 plt.title("cross ent loss")
 sns.despine()
-
 
 plt.subplot(313)
 plt.plot(avg_ppl)  # np.exp(y_eval)#)

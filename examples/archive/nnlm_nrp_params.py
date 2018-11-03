@@ -2,7 +2,7 @@ from exp.params import ParamSpace
 import os
 
 ps = ParamSpace()
-# prefix used to identify result files
+# prefix used to identify result assets
 
 # data
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
@@ -62,6 +62,6 @@ ps.add_value("l2_loss", False)
 ps.add_value("l2_loss_coef", 1e-5)
 
 print("parameter space generated")
-print("number of configurations: ", ps.grid_size)
+print("number of configurations: ", ps.size)
 
 ps.write("nnlm_nrp.params")

@@ -39,6 +39,8 @@ class LookupNCE(Layer):
         self.shared_weights= shared_weights
         self.shared_bias = shared_bias
 
+        #1/(1+kexp(-x)) == 1/(1+exp(-(x-log(k)))
+
 
 
 

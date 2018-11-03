@@ -43,7 +43,7 @@ def generate_ri(k, s, n):
     s = s // 2 * 2
     density = s / k
 
-    ris = tx.sparse_random_mask([n, k],
+    ris = tx.sparse_random_mask(n, k,
                                 density=density,
                                 mask_values=[1, -1],
                                 symmetrical=True)
@@ -357,6 +357,108 @@ def ri_nce_loss(ri_tensors,
         return _sum_rows(sampled_losses)
 
 
+def _sampled_logits_from_parametric_noise(ri_tensors,
+                                          k_dim,
+                                          weights,
+                                          labels,
+                                          inputs,
+                                          input_dim,
+                                          num_true=1,
+                                          partition_strategy="mod",
+                                          name=None):
+    if isinstance(weights, variables.PartitionedVariable):
+        weights = list(weights)
+    if not isinstance(weights, list):
+        weights = [weights]
+
+    with ops.name_scope(name, "compute_sampled_logits",
+                        weights + [inputs, labels]):
+        if labels.dtype != dtypes.int64:
+            labels = math_ops.cast(labels, dtypes.int64)
+        labels_flat = array_ops.reshape(labels, [-1])
+
+        # true_ris
+        true_ris = tx.gather_sparse(sp_tensor=ri_tensors, ids=labels_flat)
+
+        true_w = embedding_lookup_sparse(params=weights,
+                                         sp_ids=tx.sparse_indices(true_ris),
+                                         sp_weights=true_ris,
+                                         combiner="sum",
+                                         partition_strategy=partition_strategy)
+
+        label_layer = tx.TensorLayer(true_w, input_dim)
+        noise_fn = tx.FC(label_layer, 512, fn=tx.relu)
+        noise_fn_sp = tx.ToSparse(noise_fn)
+        noise_ris = tx.Linear(noise_fn_sp, k_dim, weight_init=tx.xavier_init(), bias=True)
+        noise_ris_sp = tx.ToSparse(noise_ris)
+
+        noise_w = embedding_lookup_sparse(params=weights,
+                                          sp_ids=tx.sparse_indices(noise_ris_sp.tensor),
+                                          sp_weights=noise_ris_sp.tensor,
+                                          combiner="sum",
+                                          partition_strategy=partition_strategy)
+
+        noise_logits = math_ops.matmul(inputs, noise_w, transpose_b=True)
+
+        dim = array_ops.shape(true_w)[1:2]
+        new_true_w_shape = array_ops.concat([[-1, num_true], dim], 0)
+        true_w_e = array_ops.reshape(true_w, new_true_w_shape)
+
+        row_wise_dots = math_ops.multiply(array_ops.expand_dims(inputs, 1),
+                                          true_w_e)
+        # We want the row-wise dot plus biases which yields a
+        # [batch_size, num_true] tensor of true_logits.
+        dots_as_matrix = array_ops.reshape(row_wise_dots,
+                                           array_ops.concat([[-1], dim], 0))
+        true_logits = array_ops.reshape(_sum_rows(dots_as_matrix), [-1, num_true])
+
+        # Construct output logits and labels. The true labels/logits start at col 0.
+        out_logits = array_ops.concat([true_logits, noise_logits], 1)
+
+        # true_logits is a float tensor, ones_like(true_logits) is a float
+        # tensor of ones. We then divide by num_true to ensure the per-example
+        # labels sum to 1.0, i.e. form a proper probability distribution.
+        out_labels = array_ops.concat([
+            array_ops.ones_like(true_logits) / num_true,
+            array_ops.zeros_like(noise_logits)
+        ], 1)
+
+        # out_logits = out_logits * math_ops.exp(partition_const)
+        # out_logits = out_logits / (partition_const + 1)
+        return out_logits, out_labels
+
+
+def parametric_ri_nce_loss(ri_tensors,
+                           k_dim,
+                           s_active,
+                           weights,
+                           labels,
+                           inputs,
+                           input_dim,
+                           num_sampled,
+                           num_classes,
+                           num_true=1,
+                           partition_strategy="mod",
+                           name="nce_loss"):
+    with ops.name_scope(name):
+        logits, labels = _sampled_logits_from_parametric_noise(
+            ri_tensors=ri_tensors,
+            k_dim=k_dim,
+            weights=weights,
+            labels=labels,
+            inputs=inputs,
+            input_dim=input_dim,
+            num_true=num_true,
+            partition_strategy=partition_strategy,
+            name=name)
+        sampled_losses = tx.binary_cross_entropy(
+            labels=labels, logits=logits, name="sampled_losses")
+        # sampled_losses is batch_size x {true_loss, sampled_losses...}
+        # We sum out true and sampled losses.
+
+        return _sum_rows(sampled_losses)
+
+
 def random_ri_nce_loss(ri_tensors,
                        k_dim,
                        s_active,
@@ -393,6 +495,7 @@ def _compute_sampled_logits(ri_tensors,
                             weights,
                             bias,
                             labels,
+                            partition_const,
                             inputs,
                             num_sampled,
                             num_classes,
@@ -448,10 +551,10 @@ def _compute_sampled_logits(ri_tensors,
                                          partition_strategy=partition_strategy)
 
         noise_w = embedding_lookup_sparse(params=weights,
-                                            sp_ids=tx.sparse_indices(sampled_ris),
-                                            sp_weights=sampled_ris,
-                                            combiner="sum",
-                                            partition_strategy=partition_strategy)
+                                          sp_ids=tx.sparse_indices(sampled_ris),
+                                          sp_weights=sampled_ris,
+                                          combiner="sum",
+                                          partition_strategy=partition_strategy)
 
         if bias is not None:
             sampled_b = embedding_lookup_sparse(
@@ -486,6 +589,9 @@ def _compute_sampled_logits(ri_tensors,
             true_b = array_ops.reshape(true_b, [-1, num_true])
             true_logits += true_b
             noise_logits += sampled_b
+
+        # TODO  need to review how to do this Z
+        # true_logits = true_logits * math_ops.exp(partition_const)
 
         if remove_accidental_hits:
             acc_hits = candidate_sampling_ops.compute_accidental_hits(
@@ -527,6 +633,8 @@ def _compute_sampled_logits(ri_tensors,
             array_ops.zeros_like(noise_logits)
         ], 1)
 
+        # out_logits = math_ops.div(out_logits,math_ops.exp(partition_const))
+        # out_logits = out_logits / (partition_const + 1)
         return out_logits, out_labels
 
 
@@ -535,6 +643,7 @@ def nce_loss(ri_tensors,
              bias,
              labels,
              inputs,
+             partition_const,
              num_sampled,
              num_classes,
              num_true=1,
@@ -545,6 +654,7 @@ def nce_loss(ri_tensors,
     logits, labels = _compute_sampled_logits(
         ri_tensors=ri_tensors,
         weights=weights,
+        partition_const=partition_const,
         bias=bias,
         labels=labels,
         inputs=inputs,

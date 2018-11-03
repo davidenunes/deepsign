@@ -130,9 +130,9 @@ lookup = tx.Lookup(in_layer, seq_size=seq_size,
 # I was thinking that this reshape could be done automatically based on the input share of
 # the tensor fed to the RNN cell layer
 out = tx.WrapLayer(lookup, embed_dim, shape=[None, seq_size, embed_dim],
-                   tf_fn=lambda tensor: tf.reshape(tensor, [-1, seq_size, embed_dim]))
+                   wrap_fn=lambda tensor: tf.reshape(tensor, [-1, seq_size, embed_dim]))
 
-out = tx.WrapLayer(out, embed_dim, tf_fn=lambda tensor: tensor[0])
+out = tx.WrapLayer(out, embed_dim, wrap_fn=lambda tensor: tensor[0])
 # apply rnn cell to single input batch
 
 with tf.name_scope("rnn"):

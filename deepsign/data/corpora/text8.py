@@ -2,7 +2,7 @@ from smart_open import smart_open
 
 
 class Text8Corpus(object):
-    """Iterate over sentences from the text8 or enwik9 corpus files.
+    """Iterate over sentences from the text8 or enwik9 corpus assets.
 
     The has everything in a single line so this tries to read a chunk with a given
     sentence length at a time. It reads a chunk of bytes and if a token is split,

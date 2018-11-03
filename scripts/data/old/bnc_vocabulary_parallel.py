@@ -97,7 +97,7 @@ if __name__ == '__main__':
     # all sentences
     max_sentences = None
 
-    # corpus and output files
+    # corpus and output assets
     home = os.getenv("HOME")
     corpus_file = home + "/data/gold_standards/bnc_full.hdf5"
     index_filename = home + "/data/gold_standards/bnc_vocab.hdf5"

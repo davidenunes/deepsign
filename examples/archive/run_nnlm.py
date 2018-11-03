@@ -9,13 +9,8 @@ import tensorflow as tf
 from tqdm import tqdm
 
 import tensorx as tx
-from deepsign.data import transform
 from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
-from deepsign.models.nrp import LBL_NRP
-from tensorx.layers import Input
-
-from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.models.nnlm import NNLM
 
 
 def str2bool(v):
@@ -30,7 +25,7 @@ def str2bool(v):
 # ======================================================================================
 # Experiment Args
 # ======================================================================================
-parser = argparse.ArgumentParser(description="LBL base experiment")
+parser = argparse.ArgumentParser(description="NNLM base model experiment")
 
 
 # clean argparse a bit
@@ -51,31 +46,20 @@ param("ngram_size", int, 5)
 param("save_model", str2bool, False)
 param("out_dir", str, default_out_dir)
 
-param("k_dim", int, 4000)
-param("s_active", int, 4)
-
 param("embed_dim", int, 128)
 
 param("embed_init", str, "uniform", valid=["normal", "uniform"])
 param("embed_init_val", float, 0.01)
+param("embed_share", str2bool, False)
 
 param("logit_init", str, "uniform", valid=["normal", "uniform"])
 param("logit_init_val", float, 0.01)
-
-param("use_gate", str2bool, True)
-param("use_hidden", str2bool, False)
-param("embed_share", str2bool, True)
-
-param("x_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("x_to_f_init_val", float, 0.01)
-param("h_to_f_init", str, "uniform", valid=["normal", "uniform"])
-param("h_to_f_init_val", float, 0.01)
 
 param("num_h", int, 1)
 param("h_dim", int, 256)
 param("h_act", str, "relu", valid=['relu', 'tanh', 'elu'])
 
-param("epochs", int, 4)
+param("epochs", int, 10)
 param("batch_size", int, 128)
 param("shuffle", str2bool, True)
 param("shuffle_buffer_size", int, 128 * 10000)
@@ -87,35 +71,40 @@ param("optimizer_beta2", float, 0.999)
 param("optimizer_epsilon", float, 1e-8)
 
 param("lr", float, 0.5)
-param("lr_decay", str2bool, False)
+param("lr_decay", str2bool, True)
 param("lr_decay_rate", float, 0.5)
 # lr does not decay beyond this threshold
 param("lr_decay_threshold", float, 1e-6)
+param("lr_restore", str2bool, False)
+param("lr_restore_rate", float, 0.4)
 # lr decay when last_ppl - current_ppl < eval_threshold
 param("eval_threshold", float, 1.0)
 
 # number of epochs without improvement before stopping
 param("early_stop", str2bool, True)
 param("patience", int, 3)
-param("use_f_predict", str2bool, False)
+param("use_f_predict", str2bool, True)
+param("f_init", str, "uniform", valid=["normal", "uniform"])
+param("f_init_val", float, 0.01)
 
 # REGULARISATION
 # clip grads by norm
 param("clip_grads", str2bool, True)
 # if true clips by local norm, else clip by norm of all gradients
-param("clip_local", str2bool, False)
+param("clip_local", str2bool, True)
 param("clip_value", float, 1.0)
 
 param("dropout", str2bool, True)
 param("embed_dropout", str2bool, True)
-param("keep_prob", float, 0.95)
+param("keep_prob", float, 0.75)
+param("eval_test", str2bool, True)
 
 param("l2_loss", str2bool, False)
 param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
 # ======================================================================================
-# Load Params, Prepare results files
+# Load Params, Prepare results assets
 # ======================================================================================
 
 # Experiment parameter summary
@@ -142,24 +131,11 @@ ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
 ppl_writer.writeheader()
 
 # ======================================================================================
-# CORPUS, Vocab and RIs
+# Load Corpus & Vocab
 # ======================================================================================
 corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
 vocab = marisa_trie.Trie(corpus["vocabulary"])
 
-print("generating random indexes")
-# generates k-dimensional random indexes with s_active units
-ri_generator = Generator(dim=args.k_dim, num_active=args.s_active)
-
-# pre-gen indices for vocab
-# it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
-ris = [ri_generator.generate() for i in range(len(vocab))]
-ri_tensor = to_sparse_tensor_value(ris, dim=args.k_dim)
-
-print("done")
-
-
-# ======================================================================================
 
 def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
     def chunk_fn(x):
@@ -206,37 +182,30 @@ elif args.logit_init == "uniform":
     logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                    maxval=args.logit_init_val)
 
-if args.h_to_f_init == "normal":
-    h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
+f_init = None
+if args.use_f_predict:
+    if args.f_init == "normal":
+        f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
+    elif args.f_init == "uniform":
+        f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-if args.x_to_f_init == "normal":
-    x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
-elif args.h_to_f_init == "uniform":
-    x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
-
-model = LBL_NRP(ctx_size=args.ngram_size - 1,
-                vocab_size=len(vocab),
-                k_dim=args.k_dim,
-                ri_tensor=ri_tensor,
-                embed_dim=args.embed_dim,
-                embed_init=embed_init,
-                x_to_f_init=x_to_f_init,
-                logit_init=logit_init,
-                embed_share=args.embed_share,
-                use_gate=args.use_gate,
-                use_hidden=args.use_hidden,
-                h_dim=args.h_dim,
-                h_activation=h_act,
-                h_init=h_init,
-                h_to_f_init=h_to_f_init,
-                use_dropout=args.dropout,
-                embed_dropout=args.embed_dropout,
-                keep_prob=args.keep_prob,
-                l2_loss=args.l2_loss,
-                l2_loss_coef=args.l2_loss_coef
-                )
+model = NNLM(ctx_size=args.ngram_size - 1,
+             vocab_size=len(vocab),
+             embed_dim=args.embed_dim,
+             embed_init=embed_init,
+             embed_share=args.embed_share,
+             logit_init=logit_init,
+             h_dim=args.h_dim,
+             num_h=args.num_h,
+             h_activation=h_act,
+             h_init=h_init,
+             use_dropout=args.dropout,
+             keep_prob=args.keep_prob,
+             embed_dropout=args.embed_dropout,
+             l2_loss=args.l2_loss,
+             l2_loss_coef=args.l2_loss_coef,
+             use_f_predict=args.use_f_predict,
+             f_init=f_init)
 
 model_runner = tx.ModelRunner(model)
 
@@ -308,7 +277,7 @@ def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
 
 
 def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
-    pb.write("[Eval Validation]")
+    pb.write("[Eval Validation Set]")
 
     val_data = corpus["validation"]
     ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
@@ -317,17 +286,21 @@ def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=Fal
                "perplexity": ppl_validation}
     ppl_writer.writerow(res_row)
 
-    pb.write("Eval Test")
-    test_data = corpus["test"]
-    ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
+    if args.eval_test:
+        pb.write("[Eval Test Set]")
+        test_data = corpus["test"]
+        ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data), display_progress)
 
-    res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
-               "perplexity": ppl_test}
-    ppl_writer.writerow(res_row)
+        res_row = {"id": args.id, "epoch": cur_epoch, "step": step, "lr": lr_param.value, "dataset": "test",
+                   "perplexity": ppl_test}
+        ppl_writer.writerow(res_row)
 
     ppl_file.flush()
 
-    pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
+    if args.eval_test:
+        pb.write("test. ppl = {}".format(ppl_test))
+
+    pb.write("valid. ppl = {}".format(ppl_validation))
     return ppl_validation
 
 
@@ -375,13 +348,17 @@ for ngram_batch in training_data:
                         break
                     patience += 1
                 else:
+                    # restart patience and adjust lr
                     patience = 0
+                    if args.lr_restore:
+                        lr_param.value = min(lr_param.value * (1.0 / args.lr_restore_rate), args.lr)
+                        progress.write("lr increased to {}".format(lr_param.value))
 
             # lr decay only at the start of each epoch
             if args.lr_decay and len(evals) > 0:
                 if evals[-2] - evals[-1] < args.eval_threshold:
                     lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
-                    progress.write("lr changed to {}".format(lr_param.value))
+                    progress.write("lr decreased to {}".format(lr_param.value))
 
     # ================================================
     # TRAIN MODEL

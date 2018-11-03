@@ -7,28 +7,32 @@ import h5py
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
-import traceback
-import tensorx as tx
-from deepsign.data.views import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, flatten_it
-from deepsign.models.nnlm import NNLM
-from exp.args import ParamDict
-from deepsign.data.corpora.ptb import PTBReader
-from deepsign.data.corpora.wiki103 import WikiText103
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorx as tx
+from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
+from deepsign.models.nrp import LBL_NRP
+from deepsign.rp.ri import Generator
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from exp.args import ParamDict
+import traceback
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 defaults = {
+    'id': (int, 0),
+    'run': (int, 1),
     'run_id': (int, 0),  # run id
-    'id': (int, 0),  # param id
-    'run': (int, 1),  # run number within param id
     'corpus': (str, default_corpus),
     'ngram_size': (int, 5),
-    'mark_eos': (bool, True),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
+    # RP default params
+    'k_dim': (int, 5000),
+    's_active': (int, 8),
+    'ri_all_positive': (bool, False),
     # network architecture
     'embed_dim': (int, 128),
     'embed_init': (str, 'normal', ["normal", "uniform"]),
@@ -36,10 +40,21 @@ defaults = {
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
-    'num_h': (int, 1),
     'h_dim': (int, 256),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu']),
-    'epochs': (int, 15),
+
+    # lbl parameters
+    'use_gate': (bool, True),
+    'use_hidden': (bool, True),
+    'embed_share': (bool, True),
+
+    'x_to_f_init': (str, "uniform", ["normal", "uniform"]),
+    'x_to_f_init_val': (float, 0.01),
+    'h_to_f_init': (str, "uniform", ["normal", "uniform"]),
+    'h_to_f_init_val': (float, 0.01),
+
+    # training
+    'epochs': (int, 2),
     'batch_size': (int, 128),
     'shuffle': (bool, True),
     'shuffle_buffer_size': (int, 128 * 10000),
@@ -58,10 +73,8 @@ defaults = {
     'eval_threshold': (float, 1.0),
     'early_stop': (bool, True),
     'patience': (int, 3),
-    'use_f_predict': (bool, True),
     'f_init': (str, "uniform", ["normal", "uniform"]),
     'f_init_val': (float, 0.01),
-    'logit_bias': (bool, False),
 
     # regularisation
     'clip_grads': (bool, True),
@@ -71,12 +84,10 @@ defaults = {
 
     'dropout': (bool, True),
     'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.75),
+    'keep_prob': (float, 0.95),
 
     'l2_loss': (bool, False),
     'l2_loss_coef': (float, 1e-5),
-
-    "eval_test": (bool, True)
 }
 arg_dict = ParamDict(defaults)
 
@@ -85,60 +96,6 @@ def run(**kwargs):
     arg_dict.from_dict(kwargs)
     args = arg_dict.to_namespace()
 
-    # ======================================================================================
-    # Load Corpus & Vocab
-    # ======================================================================================
-    corpus = PTBReader(path=args.corpus, mark_eos=args.mark_eos)
-    corpus_stats = h5py.File(os.path.join(args.corpus, "ptb_stats.hdf5"), mode='r')
-    vocab = marisa_trie.Trie(corpus_stats["vocabulary"])
-
-    def corpus_pipeline(corpus_stream,
-                        n_gram_size=args.ngram_size,
-                        epochs=1,
-                        batch_size=args.batch_size,
-                        shuffle=args.shuffle,
-                        flatten=False):
-        """ Corpus Processing Pipeline.
-
-        Transforms the corpus reader -a stream of sentences or words- into a stream of n-gram batches.
-
-        Args:
-            n_gram_size: the size of the n-gram window
-            corpus_stream: the stream of sentences of words
-            epochs: number of epochs we want to iterate over this corpus
-            batch_size: batch size for the n-gram batch
-            shuffle: if true, shuffles the n-grams according to a buffer size
-            flatten: if true sliding windows are applied over a stream of words rather than within each sentence
-            (n-grams can cross sentence boundaries)
-        """
-
-        if flatten:
-            word_it = flatten_it(corpus_stream)
-            n_grams = window_it(word_it, n_gram_size)
-        else:
-            sentence_n_grams = (window_it(sentence, n_gram_size) for sentence in corpus_stream)
-            n_grams = flatten_it(sentence_n_grams)
-
-        # at this point this is an n_gram iterator
-        n_grams = ([vocab[w] for w in ngram] for ngram in n_grams)
-
-        if epochs > 1:
-            n_grams = repeat_it(n_grams, epochs)
-
-        if shuffle:
-            n_grams = shuffle_it(n_grams, args.shuffle_buffer_size)
-
-        n_grams = batch_it(n_grams, size=batch_size, padding=False)
-        return n_grams
-
-    print("counting samples...")
-    training_len = sum(1 for _ in corpus_pipeline(corpus.training_set(), batch_size=1, epochs=1, shuffle=False))
-    validation_len = sum(1 for _ in corpus_pipeline(corpus.validation_set(), batch_size=1, epochs=1, shuffle=False))
-    test_len = sum(1 for _ in corpus_pipeline(corpus.test_set(), batch_size=1, epochs=1, shuffle=False))
-
-    # ======================================================================================
-    # Load Params, Prepare results files
-    # ======================================================================================
     # Experiment parameter summary
     res_param_filename = os.path.join(args.out_dir, "params_{id}.csv".format(id=args.run_id))
     with open(res_param_filename, "w") as param_file:
@@ -162,9 +119,42 @@ def run(**kwargs):
     ppl_writer.writeheader()
 
     # ======================================================================================
+    # CORPUS, Vocab and RIs
+    # ======================================================================================
+    corpus = h5py.File(os.path.join(args.corpus, "ptb_{}.hdf5".format(args.ngram_size)), mode='r')
+    vocab = marisa_trie.Trie(corpus["vocabulary"])
+
+    # generates k-dimensional random indexes with s_active units
+    all_positive = args.ri_all_positive
+    ri_generator = Generator(dim=args.k_dim, num_active=args.s_active, symmetric=not all_positive)
+
+    # pre-gen indices for vocab
+    # it doesn't matter which ri gets assign to which word since we are pre-generating the indexes
+    ris = [ri_generator.generate() for i in range(len(vocab))]
+    ri_tensor = ris_to_sp_tensor_value(ris, dim=args.k_dim)
+
+    # ri_tensor = RandomIndexTensor.from_ri_list(ris, args.k_dim, args.s_active)
+    # ======================================================================================
+
+    def data_pipeline(data, epochs=1, batch_size=args.batch_size, shuffle=False):
+        def chunk_fn(x):
+            return chunk_it(x, chunk_size=batch_size * 1000)
+
+        if epochs > 1:
+            data = repeat_apply(chunk_fn, data, epochs)
+        else:
+            data = chunk_fn(data)
+
+        if shuffle:
+            data = shuffle_it(data, args.shuffle_buffer_size)
+
+        data = batch_it(data, size=batch_size, padding=False)
+        return data
+
+    # ======================================================================================
     # MODEL
     # ======================================================================================
-    # Configure weight initializers based on activation functions
+    # Activation functions
     if args.h_act == "relu":
         h_act = tx.relu
         h_init = tx.he_normal_init()
@@ -175,7 +165,7 @@ def run(**kwargs):
         h_act = tx.elu
         h_init = tx.he_normal_init()
 
-    # Configure embedding and logit weight initializers
+    # Parameter Init
     if args.embed_init == "normal":
         embed_init = tx.random_normal(mean=0.,
                                       stddev=args.embed_init_val)
@@ -190,41 +180,42 @@ def run(**kwargs):
         logit_init = tx.random_uniform(minval=-args.logit_init_val,
                                        maxval=args.logit_init_val)
 
-    f_init = None
-    if args.use_f_predict:
-        if args.f_init == "normal":
-            f_init = tx.random_normal(mean=0., stddev=args.f_init_val)
-        elif args.f_init == "uniform":
-            f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
+    if args.h_to_f_init == "normal":
+        h_to_f_init = tx.random_normal(mean=0., stddev=args.h_to_f_init_val)
+    elif args.h_to_f_init == "uniform":
+        h_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.h_to_f_init_val)
 
-    model = NNLM(ctx_size=args.ngram_size - 1,
-                 vocab_size=len(vocab),
-                 embed_dim=args.embed_dim,
-                 embed_init=embed_init,
-                 embed_share=args.embed_share,
-                 logit_init=logit_init,
-                 h_dim=args.h_dim,
-                 num_h=args.num_h,
-                 h_activation=h_act,
-                 h_init=h_init,
-                 use_dropout=args.dropout,
-                 keep_prob=args.keep_prob,
-                 embed_dropout=args.embed_dropout,
-                 l2_loss=args.l2_loss,
-                 l2_loss_coef=args.l2_loss_coef,
-                 use_f_predict=args.use_f_predict,
-                 f_init=f_init,
-                 logit_bias=args.logit_bias)
+    if args.x_to_f_init == "normal":
+        x_to_f_init = tx.random_normal(mean=0., stddev=args.x_to_f_init_val)
+    elif args.h_to_f_init == "uniform":
+        x_to_f_init = tx.random_uniform(minval=-args.h_to_f_init_val, maxval=args.x_to_f_init_val)
+
+    model = LBL_NRP(ctx_size=args.ngram_size - 1,
+                    vocab_size=len(vocab),
+                    k_dim=args.k_dim,
+                    ri_tensor=ri_tensor,
+                    embed_dim=args.embed_dim,
+                    embed_init=embed_init,
+                    x_to_f_init=x_to_f_init,
+                    logit_init=logit_init,
+                    embed_share=args.embed_share,
+                    use_gate=args.use_gate,
+                    use_hidden=args.use_hidden,
+                    h_dim=args.h_dim,
+                    h_activation=h_act,
+                    h_init=h_init,
+                    h_to_f_init=h_to_f_init,
+                    use_dropout=args.dropout,
+                    embed_dropout=args.embed_dropout,
+                    keep_prob=args.keep_prob,
+                    l2_loss=args.l2_loss,
+                    l2_loss_coef=args.l2_loss_coef
+                    )
 
     model_runner = tx.ModelRunner(model)
 
-    # Input params can be changed during training by setting their value
-    # lr_param = tx.InputParam(init_value=args.lr)
-    lr_param = tx.EvalStepDecayParam(init_value=args.lr,
-                                     improvement_threshold=args.eval_threshold,
-                                     less_is_better=True,
-                                     decay_rate=args.lr_decay_rate,
-                                     decay_threshold=args.lr_decay_threshold)
+    # we use an InputParam because we might want to change it during training
+    lr_param = tx.InputParam(init_value=args.lr)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":
@@ -285,40 +276,34 @@ def run(**kwargs):
         return np.exp(sum_loss / batches_processed)
 
     def evaluation(runner: tx.ModelRunner, pb, cur_epoch, step, display_progress=False):
+        pb.write("[Eval Validation]")
 
-        ##pb.write("[Eval Validation Set]")
-
-        ppl_validation = eval_model(runner, corpus_pipeline(corpus.validation_set(), epochs=1, shuffle=False),
-                                    validation_len,
+        val_data = corpus["validation"]
+        ppl_validation = eval_model(runner, data_pipeline(val_data, epochs=1, shuffle=False), len(val_data),
                                     display_progress)
         res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
                    "dataset": "validation",
                    "perplexity": ppl_validation}
         ppl_writer.writerow(res_row)
 
-        if args.eval_test:
-            # pb.write("[Eval Test Set]")
+        pb.write("Eval Test")
+        test_data = corpus["test"]
+        ppl_test = eval_model(runner, data_pipeline(test_data, epochs=1, shuffle=False), len(test_data),
+                              display_progress)
 
-            ppl_test = eval_model(runner, corpus_pipeline(corpus.test_set(), epochs=1, shuffle=False), test_len,
-                                  display_progress)
-
-            res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
-                       "dataset": "test",
-                       "perplexity": ppl_test}
-            ppl_writer.writerow(res_row)
+        res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                   "dataset": "test",
+                   "perplexity": ppl_test}
+        ppl_writer.writerow(res_row)
 
         ppl_file.flush()
 
-        if args.eval_test:
-            pb.write("test. ppl = {}".format(ppl_test))
-
-        # pb.write("valid. ppl = {}".format(ppl_validation))
+        pb.write("valid. ppl = {} \n test ppl {}".format(ppl_validation, ppl_test))
         return ppl_validation
 
     # ======================================================================================
     # TRAINING LOOP
     # ======================================================================================
-    print("starting TF")
 
     # preparing evaluation steps
     # I use ceil because I make sure we have padded batches at the end
@@ -328,48 +313,44 @@ def run(**kwargs):
     current_epoch = 0
     patience = 0
 
-    cfg = tf.ConfigProto()
-    cfg.gpu_options.allow_growth = True
-    sess = tf.Session(config=cfg)
+    sess = tf.Session()
     model_runner.set_session(sess)
     model_runner.init_vars()
 
-    print("dset len ", training_len)
-
-    progress = tqdm(total=training_len * args.epochs, position=1)
-    training_data = corpus_pipeline(corpus.training_set(),
-                                    batch_size=args.batch_size,
-                                    epochs=args.epochs,
-                                    shuffle=args.shuffle)
+    training_dset = corpus["training"]
+    progress = tqdm(total=len(training_dset) * args.epochs)
+    training_data = data_pipeline(training_dset, epochs=args.epochs, shuffle=True)
 
     evals = []
-
     try:
-
         for ngram_batch in training_data:
-            epoch = progress.n // training_len + 1
+            epoch = progress.n // len(training_dset) + 1
             # Start New Epoch
             if epoch != current_epoch:
                 current_epoch = epoch
                 epoch_step = 0
-                if progress:
-                    progress.write("epoch: {}".format(current_epoch))
+                progress.write("epoch: {}".format(current_epoch))
 
             # Eval Time
             if epoch_step == 0:
                 current_eval = evaluation(model_runner, progress, epoch, global_step)
-                lr_param.update(current_eval)
-                print(lr_param.eval_history)
-                print("improvement ", lr_param.eval_improvement())
+                evals.append(current_eval)
 
                 if global_step > 0:
-                    if args.early_stop and epoch > 1:
-                        if lr_param.eval_improvement() < lr_param.improvement_threshold:
+                    if args.early_stop:
+                        if evals[-2] - evals[-1] < args.eval_threshold:
                             if patience >= 3:
+                                progress.write("early stop")
                                 break
                             patience += 1
                         else:
                             patience = 0
+
+                    # lr decay only at the start of each epoch
+                    if args.lr_decay and len(evals) > 0:
+                        if evals[-2] - evals[-1] < args.eval_threshold:
+                            lr_param.value = max(lr_param.value * args.lr_decay_rate, args.lr_decay_threshold)
+                            progress.write("lr changed to {}".format(lr_param.value))
 
             # ================================================
             # TRAIN MODEL
@@ -395,7 +376,6 @@ def run(**kwargs):
         model_runner.close_session()
         progress.close()
         tf.reset_default_graph()
-
     except Exception as e:
         traceback.print_exc()
         os.remove(ppl_file.name)
@@ -406,4 +386,4 @@ def run(**kwargs):
 if __name__ == "__main__":
     # test with single gpu
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    run(progress=True)
+    run()

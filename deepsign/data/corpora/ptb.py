@@ -46,7 +46,7 @@ class PTBReader:
 
     """ PTB Corpus Reader
 
-        Implements a sentence iterator over PTB WSJ corpus files. Provided by Mikolov
+        Implements a sentence iterator over PTB WSJ corpus assets. Provided by Mikolov
         with the same pre-processing as in the paper:
          "Empirical Evaluation and Combination of Advanced Language Modeling Techniques"
 
@@ -65,7 +65,7 @@ class PTBReader:
             PTBReader.UNKNOWN_TOKEN
             
         Args:
-            path: path to the directory containing the dataset files
+            path: path to the directory containing the dataset assets
     """
 
     def __init__(self, path, mark_eos=False):

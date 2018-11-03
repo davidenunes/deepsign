@@ -50,3 +50,6 @@ target/
 
 # Idea
 .idea
+
+#VSCODE
+.vscode

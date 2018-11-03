@@ -4,11 +4,26 @@
 import tensorx as tx
 from tensorx.utils import to_tensor_cast
 import tensorflow as tf
+from tensorflow.python.ops.candidate_sampling_ops import learned_unigram_candidate_sampler as learned_unigram
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
 import numpy as np
 
 from deepsign.models.ri_nce import ri_nce_loss, random_ri_nce_loss, nce_loss
 from deepsign.rp.tf_utils import RandomIndexTensor
+
+
+def _sum_rows(x):
+    with tf.name_scope("row_sum"):
+        """Returns a vector summing up each row of the matrix x."""
+        # _sum_rows(x) is equivalent to math_ops.reduce_sum(x, 1) when x is
+        # a matrix.  The gradient of _sum_rows(x) is more efficient than
+        # reduce_sum(x, 1)'s gradient in today's implementation. Therefore,
+        # we use _sum_rows(x) in the nce_loss() computation since the loss
+        # is mostly used for training.
+        cols = tf.shape(x)[1]
+        ones_shape = tf.stack([cols, 1])
+        ones = tf.ones(ones_shape, x.dtype)
+        return tf.reshape(tf.matmul(x, ones), [-1])
 
 
 class LBL_NRP(tx.Model):
@@ -91,7 +106,7 @@ class LBL_NRP(tx.Model):
             # ===========================================================
 
             if use_gate or use_hidden:
-                hl = tx.Linear(feature_lookup, h_dim, h_init, name="h_linear")
+                hl = tx.Linear(feature_lookup, h_dim, h_init, bias=True, name="h_linear")
                 ha = tx.Activation(hl, h_activation, name="h_activation")
                 h = tx.Compose(hl, ha, name="hidden")
                 var_reg.append(hl.weights)
@@ -102,12 +117,12 @@ class LBL_NRP(tx.Model):
                 gate = features
                 var_reg.append(features.gate_weights)
 
-            x_to_f = tx.Linear(features, embed_dim, x_to_f_init, name="x_to_f")
+            x_to_f = tx.Linear(features, embed_dim, x_to_f_init, bias=True, name="x_to_f")
             var_reg.append(x_to_f.weights)
             f_prediction = x_to_f
 
             if use_hidden:
-                h_to_f = tx.Linear(h, embed_dim, h_to_f_init, name="h_to_f")
+                h_to_f = tx.Linear(h, embed_dim, h_to_f_init, bias=True, name="h_to_f")
                 var_reg.append(h_to_f.weights)
                 f_prediction = tx.Add(x_to_f, h_to_f, name="f_predicted")
 
@@ -223,7 +238,8 @@ class NNLM_NRP(tx.Model):
                  embed_share=True,
                  logit_bias=False,
                  use_nce=False,
-                 nce_samples=100
+                 nce_samples=100,
+                 noise_level=0.1
                  ):
 
         run_inputs = tx.Input(ctx_size, dtype=tf.int32)
@@ -248,20 +264,22 @@ class NNLM_NRP(tx.Model):
             # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
             # ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
             with tf.name_scope("ri_encode"):
-                # used to compute logits
                 if isinstance(ri_tensor, RandomIndexTensor):
-                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
+                    ri_tensor = ri_tensor
+                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim, shape=[vocab_size, k_dim])
 
                     ri_inputs = ri_tensor.gather(run_inputs.tensor)
                     ri_inputs = ri_inputs.to_sparse_tensor()
-                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim, shape=[ri_inputs.get_shape()[0], k_dim])
                 # ri_tensor is a sparse tensor
                 else:
-                    ri_layer = tx.TensorLayer(ri_tensor, k_dim)
-                    ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
-                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
+                    raise TypeError("please supply RandomIndexTensor instead of sparse Tensor")
+                    # ri_layer = tx.TensorLayer(ri_tensor, k_dim)
+                    # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
+                    # ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
 
             feature_lookup = tx.Lookup(ri_inputs, ctx_size, [k_dim, embed_dim], embed_init, name="lookup")
+            self.embeddings = feature_lookup
             var_reg.append(feature_lookup.weights)
             feature_lookup = feature_lookup.as_concat()
             # ===========================================================
@@ -276,9 +294,11 @@ class NNLM_NRP(tx.Model):
                 last_layer = h
                 var_reg.append(h_i.weights)
 
+            self.h_layers = h_layers
+
             # feature prediction for Energy-Based Model
 
-            f_prediction = tx.Linear(last_layer, embed_dim, f_init, name="f_predict")
+            f_prediction = tx.Linear(last_layer, embed_dim, f_init, bias=True, name="f_predict")
             var_reg.append(f_prediction.weights)
 
             # RI DECODING ===============================================
@@ -328,216 +348,30 @@ class NNLM_NRP(tx.Model):
             train_embed_prob = tx.Activation(train_logits, tx.softmax, name="train_output")
 
             if use_nce:
-                # TODO I should have a dedicated NCE layer to avoid creating weights
-                # in a different layer
-                # w = tx.Linear(ri_inputs, embed_dim, bias=True)
-                # if I don't remove accidental hits the loss gets huge sometimes
-                train_loss = nce_loss(ri_tensors=ri_layer.tensor,
-                                      weights=feature_lookup.weights,
-                                      bias=None,
-                                      labels=loss_inputs.tensor,
-                                      inputs=f_prediction.tensor,
-                                      num_sampled=nce_samples,
-                                      num_classes=vocab_size,
-                                      num_true=1,
-                                      remove_accidental_hits=True
-                                      )
+                # labels
+                labels = loss_inputs.tensor
+
+                #  convert labels to random indices
+                def labels_to_ri(x):
+                    random_index_tensor = ri_tensor.gather(x)
+                    sp_features = random_index_tensor.to_sparse_tensor()
+                    return sp_features
+
+                model_prediction = f_prediction.tensor
+
+                train_loss = tx.sparse_cnce_loss(label_features=labels,
+                                                 model_prediction=model_prediction,
+                                                 weights=feature_lookup.weights,
+                                                 noise_ratio=noise_level,
+                                                 num_samples=nce_samples,
+                                                 labels_to_sparse_features=labels_to_ri)
+
+
             else:
                 one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
                 train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
 
                 train_loss = tf.reduce_mean(train_loss)
-
-            if l2_loss:
-                losses = [tf.nn.l2_loss(var) for var in var_reg]
-                train_loss = train_loss + l2_loss_coef * tf.add_n(losses)
-
-        # ===============================================
-        # EVAL GRAPH
-        # ===============================================
-        with tf.name_scope("eval"):
-            one_hot = tx.dense_one_hot(column_indices=eval_inputs.tensor, num_cols=vocab_size)
-            eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
-            eval_loss = tf.reduce_mean(eval_loss)
-
-        # BUILD MODEL
-        super().__init__(run_in_layers=run_inputs, run_out_layers=embed_prob,
-                         train_in_layers=run_inputs, train_out_layers=train_embed_prob,
-                         eval_in_layers=run_inputs, eval_out_layers=embed_prob,
-                         train_loss_tensors=train_loss, train_loss_in=loss_inputs,
-                         eval_tensors=eval_loss, eval_tensors_in=eval_inputs)
-
-
-class NNLM_NRP_RNN(tx.Model):
-    """ Neural Probabilistic Language Model with NRP and Recurrent Context
-
-
-    if use_f_predict is True, this model can be interpreted as an
-
-    Energy-based Neural Network Language Modelling network
-
-    Same as Bengio Neural Probabilistic Language Model but with a linear layer
-    at the end feature_pred with the same dimensions as the embeddings and possibly
-    with embedding sharing between input and output layers
-
-    """
-
-    def __init__(self,
-                 ctx_size,
-                 vocab_size,
-                 k_dim,
-                 s_active,
-                 ri_tensor,
-                 embed_dim,
-                 h_dim,
-                 embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 num_h=1,
-                 use_dropout=False,
-                 embed_dropout=False,
-                 keep_prob=0.95,
-                 l2_loss=False,
-                 l2_loss_coef=1e-5,
-                 f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 embed_share=False,
-                 logit_bias=False,
-                 use_nce=False,
-                 nce_samples=100
-                 ):
-
-        run_inputs = tx.Input(ctx_size, dtype=tf.int32)
-        loss_inputs = tx.Input(n_units=1, dtype=tf.int64)
-        eval_inputs = loss_inputs
-
-        if run_inputs.dtype != tf.int32 and run_inputs.dtype != tf.int64:
-            raise TypeError("Invalid dtype for input: expected int32 or int64, got {}".format(run_inputs.dtype))
-
-        if num_h < 0:
-            raise ValueError("num hidden should be >= 0")
-
-        # ===============================================
-        # RUN GRAPH
-        # ===============================================
-        var_reg = []
-
-        with tf.name_scope("run"):
-            # RI ENCODING ===============================================
-            # convert ids to ris gather a set of random indexes based on the ids in a sequence
-            # ri_layer = tx.TensorLayer(ri_tensor, n_units=k_dim)
-            # ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
-            # ri_inputs = tx.TensorLayer(ri_inputs, n_units=k_dim)
-            with tf.name_scope("ri_encode"):
-                # used to compute logits
-                if isinstance(ri_tensor, RandomIndexTensor):
-                    ri_layer = tx.TensorLayer(ri_tensor.to_sparse_tensor(), k_dim)
-
-                    ri_inputs = ri_tensor.gather(run_inputs.tensor)
-                    ri_inputs = ri_inputs.to_sparse_tensor()
-                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
-                # ri_tensor is a sparse tensor
-                else:
-                    ri_layer = tx.TensorLayer(ri_tensor, k_dim)
-                    ri_inputs = tx.gather_sparse(ri_layer.tensor, run_inputs.tensor)
-                    ri_inputs = tx.TensorLayer(ri_inputs, k_dim)
-
-            lookup = tx.Lookup(ri_inputs,
-                               ctx_size,
-                               [k_dim, embed_dim],
-                               embed_init,
-                               name="lookup")
-
-            var_reg.append(lookup.weights)
-            lookup = lookup.as_seq()
-
-            # reshape to [batch x seq_size x feature_shape[1]]
-            # lookup_to_seq = tf.reshape(feature_lookup.tensor, [-1, seq_size, embed_dim])
-            # ===========================================================
-
-            state = None
-            # recurrent context
-            h_layers = []
-            for i in range(ctx_size):
-                rnn_cell = tx.RNNCell(lookup[i], h_dim, previous_state=state)
-                state = rnn_cell
-                h_layers.append(state)
-            last_layer = state
-
-            # num_h would be a stacked configuration, I can do that latter
-            # h_layers = []
-            # for i in range(num_h):
-            #    h_i = tx.Linear(last_layer, h_dim, h_init, bias=True, name="h_{i}_linear".format(i=i))
-            #    h_a = tx.Activation(h_i, h_activation)
-            #    h = tx.Compose([h_i, h_a], name="h_{i}".format(i=i))
-            #    h_layers.append(h)
-            #    last_layer = h
-            #    var_reg.append(h_i.weights)
-
-            # feature prediction for Energy-Based Model
-
-            f_prediction = tx.Linear(last_layer, embed_dim, f_init, name="f_predict")
-            var_reg.append(f_prediction.weights)
-
-            # RI DECODING ===============================================
-
-            shared_weights = lookup.weights if embed_share else None
-            logit_init = logit_init if not embed_share else None
-
-            # ri_dense = tx.ToDense(ri_layer)
-            all_embeddings = tx.Linear(ri_layer, embed_dim, logit_init, shared_weights, name="all_features",
-                                       bias=False)
-
-            # dot product of f_predicted . all_embeddings with bias for each target word
-            run_logits = tx.Linear(f_prediction, vocab_size, shared_weights=all_embeddings.tensor,
-                                   transpose_weights=True,
-                                   bias=logit_bias, name="logits")
-
-            if not embed_share:
-                var_reg.append(all_embeddings.weights)
-            # ===========================================================
-
-            embed_prob = tx.Activation(run_logits, tx.softmax, name="run_output")
-
-        # ===============================================
-        # TRAIN GRAPH
-        # ===============================================
-        with tf.name_scope("train"):
-            if use_dropout and embed_dropout:
-                lookup = lookup.reuse_with(ri_inputs)
-                last_layer = tx.Dropout(lookup, keep_prob=keep_prob)
-            else:
-                last_layer = lookup
-
-            # add dropout between each layer (naive approach)
-            # it's recommended to use the same mask between steps
-            # or variational dropout
-            state = None
-            for i in range(ctx_size):
-                rnn_cell = h_layers[i].reuse_with(last_layer[i], previous_state=state)
-                if use_dropout:
-                    rnn_cell = tx.Dropout(rnn_cell, keep_prob=keep_prob)
-
-                state = rnn_cell
-            last_layer = state
-
-            f_prediction = f_prediction.reuse_with(last_layer)
-
-            train_logits = run_logits.reuse_with(f_prediction, name="train_logits")
-            train_embed_prob = tx.Activation(train_logits, tx.softmax, name="train_output")
-
-            if use_nce:
-                train_loss = random_ri_nce_loss(ri_tensors=ri_layer.tensor, k_dim=k_dim, s_active=s_active,
-                                                weights=lookup.weights,
-                                                labels=loss_inputs.tensor,
-                                                inputs=f_prediction.tensor,
-                                                num_sampled=nce_samples,
-                                                num_classes=vocab_size,
-                                                num_true=1,
-                                                )
-            else:
-                one_hot = tx.dense_one_hot(column_indices=loss_inputs.tensor, num_cols=vocab_size)
-                train_loss = tx.categorical_cross_entropy(one_hot, train_logits.tensor)
-
-            train_loss = tf.reduce_mean(train_loss)
 
             if l2_loss:
                 losses = [tf.nn.l2_loss(var) for var in var_reg]

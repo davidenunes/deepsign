@@ -53,7 +53,7 @@ h_dim = args.h_dim
 # training params
 batch_size = args.batch_size
 
-# files
+# assets
 home = os.getenv("HOME")
 model_suffix = "{k}_{s}_h{h}".format(k=k, s=s, h=h_dim)
 result_dir = home + args.out_dir

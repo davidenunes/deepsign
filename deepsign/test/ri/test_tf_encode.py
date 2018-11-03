@@ -1,7 +1,7 @@
 import unittest
 from deepsign.rp.ri import Generator
 from deepsign.rp.index import SignIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 
 class MyTestCase(unittest.TestCase):
@@ -22,7 +22,7 @@ class MyTestCase(unittest.TestCase):
             ri = self.sign_index.get_ri(word)
             ris.append(ri)
 
-        result = to_sparse_tensor_value(ris,self.sign_index.feature_dim())
+        result = ris_to_sp_tensor_value(ris, self.sign_index.feature_dim())
         print(result)
 
     def test_encode_sp_positive(self):
@@ -40,7 +40,7 @@ class MyTestCase(unittest.TestCase):
             ri = self.sign_index.get_ri(word)
             ris.append(ri)
 
-        result = to_sparse_tensor_value(ris, self.sign_index.feature_dim(),all_positive=True)
+        result = ris_to_sp_tensor_value(ris, self.sign_index.feature_dim(), all_positive=True)
         print(result)
 
 

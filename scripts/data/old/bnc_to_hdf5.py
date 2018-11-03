@@ -89,7 +89,7 @@ def convert_file(filename):
 
 
 
-print("Processing BNC corpus files in ",bnc_dir)
+print("Processing BNC corpus assets in ",bnc_dir)
 files = file_walker(bnc_dir)
 
 for file in tqdm(sorted(files)):

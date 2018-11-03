@@ -3,7 +3,7 @@ import tensorflow as tf
 from deepsign.rp.ri import Generator
 import numpy as np
 from tqdm import tqdm
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 
 ri_dim = 1000
 ri_s = 10

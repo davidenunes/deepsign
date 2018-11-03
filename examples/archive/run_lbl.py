@@ -107,7 +107,7 @@ param("l2_loss_coef", float, 1e-5)
 
 args = parser.parse_args()
 # ======================================================================================
-# Load Params, Prepare results files
+# Load Params, Prepare results assets
 # ======================================================================================
 
 # Experiment parameter summary

@@ -1,5 +1,5 @@
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import to_sparse_tensor_value
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value
 import tensorx as tx
 import tensorflow as tf
 import numpy as np
@@ -15,7 +15,7 @@ embed_size = 6
 generator = Generator(k, s)
 ris = [generator.generate() for _ in range(vocab_size)]
 # ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
-ri_tensor = to_sparse_tensor_value(ris, k)
+ri_tensor = ris_to_sp_tensor_value(ris, k)
 ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
 
 num_samples = 4
@@ -44,7 +44,7 @@ all_ris = tx.gather_sparse(ri_tensor, all_ids)
 
 # weights shape is [num_classes, dim]
 ri_layer = tx.TensorLayer(ri_tensor, k)
-l = tx.Linear(ri_layer, embed_size, weight_init=tx.random_normal(0, 1))
+l = tx.Linear(ri_layer, embed_size, weight_init=tx.random_normal(0, 1), bias=True)
 weights = l.weights
 
 sp_values = all_ris

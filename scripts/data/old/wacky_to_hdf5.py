@@ -95,7 +95,7 @@ def convert_file(file_name):
     reader.source.close()
     print("Finished with: ", file_name)
 
-print("Processing WaCKy corpus files in ",dir)
+print("Processing WaCKy corpus assets in ",dir)
 files = [f for f in os.listdir(dir) if fnmatch.fnmatch(f,"*.xml.gz")]
 
 

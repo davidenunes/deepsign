@@ -90,7 +90,7 @@ def run(**kwargs):
     args = arg_dict.to_namespace()
 
     # ======================================================================================
-    # Load Params, Prepare results files
+    # Load Params, Prepare results assets
     # ======================================================================================
     # os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     # print(args.corpus)

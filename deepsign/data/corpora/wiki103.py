@@ -51,7 +51,7 @@ class WikiText103:
     """ 
             
         Args:
-            path: path to the directory containing the dataset files
+            path: path to the directory containing the dataset assets
     """
 
     def __init__(self, path, mark_eos=False):

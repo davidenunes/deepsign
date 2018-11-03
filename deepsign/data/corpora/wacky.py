@@ -27,8 +27,8 @@ RE_WORD = re.compile('(.*)\t(.*)\t(.*)')
 class WaCKyCorpus:
     """ WacKy Corpus Reader
 
-        Implements a sentence iterator over WaCKy corpus files.
-        The files are usualy compressed so this uses gzip to open them. They are also encoded using latin1, so I found
+        Implements a sentence iterator over WaCKy corpus assets.
+        The assets are usualy compressed so this uses gzip to open them. They are also encoded using latin1, so I found
         it necessary to open them with this encoding (SO-8859-1). An example for the usage of this reader is provided in
         this module if you execute it directly.
 
