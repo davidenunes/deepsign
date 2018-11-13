@@ -5,11 +5,15 @@ import tensorx as tx
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
+from deepsign.models.nrp_nce import NRP
 from deepsign.rp.ri import Generator, RandomIndex, ri_from_indexes
+from deepsign.rp.index import TrieSignIndex
 import deepsign.data.views as views
-
+from deepsign.rp.tf_utils import ris_to_sp_tensor_value, generate_noise
 from tqdm import tqdm
 import os
+from scipy.stats import chisquare, kstest, uniform
+import time
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -57,6 +61,20 @@ class TestModels(unittest.TestCase):
             # result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
             result = runner.train(data, labels)
 
+    def test_tx_random_choice(self):
+        range_max = 100
+        num_samples = 10
+        batch_size = 10000
+
+        samples = tx.choice(range_max, num_samples, batch_size)
+        result = samples.eval()
+        test = chisquare(result)
+        plt.hist(result)
+        plt.show()
+        #print(test)
+
+
+
     def test_nnlm_nrp(self):
         vocab_size = 100000
         embed_dim = 512
@@ -96,60 +114,55 @@ class TestModels(unittest.TestCase):
         for _ in tqdm(range(10)):
             runner.train(data, labels)
 
-    def test_nce_nnlm_nrp(self):
-        # ok for vocab bigger than 1000 with 10 samples, the eval keeps getting worse
-        # gradient clipping too high also damages performance
-        # lower dimensional k also turns the problem more challenging
-        # so this depends more on k than on number of samples ?
-        # also seems sensible to value of s, a bigger s makes the problem more difficult?
-        # I know what it is: it's the fucking function that is malformed
-        # I need to use tensorx lookup for the noise lookup otherwise I end up with a single vector
-        # when using lookup sparse
-        # when what I weant is multiple vectors, one for each noise sample
-        vocab_size = 10000
-        k = 400
+    def test_nce_nrp(self):
+        vocab_size = 1000
+        k = 500
         s = 8
-        embed_size = 100
-        nce_samples = 1
+        embed_size = 128
+        nce_samples = 10
+        noise_ratio = 0.1
+
+        vocab = [str(i) for i in range(vocab_size)]
 
         generator = Generator(k, s)
-        ris = [generator.generate() for _ in range(vocab_size)]
-        ri_tensor = RandomIndexTensor.from_ri_list(ris, k, s)
+        sign_index = TrieSignIndex(generator, vocabulary=vocab, pregen_indexes=True)
+        ris = [sign_index.get_ri(sign_index.get_sign(i)) for i in range(len(sign_index))]
+        # ris = [generator.generate() for _ in range(vocab_size)]
 
-        # ri_tensor = to_sparse_tensor_value(ris, k)
-        # ri_tensor = tf.convert_to_tensor_or_sparse_tensor(ri_tensor)
+        ri_tensor = ris_to_sp_tensor_value(ri_seq=ris,
+                                           dim=k,
+                                           all_positive=False)
 
-        model = NNLM_NRP(ctx_size=2,
-                         vocab_size=vocab_size,
-                         k_dim=k,
-                         num_h=2,
-                         s_active=s,
-                         h_activation=tf.nn.selu,
-                         ri_tensor=ri_tensor,
-                         embed_dim=embed_size,
-                         embed_share=True,
-                         h_dim=128,
-                         use_dropout=True,
-                         embed_dropout=True,
-                         keep_prob=0.75,
-                         use_nce=True,
-                         nce_samples=nce_samples,
-                         # 0.04
-                         noise_level=0.08
-                         )
+        ri_tensor_input = tx.SparseInput(n_units=k, value=ri_tensor)
+
+        model = NRP(ctx_size=2,
+                    vocab_size=vocab_size,
+                    k_dim=k,
+                    ri_tensor_input=ri_tensor_input,  # current dictionary state
+                    embed_dim=embed_size,
+                    h_dim=128,
+                    num_h=1,
+                    h_activation=tx.relu,
+                    use_dropout=True,
+                    embed_dropout=True,
+                    keep_prob=0.70,
+                    nce_samples=nce_samples,
+                    nce_noise_amount=noise_ratio
+                    )
 
         tf.summary.histogram("embeddings", model.embeddings.weights)
         for h in model.h_layers:
-            tf.summary.histogram("h", h.layers[0].weights)
+            tf.summary.histogram("h", h.linear.weights)
 
         # model.eval_tensors.append(model.train_loss_tensors[0])
         runner = tx.ModelRunner(model)
-        runner.set_log_dir("/tmp/")
+        runner.set_log_dir("/tmp")
         runner.log_graph()
+        print("log graph")
 
-        # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         # options = None
-        # runner.set_session(runtime_stats=True,run_options=options)
+        runner.set_session(runtime_stats=True, run_options=options)
 
         # options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 
@@ -164,40 +177,20 @@ class TestModels(unittest.TestCase):
                                 # gradient_op=lambda grad: tf.clip_by_global_norm(grad, 10.0)[0])
                                 gradient_op=lambda grad: tf.clip_by_norm(grad, 1.0))
 
-        # runner.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.001))  # ,
-        # runner.config_optimizer(tx.AMSGrad(learning_rate=0.001),
-        #                        global_gradient_op=lambda grad: tf.clip_by_global_norm(grad, 1.0))
-
         data = np.array([[0, 2], [5, 7], [9, 8], [3, 4], [1, 9], [12, 8]])
         labels = np.array([[32], [56], [12], [2], [5], [23]])
 
-        #
-        # data = np.array([[0, 2]])
-        # labels = np.array([[32]])
-
-        # perplexity should be 2 on average
-
-        # runner.init_vars()
-
-        # TODO streamline this
-        # true_logits = runner.session.run(model.true_logits, {model.run_in_layers[0].placeholder: data,
-        #                                                    model.train_loss_in[0].placeholder: labels})
-        # noise_logits = runner.session.run(model.noise_logits, {model.run_in_layers[0].placeholder: data,
-        #                                                       model.train_loss_in[0].placeholder: labels})
-        # print(np.shape(true_logits))
-        # print(np.shape(noise_logits))
-
         ppl_curve = []
-        n = 1000
-        b = 2
+        n = 256
+        batch_size = 128
 
         dataset = np.column_stack((data, labels))
-        print(dataset)
+        # print(dataset)
         dataset = views.repeat_it([dataset], n)
         dataset = views.flatten_it(dataset)
         # shuffle 5 at a time
         dataset = views.shuffle_it(dataset, 6)
-        dataset = views.batch_it(dataset, b)
+        dataset = views.batch_it(dataset, batch_size)
 
         # print(np.array(list(dataset)))
         # d = list(views.take_it(1, views.shuffle_it(d, 4)))[0]
@@ -205,27 +198,47 @@ class TestModels(unittest.TestCase):
         data_stream = dataset
 
         i = 0
-        for data_stream in tqdm(data_stream, total=n * 5 / b):
+        for data_stream in tqdm(data_stream, total=n * 5 / batch_size):
             sample = np.array(data_stream)
 
+            t0 = time.time()
             ctx = sample[:, :-1]
-            lbl = sample[:, -1:]
-            runner.train(ctx, lbl, output_loss=True)
-            if i % 5 == 0:
-                res = runner.eval(ctx, lbl, write_summaries=False)
-                if np.isnan(res):
-                    print()
-                # print(res)
-                ppl_curve.append(np.exp(res))
-            i += 1
-            # if i % 80 == 0:
-            #    lr.value = lr.value * 0.5
-        print(i)
+            ctx.flatten()
+            ctx = ctx.flatten()
+            ctx_ris = [sign_index.get_ri(sign_index.get_sign(i)) for i in ctx]
+            ctx_ris = ris_to_sp_tensor_value(ctx_ris,
+                                             dim=sign_index.feature_dim(),
+                                             all_positive=not sign_index.generator.symmetric)
+            lbl_ids = sample[:, -1:]
+            lbl = lbl_ids.flatten()
+            lbl_ris = [sign_index.get_ri(sign_index.get_sign(i)) for i in lbl]
+            lbl_ris = ris_to_sp_tensor_value(lbl_ris,
+                                             dim=sign_index.feature_dim(),
+                                             all_positive=not sign_index.generator.symmetric)
 
-        ppl = sns.lineplot(x=np.array(list(range(len(ppl_curve)))), y=np.array(ppl_curve))
-        print(ppl_curve)
-        plt.show()
-        # print("ppl ",np.exp(res))
+            noise = generate_noise(k_dim=k,
+                                   batch_size=lbl_ris.dense_shape[0] * nce_samples,
+                                   ratio=noise_ratio)
+            t1 = time.time()
+            # print(t1 - t0)
+            # tf.summary.scalar("ctx convert time", t1 - t0)
+
+            runner.train(ctx_ris, [lbl_ris, noise], output_loss=True, write_summaries=True)
+
+        runner.close_session()
+
+    #            if i % 5 == 0:
+    #                res = runner.eval(ctx_ris, lbl_ids, write_summaries=False)
+    #                if np.isnan(res):
+    #                    print()
+    #                ppl_curve.append(np.exp(res))
+    #            i += 1
+    #        print(i)
+
+    #        ppl = sns.lineplot(x=np.array(list(range(len(ppl_curve)))), y=np.array(ppl_curve))
+    #        print(ppl_curve)
+    #        plt.show()
+    # print("ppl ",np.exp(res))
 
     def test_nce_nnlm(self):
         vocab_size = 1000
@@ -252,7 +265,7 @@ class TestModels(unittest.TestCase):
 
         options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         # options = None
-        # runner.set_session(runtime_stats=True,run_options=options)
+        runner.set_session(runtime_stats=True, run_options=options)
         runner.set_log_dir("/tmp/")
         runner.log_graph()
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.01),

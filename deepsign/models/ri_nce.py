@@ -74,7 +74,7 @@ def sample_ri(k, s, n, true_ri):
 
     sampled_ids, true_expected, sampled_expected = tx.sample_with_expected(k, s, true_ri_indices, num_true=s,
                                                                            batch_size=n, unique=True)
-    sampled_ri_indices = tx.column_indices_to_matrix_indices(sampled_ids, dtype=dtypes.int64)
+    sampled_ri_indices = tx.to_matrix_indices(sampled_ids, dtype=dtypes.int64)
 
     ri_values = array_ops.tile([1., -1.], [n * (s // 2)])
 

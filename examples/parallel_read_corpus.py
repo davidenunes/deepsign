@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Example for the use of multiprocessing and spaCy to read and process a corpus dataset
-# in parallel. The problem with this is that in order to transform it into a parallel processing
+# in parallel. The problem with this is that in order to transform.py it into a parallel processing
 # with random indexing, the sign index update becomes the bottleneck
 # perhaps this bottleneck is not as sever as I think it is, I should just implement it and profile the code
 # in production, some kind of system providing the sign index would have to exist anyway unless I find a way

@@ -260,7 +260,7 @@ def run(**kwargs):
                 logit_bias=args.logit_bias,
                 use_nce=args.nce,
                 nce_samples=args.nce_samples,
-                noise_level=0.04)
+                nce_noise_amount=0.04)
 
     model_runner = tx.ModelRunner(model)
 
