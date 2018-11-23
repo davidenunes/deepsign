@@ -3,7 +3,7 @@ from deepsign.rp.ri import Generator
 import numpy as np
 import numpy.testing as npt
 
-import deepsign.data.views as view
+import deepsign.data.iterators as view
 
 
 class TestSparseNPView(unittest.TestCase):

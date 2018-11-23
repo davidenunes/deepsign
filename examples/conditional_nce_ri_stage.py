@@ -4,7 +4,7 @@ from tensorflow.python.ops.nn import embedding_lookup_sparse, embedding_lookup, 
 
 from deepsign.rp.tf_utils import RandomIndexTensor
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 
 import os
 import numpy as np
@@ -171,9 +171,9 @@ opt = tx.AMSGrad(learning_rate=lr.tensor)
 
 model = tx.Model(
     run_in_layers=input_layer,
-    train_loss_in=input_labels,
-    train_loss_tensors=sampled_loss,
-    eval_tensors=val_loss
+    train_in_loss=input_labels,
+    train_out_loss=sampled_loss,
+    eval_out_score=val_loss
 )
 runner = tx.ModelRunner(model)
 runner.set_session()

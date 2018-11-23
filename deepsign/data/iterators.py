@@ -22,7 +22,7 @@ def repeat_it(iterable, n):
     return itertools.chain.from_iterable(itertools.repeat(x, n) for x in iterable)
 
 
-def pairwise(iterable):
+def pair_it(iterable):
     """
     Example:
         s -> (s0,s1), (s1,s2), (s2, s3), ...
@@ -55,7 +55,7 @@ def divide_slices(n, n_slices=1, offset=0):
         ss.append(s)
 
     ss.append(n)
-    ranges = [range(s[0] + offset, s[1] + offset) for s in pairwise(ss)]
+    ranges = [range(s[0] + offset, s[1] + offset) for s in pair_it(ss)]
 
     return ranges
 

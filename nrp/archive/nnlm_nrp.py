@@ -11,12 +11,12 @@ import traceback
 
 import tensorx as tx
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
+from deepsign.data.iterators import chunk_it, batch_it, shuffle_it, repeat_apply
 from deepsign.models.nrp import NNLM_NRP, RandomIndexTensor
 from exp.args import ParamDict
 
 from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
@@ -220,7 +220,7 @@ def run(**kwargs):
     # model_runner.set_session(sess)
 
     # we use an InputParam because we might want to change it during training
-    lr_param = tx.InputParam(init_value=args.lr)
+    lr_param = tx.InputParam(value=args.lr)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":

@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from deepsign.data.corpora.pipe import WaCKyPipe
 from deepsign.nlp.tokenization import Tokenizer
-from deepsign.data.views import chunk_it
+from deepsign.data.iterators import chunk_it
 
 
 def build_vocabulary(corpus_file, output_file=None, max_sentences=0):

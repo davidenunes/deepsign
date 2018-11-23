@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 import tensorx as tx
-from deepsign.data.views import batch_it, shuffle_it, repeat_it
+from deepsign.data.iterators import batch_it, shuffle_it, repeat_it
 
 N = 10000
 M = 1000
@@ -47,8 +47,8 @@ loss = tx.binary_cross_entropy(labels=label_layer.tensor, logits=out.tensor)
 
 model = tx.Model(run_in_layers=in_layer,
                  run_out_layers=out_prob,
-                 train_loss_in=label_layer,
-                 train_loss_tensors=loss)
+                 train_in_loss=label_layer,
+                 train_out_loss=loss)
 
 runner = tx.ModelRunner(model)
 runner.config_optimizer(optimizer=tf.train.AdamOptimizer(learning_rate=0.001))

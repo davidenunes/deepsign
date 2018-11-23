@@ -1,5 +1,5 @@
 from tensorx_old.models.word2vec import SkipGram
-from deepsign.data.views import windows
+from deepsign.data.iterators import windows
 
 import gensim
 

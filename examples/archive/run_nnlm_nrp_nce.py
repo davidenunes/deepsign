@@ -10,11 +10,11 @@ from tqdm import tqdm
 
 import tensorx as tx
 
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply
+from deepsign.data.iterators import chunk_it, batch_it, shuffle_it, repeat_apply
 from deepsign.models.nrp import NNLM_NRP,NNLMNRP_NCE, RandomIndexTensor
 
 from deepsign.rp.ri import Generator
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 
 
 def str2bool(v):
@@ -233,7 +233,7 @@ model = NNLMNRP_NCE(ctx_size=args.ngram_size - 1,
 model_runner = tx.ModelRunner(model)
 
 # we use an InputParam because we might want to change it during training
-lr_param = tx.InputParam(init_value=args.lr)
+lr_param = tx.InputParam(value=args.lr)
 if args.optimizer == "sgd":
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
 elif args.optimizer == "adam":

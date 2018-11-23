@@ -161,5 +161,5 @@ class LBL(tx.Model):
         super().__init__(run_in_layers=run_inputs, run_out_layers=y_prob,
                          train_in_layers=run_inputs, train_out_layers=y_prob,
                          eval_in_layers=run_inputs, eval_out_layers=y_prob,
-                         train_loss_tensors=train_loss, train_loss_in=loss_inputs,
-                         eval_tensors=eval_loss, eval_tensors_in=eval_inputs)
+                         train_out_loss=train_loss, train_in_loss=loss_inputs,
+                         eval_out_score=eval_loss, eval_in_score=eval_inputs)

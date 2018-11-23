@@ -6,7 +6,7 @@ import marisa_trie
 from collections import Counter
 
 from deepsign.data.corpora.ptb import PTBReader
-from deepsign.data.views import window_it, flatten_it
+from deepsign.data.iterators import window_it, flatten_it
 
 parser = argparse.ArgumentParser(description="PTB n-grams to hdf5")
 parser.add_argument('-n', dest="n", type=int, default=5)

@@ -6,7 +6,7 @@ import marisa_trie
 from collections import Counter
 
 from deepsign.data.corpora.ptb import PTBReader
-from deepsign.data.views import window_it, flatten_it
+from deepsign.data.iterators import window_it, flatten_it
 
 parser = argparse.ArgumentParser(description="PTB to hdf5 vocab and frequencies")
 parser.add_argument('-mark_eos', dest="mark_eos", type=bool, default=True)

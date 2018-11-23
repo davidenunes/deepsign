@@ -12,8 +12,8 @@ from deepsign.nlp.sampling import subsamplig_prob_cut as ss_prob
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.data.views import chunk_it
-from deepsign.data.views import windows
+from deepsign.data.iterators import chunk_it
+from deepsign.data.iterators import windows
 from tensorx_old.layers import Input
 from tensorx_old.models.nrp2 import NRP
 

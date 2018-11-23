@@ -45,8 +45,8 @@ optimizer = tx.AMSGrad(learning_rate=0.01)
 
 model = tx.Model(run_in_layers=in_layer, run_out_layers=out,
                  train_in_layers=in_layer, train_out_layers=out,
-                 train_loss_in=loss_inputs, train_loss_tensors=loss,
-                 eval_tensors=loss, eval_tensors_in=loss_inputs)
+                 train_in_loss=loss_inputs, train_out_loss=loss,
+                 eval_out_score=loss, eval_in_score=loss_inputs)
 
 print(model.feedable_train())
 
@@ -60,7 +60,7 @@ data = np.array([[0, 1], [1, 0]])
 targets = np.array([[2], [3]])
 
 for i in tqdm(range(10000)):
-    runner.train(data=data, loss_input_data=targets)
+    runner.train(model_input_data=data, loss_input_data=targets)
 
     if i % 1000 == 0:
         loss = runner.eval(data, targets)

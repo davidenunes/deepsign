@@ -8,7 +8,7 @@ from tqdm import tqdm
 from deepsign.nlp import is_token
 
 from deepsign.data.corpora.text8 import Text8Corpus
-from deepsign.data import views
+from deepsign.data import iterators
 
 parser = argparse.ArgumentParser(description="text8 n-grams to hdf5")
 parser.add_argument('-n', dest="n", type=int, default=4)
@@ -24,7 +24,7 @@ dataset = os.path.join(args.data_dir, "text8.txt")
 corpus = Text8Corpus(dataset, sentence_length=1000)
 
 word_counter = Counter()
-for word in tqdm(views.flatten_it(corpus)):
+for word in tqdm(iterators.flatten_it(corpus)):
     word_counter[word] += 1
 
 print("total words ", sum(word_counter.values()))
@@ -63,7 +63,7 @@ hdf5_file.create_dataset("ids", data=ids, compression="gzip")
 print("vocabulary and frequencies written")
 print("processing n-grams...")
 
-filtered_corpus = map(lambda w: w if w in vocab else args.unk_token, views.flatten_it(corpus))
+filtered_corpus = map(lambda w: w if w in vocab else args.unk_token, iterators.flatten_it(corpus))
 
 total_words = sum(word_freq)
 n_training = int(total_words * 0.8)
@@ -75,7 +75,7 @@ n_eval = n_leave // 2
 n_test = n_leave - n_eval
 
 # 80 / 10 / 10 split
-ngrams = views.window_it(filtered_corpus, args.n)
+ngrams = iterators.window_it(filtered_corpus, args.n)
 
 # TODO iterative: 1 consume n n grams 2 extend hdf5 dataset 3 write to dataset
 # https://stackoverflow.com/questions/34531479/writing-a-large-hdf5-dataset-using-h5py

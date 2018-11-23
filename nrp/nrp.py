@@ -9,11 +9,11 @@ import tensorflow as tf
 from tqdm import tqdm
 import traceback
 import tensorx as tx
-from deepsign.data.views import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, flatten_it
+from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, flatten_it
 from deepsign.models.nrp_nce import NRP, RandomIndexTensor
 from deepsign.rp.index import Generator, TrieSignIndex
 from deepsign.rp.ri import RandomIndex
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 from exp.args import ParamDict
 from deepsign.data.corpora.ptb import PTBReader
 from deepsign.data.corpora.wiki103 import WikiText103
@@ -266,7 +266,7 @@ def run(**kwargs):
 
     # Input params can be changed during training by setting their value
     # lr_param = tx.InputParam(init_value=args.lr)
-    lr_param = tx.EvalStepDecayParam(init_value=args.lr,
+    lr_param = tx.EvalStepDecayParam(value=args.lr,
                                      improvement_threshold=args.eval_threshold,
                                      less_is_better=True,
                                      decay_rate=args.lr_decay_rate,

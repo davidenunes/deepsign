@@ -2,18 +2,21 @@ import numpy as np
 import unittest
 import tensorflow as tf
 import tensorx as tx
+from tensorx.test_utils import TestCase
 from deepsign.models.nnlm import NNLM
 from deepsign.models.lbl import LBL
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
 from deepsign.models.nrp_nce import NRP
 from deepsign.rp.ri import Generator, RandomIndex, ri_from_indexes
 from deepsign.rp.index import TrieSignIndex
-import deepsign.data.views as views
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value, generate_noise
+import deepsign.data.iterators as views
+from deepsign.rp.tf_utils import generate_noise
+from deepsign.data.transform import ris_to_sp_tensor_value
 from tqdm import tqdm
 import os
 from scipy.stats import chisquare, kstest, uniform
 import time
+from deepsign.data.transform import batch_one_hot
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -23,43 +26,42 @@ sns.set(style="darkgrid")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class TestModels(unittest.TestCase):
-    def setUp(self):
-        self.ss = tf.InteractiveSession()
-        self.logdir = os.path.join(os.getenv("HOME"), "tmp")
-
-    def tearDown(self):
-        self.ss.close()
+class TestModels(TestCase):
 
     def test_nnlm(self):
-        vocab_size = 100000
-        ctx_size = 20
+        vocab_size = 10000
+        ctx_size = 4
         batch_size = 128
         embed_dim = 512
+        h_dim = 128
 
-        model = NNLM(ctx_size=ctx_size,
+        inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
+        labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
+        model = NNLM(inputs=inputs,
+                     labels=labels,
                      vocab_size=vocab_size,
                      embed_dim=embed_dim,
-                     embed_share=False,
-                     use_f_predict=False,
-                     h_dim=128,
+                     embed_share=True,
+                     use_f_predict=True,
+                     h_dim=h_dim,
                      use_dropout=True,
                      embed_dropout=True
                      )
-        runner = tx.ModelRunner(model)
 
-        options = None
-        runner.set_session(runtime_stats=True)
-        runner.set_log_dir(self.logdir)
-        runner.log_graph()
-        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=0.05))
+        model.set_session(runtime_stats=True)
+        model.set_log_dir("/tmp/")
+        model.log_graph()
+        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.04),
+                               gradient_op=lambda grad: tf.clip_by_norm(grad, 4.0))
 
-        data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
-        labels = np.random.randint(0, vocab_size, [batch_size, 1])
+        input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
+        label_data = np.random.randint(0, vocab_size, [batch_size, 1])
 
-        for _ in tqdm(range(20)):
-            # result = runner.train(np.array([[0, 2, 1]]),np.array([[0]]))
-            result = runner.train(data, labels)
+        with self.cached_session():
+            for _ in tqdm(range(40)):
+                result = model.train({inputs: input_data, labels: label_data}, output_loss=True)
+
+        print(result)
 
     def test_tx_random_choice(self):
         range_max = 100
@@ -71,9 +73,7 @@ class TestModels(unittest.TestCase):
         test = chisquare(result)
         plt.hist(result)
         plt.show()
-        #print(test)
-
-
+        # print(test)
 
     def test_nnlm_nrp(self):
         vocab_size = 100000
@@ -121,6 +121,7 @@ class TestModels(unittest.TestCase):
         embed_size = 128
         nce_samples = 10
         noise_ratio = 0.1
+        use_nce = True
 
         vocab = [str(i) for i in range(vocab_size)]
 
@@ -135,8 +136,20 @@ class TestModels(unittest.TestCase):
 
         ri_tensor_input = tx.SparseInput(n_units=k, value=ri_tensor)
 
-        model = NRP(ctx_size=2,
-                    vocab_size=vocab_size,
+        if use_nce:
+            label_inputs = tx.SparseInput(k, name="target_random_indices")
+        else:
+            label_inputs = [tx.Input(1, dtype=tf.int64, name="ids"),
+                            tx.InputParam(dtype=tf.int32, value=vocab_size, name="vocab_size")]
+
+        eval_label_inputs = [tx.Input(1, dtype=tf.int64, name="ids_eval"),
+                             tx.InputParam(dtype=tf.int32, value=vocab_size, name="vocab_size")]
+
+        model = NRP(run_inputs=tx.SparseInput(n_units=k, name="random_index_inputs"),
+                    label_inputs=label_inputs,
+                    eval_label_input=eval_label_inputs,
+                    ctx_size=2,
+                    # vocab_size=vocab_size,
                     k_dim=k,
                     ri_tensor_input=ri_tensor_input,  # current dictionary state
                     embed_dim=embed_size,
@@ -146,8 +159,10 @@ class TestModels(unittest.TestCase):
                     use_dropout=True,
                     embed_dropout=True,
                     keep_prob=0.70,
+                    use_nce=use_nce,
                     nce_samples=nce_samples,
-                    nce_noise_amount=noise_ratio
+                    nce_noise_amount=noise_ratio,
+                    noise_input=tx.SparseInput(k, name="noise")
                     )
 
         tf.summary.histogram("embeddings", model.embeddings.weights)
@@ -158,7 +173,6 @@ class TestModels(unittest.TestCase):
         runner = tx.ModelRunner(model)
         runner.set_log_dir("/tmp")
         runner.log_graph()
-        print("log graph")
 
         options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         # options = None
@@ -170,7 +184,7 @@ class TestModels(unittest.TestCase):
         # SGD with 0.025
 
         # lr = tx.InputParam(init_value=0.0002)
-        lr = tx.InputParam(init_value=0.025)
+        lr = tx.InputParam(value=0.025)
         # runner.config_optimizer(tf.train.AdamOptimizer(learning_rate=lr.tensor, beta1=0.9), params=lr,
         runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=lr.tensor), params=lr,
                                 global_gradient_op=False,
@@ -197,11 +211,9 @@ class TestModels(unittest.TestCase):
 
         data_stream = dataset
 
-        i = 0
         for data_stream in tqdm(data_stream, total=n * 5 / batch_size):
             sample = np.array(data_stream)
 
-            t0 = time.time()
             ctx = sample[:, :-1]
             ctx.flatten()
             ctx = ctx.flatten()
@@ -211,19 +223,19 @@ class TestModels(unittest.TestCase):
                                              all_positive=not sign_index.generator.symmetric)
             lbl_ids = sample[:, -1:]
             lbl = lbl_ids.flatten()
-            lbl_ris = [sign_index.get_ri(sign_index.get_sign(i)) for i in lbl]
-            lbl_ris = ris_to_sp_tensor_value(lbl_ris,
-                                             dim=sign_index.feature_dim(),
-                                             all_positive=not sign_index.generator.symmetric)
 
-            noise = generate_noise(k_dim=k,
-                                   batch_size=lbl_ris.dense_shape[0] * nce_samples,
-                                   ratio=noise_ratio)
-            t1 = time.time()
-            # print(t1 - t0)
-            # tf.summary.scalar("ctx convert time", t1 - t0)
+            if use_nce:
+                lbl_ris = [sign_index.get_ri(sign_index.get_sign(i)) for i in lbl]
+                lbl_ris = ris_to_sp_tensor_value(lbl_ris,
+                                                 dim=sign_index.feature_dim(),
+                                                 all_positive=not sign_index.generator.symmetric)
 
-            runner.train(ctx_ris, [lbl_ris, noise], output_loss=True, write_summaries=True)
+                noise = generate_noise(k_dim=k,
+                                       batch_size=lbl_ris.dense_shape[0] * nce_samples,
+                                       ratio=noise_ratio)
+                runner.train(ctx_ris, [lbl_ris, noise], output_loss=True, write_summaries=True)
+            else:
+                runner.train(model_input_data=ctx_ris, loss_input_data=lbl_ids, output_loss=True, write_summaries=True)
 
         runner.close_session()
 

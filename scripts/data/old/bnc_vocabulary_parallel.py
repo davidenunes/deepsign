@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from deepsign.data.corpora.pipe import BNCPipe
 from deepsign.nlp.tokenization import Tokenizer
-from deepsign.data.views import subset_chunk_it, divide_slices
+from deepsign.data.iterators import subset_chunk_it, divide_slices
 
 
 def word_frequencies(args):

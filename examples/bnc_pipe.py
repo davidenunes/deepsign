@@ -6,7 +6,7 @@ from tqdm import tqdm
 from deepsign.data.corpora.pipe import BNCPipe
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import SignIndex, Generator
-from deepsign.data.views import chunk_it, windows
+from deepsign.data.iterators import chunk_it, windows
 
 home = os.getenv("HOME")
 

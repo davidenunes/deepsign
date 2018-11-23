@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply, take_it
+from deepsign.data.iterators import chunk_it, batch_it, shuffle_it, repeat_apply, take_it
 from deepsign.models.lbl import LBL
 from tensorx.layers import Input
 
@@ -210,7 +210,7 @@ model = LBL(ctx_size=args.ngram_size - 1,
 
 model_runner = tx.ModelRunner(model)
 
-lr_param = tx.InputParam(init_value=args.lr)
+lr_param = tx.InputParam(value=args.lr)
 # optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)

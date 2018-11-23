@@ -11,7 +11,7 @@ import h5py
 import os.path
 from spacy.en import English
 
-from deepsign.data.views import divide_slices
+from deepsign.data.iterators import divide_slices
 from deepsign.rp.index import SignIndex
 from deepsign.rp.ri import Generator
 

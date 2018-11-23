@@ -1,5 +1,5 @@
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 import tensorx as tx
 import tensorflow as tf
 import numpy as np

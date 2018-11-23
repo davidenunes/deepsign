@@ -1,7 +1,7 @@
 import unittest
 from deepsign.rp.ri import Generator
 from deepsign.rp.index import SignIndex
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 
 
 class MyTestCase(unittest.TestCase):

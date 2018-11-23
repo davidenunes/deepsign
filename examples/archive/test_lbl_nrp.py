@@ -10,12 +10,12 @@ from tqdm import tqdm
 
 import tensorx as tx
 from deepsign.data import transform
-from deepsign.data.views import chunk_it, batch_it, shuffle_it, repeat_apply, take_it
+from deepsign.data.iterators import chunk_it, batch_it, shuffle_it, repeat_apply, take_it
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor
 from tensorx.layers import Input
 
 from deepsign.rp.ri import Generator, RandomIndex
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 
 
 def str2bool(v):
@@ -224,7 +224,7 @@ model = LBL_NRP(ctx_size=args.ngram_size - 1,
 
 model_runner = tx.ModelRunner(model)
 
-lr_param = tx.InputParam(init_value=args.lr)
+lr_param = tx.InputParam(value=args.lr)
 # optimizer = tf.train.AdamOptimizer(learning_rate=lr_param.tensor)
 
 # optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate)

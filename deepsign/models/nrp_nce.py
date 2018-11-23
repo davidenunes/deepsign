@@ -1,6 +1,6 @@
 import tensorx as tx
 import tensorflow as tf
-from deepsign.rp.tf_utils import ris_to_sp_tensor_value
+from deepsign.data.transform import ris_to_sp_tensor_value
 from deepsign.rp.index import SignIndex
 
 from deepsign.rp.tf_utils import RandomIndexTensor
@@ -21,8 +21,10 @@ class NRP(tx.Model):
     """
 
     def __init__(self,
+                 run_inputs,
+                 label_inputs,
+                 eval_label_input,
                  ctx_size,
-                 vocab_size,
                  k_dim,
                  ri_tensor_input,
                  embed_dim,
@@ -37,23 +39,13 @@ class NRP(tx.Model):
                  l2_loss=False,
                  l2_loss_coef=1e-5,
                  f_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 use_nce=False,
                  nce_samples=2,
-                 nce_noise_amount=0.1
+                 nce_noise_amount=0.1,
+                 noise_input=None,
                  ):
 
         self.embed_dim = embed_dim
-
-        run_inputs = tx.SparseInput(k_dim, name="sparse_context")
-        loss_sparse_labels = tx.SparseInput(k_dim, name="sparse_labels")
-        loss_sparse_noise = tx.SparseInput(k_dim, name="sparse_noise")
-        eval_inputs = tx.Input(n_units=1)
-
-        if isinstance(ri_tensor_input, (tx.Input, tx.SparseInput)):
-            if ri_tensor_input.n_units != k_dim:
-                raise ValueError("ri_tensor_input.n_units != k_dim: {} != {}".format(ri_tensor_input.n_units, k_dim))
-        else:
-            raise TypeError("invalid ri_tensor_input: must be an Input or SparseInput, got {} instead ".format(
-                type(ri_tensor_input)))
 
         var_reg = []
 
@@ -145,13 +137,19 @@ class NRP(tx.Model):
             #  convert labels to random indices
             model_prediction = f_prediction.tensor
 
-            train_loss = tx.sparse_cnce_loss(label_features=loss_sparse_labels.tensor,
-                                             noise_features=loss_sparse_noise.tensor,
-                                             model_prediction=model_prediction,
-                                             weights=feature_lookup.weights,
-                                             num_samples=nce_samples,
-                                             noise_ratio=nce_noise_amount
-                                             )
+            if use_nce:
+                train_loss = tx.sparse_cnce_loss(label_features=label_inputs.tensor,
+                                                 noise_features=noise_input.tensor,
+                                                 model_prediction=model_prediction,
+                                                 weights=feature_lookup.weights,
+                                                 num_samples=nce_samples,
+                                                 noise_ratio=nce_noise_amount
+                                                 )
+            else:
+                one_hot_dense = tx.dense_one_hot(column_indices=label_inputs[0].tensor, num_cols=label_inputs[1].tensor)
+                train_loss = tx.categorical_cross_entropy(one_hot_dense, train_logits.tensor)
+
+                train_loss = tf.reduce_mean(train_loss)
 
             if l2_loss:
                 losses = [tf.nn.l2_loss(var) for var in var_reg]
@@ -161,16 +159,22 @@ class NRP(tx.Model):
         # EVAL GRAPH
         # ===============================================
         with tf.name_scope("eval"):
-            one_hot = tx.dense_one_hot(column_indices=eval_inputs.tensor, num_cols=vocab_size)
-            eval_loss = tx.categorical_cross_entropy(one_hot, run_logits.tensor)
+            one_hot_dense = tx.dense_one_hot(column_indices=eval_label_input[0].tensor, num_cols=label_inputs[1].tensor)
+            train_loss = tx.categorical_cross_entropy(one_hot_dense, train_logits.tensor)
+            eval_loss = tx.categorical_cross_entropy(one_hot_dense, run_logits.tensor)
             eval_loss = tf.reduce_mean(eval_loss)
+
+        if use_nce:
+            train_loss_in = [label_inputs, noise_input]
+        else:
+            train_loss_in = label_inputs
 
         # BUILD MODEL
         super().__init__(run_in_layers=run_inputs, run_out_layers=embed_prob,
                          train_in_layers=run_inputs, train_out_layers=train_embed_prob,
                          eval_in_layers=run_inputs, eval_out_layers=embed_prob,
-                         train_loss_tensors=train_loss, train_loss_in=[loss_sparse_labels, loss_sparse_noise],
-                         eval_tensors=eval_loss, eval_tensors_in=eval_inputs,
+                         train_out_loss=train_loss, train_in_loss=train_loss_in,
+                         eval_out_score=eval_loss, eval_in_score=eval_label_input,
                          update_in_layers=ri_tensor_input)
 
     def update_state(self):

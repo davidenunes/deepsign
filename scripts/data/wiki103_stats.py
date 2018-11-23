@@ -7,7 +7,7 @@ from collections import Counter
 from tqdm import tqdm
 
 from deepsign.data.corpora.wiki103 import WikiText103
-from deepsign.data.views import window_it, flatten_it
+from deepsign.data.iterators import window_it, flatten_it
 
 parser = argparse.ArgumentParser(description="wikitext 103 n-grams to hdf5")
 parser.add_argument('-data_dir', dest="data_dir", type=str, default=os.getenv("HOME") + "/data/datasets/wikitext-103")

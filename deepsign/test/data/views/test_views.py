@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
-from deepsign.data.views import chunk_it, subset_chunk_it
-from deepsign.data.views import divide_slices, window_it, batch_it, shuffle_it, flatten_it, repeat_apply, chain_it
+from deepsign.data.iterators import chunk_it, subset_chunk_it
+from deepsign.data.iterators import divide_slices, window_it, batch_it, shuffle_it, flatten_it, repeat_apply, chain_it
 import itertools
 
 

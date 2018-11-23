@@ -9,8 +9,8 @@ from deepsign.nlp.tokenization import Tokenizer
 from deepsign.rp.encode import to_bow
 from deepsign.rp.index import TrieSignIndex
 from deepsign.rp.ri import Generator
-from deepsign.data.views import windows, np_to_sparse, divide_slices
-from deepsign.data.views import subset_chunk_it
+from deepsign.data.iterators import windows, np_to_sparse, divide_slices
+from deepsign.data.iterators import subset_chunk_it
 
 # global for sign index
 sign_index = None

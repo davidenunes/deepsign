@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 import h5py
-from deepsign.data.views import chunk_it
+from deepsign.data.iterators import chunk_it
 import marisa_trie
 import tensorx as tx
 import numpy as np
