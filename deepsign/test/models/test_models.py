@@ -14,9 +14,7 @@ from deepsign.rp.tf_utils import generate_noise
 from deepsign.data.transform import ris_to_sp_tensor_value
 from tqdm import tqdm
 import os
-from scipy.stats import chisquare, kstest, uniform
-import time
-from deepsign.data.transform import batch_one_hot
+from scipy.stats import chisquare
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -29,9 +27,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 class TestModels(TestCase):
 
     def test_nnlm(self):
-        vocab_size = 10000
+        vocab_size = 4
         ctx_size = 4
-        batch_size = 128
+        batch_size = 2
         embed_dim = 512
         h_dim = 128
 
@@ -44,24 +42,34 @@ class TestModels(TestCase):
                      embed_share=True,
                      use_f_predict=True,
                      h_dim=h_dim,
-                     use_dropout=True,
-                     embed_dropout=True
+                     use_dropout=False,
+                     keep_prob=0.9,
+                     embed_dropout=False,
+                     use_nce=True,
+                     nce_samples=2
                      )
 
         model.set_session(runtime_stats=True)
         model.set_log_dir("/tmp/")
         model.log_graph()
-        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.04),
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = None
+        model.set_session(runtime_stats=True, run_options=options)
+        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.005),
                                gradient_op=lambda grad: tf.clip_by_norm(grad, 4.0))
 
         input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
         label_data = np.random.randint(0, vocab_size, [batch_size, 1])
 
         with self.cached_session():
-            for _ in tqdm(range(40)):
-                result = model.train({inputs: input_data, labels: label_data}, output_loss=True)
+            for _ in tqdm(range(10)):
+                eval1 = model.eval({inputs: input_data, labels: label_data})
+                eval2 = model.eval({inputs: input_data, labels: label_data})
+                result = model.train({inputs: input_data, labels: label_data})
 
-        print(result)
+        # print(list(map(str,model.train_graph.output_layers)))
+        self.assertArrayEqual(eval1,eval2)
+        self.assertArrayNotEqual(result,eval2)
 
     def test_tx_random_choice(self):
         range_max = 100
@@ -186,7 +194,7 @@ class TestModels(TestCase):
         # lr = tx.InputParam(init_value=0.0002)
         lr = tx.InputParam(value=0.025)
         # runner.config_optimizer(tf.train.AdamOptimizer(learning_rate=lr.tensor, beta1=0.9), params=lr,
-        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=lr.tensor), params=lr,
+        runner.config_optimizer(tf.train.GradientDescentOptimizer(learning_rate=lr.tensor), optimizer_params=lr,
                                 global_gradient_op=False,
                                 # gradient_op=lambda grad: tf.clip_by_global_norm(grad, 10.0)[0])
                                 gradient_op=lambda grad: tf.clip_by_norm(grad, 1.0))
@@ -355,7 +363,7 @@ class TestModels(TestCase):
                     embed_dropout=True)
 
         print("RUN GRAPH:")
-        for layer in tx.layers_to_list(model.run_out_layers):
+        for layer in tx.layers_to_list(model.run_outputs):
             print(layer.full_str())
 
         print("=" * 60)
@@ -376,18 +384,18 @@ class TestModels(TestCase):
                      keep_prob=0.1)
 
         print("RUN GRAPH:")
-        for layer in tx.layers_to_list(model.run_out_layers):
+        for layer in tx.layers_to_list(model.run_outputs):
             print(layer.full_str())
 
         print("=" * 60)
 
         print("TRAIN GRAPH:")
-        for layer in tx.layers_to_list(model.train_out_layers):
+        for layer in tx.layers_to_list(model.train_outputs):
             print(layer.full_str())
         print("=" * 60)
 
         print("EVAL GRAPH:")
-        for layer in tx.layers_to_list(model.eval_out_layers):
+        for layer in tx.layers_to_list(model.eval_outputs):
             print(layer.full_str())
         print("=" * 60)
 

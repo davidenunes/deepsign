@@ -9,7 +9,8 @@ import tensorflow as tf
 from tqdm import tqdm
 import traceback
 import tensorx as tx
-from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, flatten_it
+from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, \
+    flatten_it
 from deepsign.models.nnlm import NNLM
 from exp.args import ParamDict
 from deepsign.data.corpora.ptb import PTBReader
@@ -30,14 +31,14 @@ defaults = {
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
     # network architecture
-    'embed_dim': (int, 512),
+    'embed_dim': (int, 128),
     'embed_init': (str, 'uniform', ["normal", "uniform"]),
     'embed_init_val': (float, 0.01),
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
     'num_h': (int, 1),
-    'h_dim': (int, 512),
+    'h_dim': (int, 128),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu', 'selu']),
     'epochs': (int, 20),
     'batch_size': (int, 128),
@@ -67,16 +68,16 @@ defaults = {
     'clip_grads': (bool, True),
     # if true clips by local norm, else clip by norm of all gradients
     'clip_local': (bool, False),
-    'clip_value': (float, 2.0),
+    'clip_value': (float, 1.0),
 
     'dropout': (bool, True),
     'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.55),
+    'keep_prob': (float, 0.60),
 
     'l2_loss': (bool, False),
     'l2_loss_coef': (float, 1e-5),
 
-    "eval_test": (bool, True),
+    "eval_test": (bool, False),
 
     # eval display progress:
     "eval_progress": (bool, True),
@@ -209,7 +210,10 @@ def run(**kwargs):
         elif args.f_init == "uniform":
             f_init = tx.random_uniform(minval=-args.f_init_val, maxval=args.f_init_val)
 
-    model = NNLM(ctx_size=args.ngram_size - 1,
+    inputs = tx.Input(args.ngram_size - 1, dtype=tf.int64, name="ctx_inputs")
+    labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
+    model = NNLM(inputs=inputs,
+                 labels=labels,
                  vocab_size=len(vocab),
                  embed_dim=args.embed_dim,
                  embed_init=embed_init,
@@ -228,8 +232,6 @@ def run(**kwargs):
                  f_init=f_init,
                  logit_bias=args.logit_bias,
                  use_nce=False)
-
-    model_runner = tx.ModelRunner(model)
 
     # Input params can be changed during training by setting their value
     # lr_param = tx.InputParam(init_value=args.lr)
@@ -265,19 +267,19 @@ def run(**kwargs):
             clip_fn = clip_grad_global
 
     if args.clip_grads:
-        model_runner.config_optimizer(optimizer, params=lr_param,
-                                      gradient_op=clip_fn,
-                                      global_gradient_op=not args.clip_local)
+        model.config_optimizer(optimizer, optimizer_params=lr_param,
+                               gradient_op=clip_fn,
+                               global_gradient_op=not args.clip_local)
     else:
-        model_runner.config_optimizer(optimizer, params=lr_param)
+        model.config_optimizer(optimizer, optimizer_params=lr_param)
 
     # ======================================================================================
     # EVALUATION
     # ======================================================================================
 
-    def eval_model(runner, dataset_it, len_dataset=None, display_progress=False):
+    def eval_model(model, dataset_it, len_dataset=None, display_progress=False):
         if display_progress:
-            pb = tqdm(total=len_dataset, ncols=60,position=1)
+            pb = tqdm(total=len_dataset, ncols=60, position=1)
         batches_processed = 0
         sum_loss = 0
         for batch in dataset_it:
@@ -285,7 +287,7 @@ def run(**kwargs):
             ctx = batch[:, :-1]
             target = batch[:, -1:]
 
-            mean_loss = runner.eval(ctx, target)
+            mean_loss = model.eval({inputs: ctx, labels: target})
             sum_loss += mean_loss
 
             if display_progress:
@@ -297,9 +299,9 @@ def run(**kwargs):
 
         return np.exp(sum_loss / batches_processed)
 
-    def evaluation(runner: tx.ModelRunner, progress_bar, cur_epoch, step, display_progress=False):
+    def evaluation(model: tx.Model, progress_bar, cur_epoch, step, display_progress=False):
 
-        ppl_validation = eval_model(runner, corpus_pipeline(corpus.validation_set(), epochs=1, shuffle=False),
+        ppl_validation = eval_model(model, corpus_pipeline(corpus.validation_set(), epochs=1, shuffle=False),
                                     validation_len,
                                     display_progress)
         res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
@@ -309,8 +311,7 @@ def run(**kwargs):
 
         if args.eval_test:
             # pb.write("[Eval Test Set]")
-
-            ppl_test = eval_model(runner, corpus_pipeline(corpus.test_set(), epochs=1, shuffle=False), test_len,
+            ppl_test = eval_model(model, corpus_pipeline(corpus.test_set(), epochs=1, shuffle=False), test_len,
                                   display_progress)
 
             res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
@@ -342,8 +343,8 @@ def run(**kwargs):
     cfg = tf.ConfigProto()
     cfg.gpu_options.allow_growth = True
     sess = tf.Session(config=cfg)
-    model_runner.set_session(sess)
-    model_runner.init_vars()
+    model.set_session(sess)
+    model.init_vars()
 
     progress = tqdm(total=training_len * args.epochs, position=args.pid + 1, disable=not args.display_progress)
     training_data = corpus_pipeline(corpus.training_set(),
@@ -368,7 +369,7 @@ def run(**kwargs):
             # EVALUATION
             # ================================================
             if epoch_step == 0:
-                current_eval = evaluation(model_runner, progress, epoch, global_step,
+                current_eval = evaluation(model, progress, epoch, global_step,
                                           display_progress=args.eval_progress)
 
                 evaluations.append(current_eval)
@@ -392,7 +393,7 @@ def run(**kwargs):
             ctx_ids = ngram_batch[:, :-1]
             word_ids = ngram_batch[:, -1:]
 
-            model_runner.train(ctx_ids, word_ids)
+            model.train({inputs: ctx_ids, labels: word_ids})
             progress.update(args.batch_size)
 
             epoch_step += 1
@@ -400,14 +401,14 @@ def run(**kwargs):
 
         # if not early stop, evaluate last state of the model
         if not args.early_stop or patience < 3:
-            current_eval = evaluation(model_runner, progress, epoch, epoch_step)
+            current_eval = evaluation(model, progress, epoch, epoch_step)
             evaluations.append(current_eval)
         ppl_file.close()
 
         if args.save_model:
-            model_runner.save_model(model_name=model_path, step=global_step, write_state=False)
+            model.save_model(model_name=model_path, step=global_step, write_state=False)
 
-        model_runner.close_session()
+        model.close_session()
         progress.close()
         tf.reset_default_graph()
 

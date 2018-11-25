@@ -66,8 +66,6 @@ gather_sp = tf.SparseTensor(indices=row_col, values=values, dense_shape=dense_sh
 dense = tf.sparse_tensor_to_dense(gather_sp)
 print(dense.eval())
 print(gather_sp.eval())
-# dense = tf.sparse_to_dense(row_col, dense_shape, values)
-# print(dense.eval())
 
 
 gather_sp_tx = tx.gather_sparse(sp, indices)

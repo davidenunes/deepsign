@@ -30,8 +30,8 @@ loss = tf.reduce_mean(tx.categorical_cross_entropy(labels=labels, logits=logits.
 # setup optimizer
 optimizer = tx.AMSGrad(learning_rate=0.01)
 
-model = tx.Model(run_in_layers=in_layer, run_out_layers=out,
-                 train_in_layers=in_layer, train_out_layers=out,
+model = tx.Model(run_inputs=in_layer, run_outputs=out,
+                 train_inputs=in_layer, train_outputs=out,
                  train_in_loss=loss_inputs, train_out_loss=loss,
                  eval_out_score=loss, eval_in_score=loss_inputs)
 

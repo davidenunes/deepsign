@@ -27,7 +27,7 @@ class NNLM(tx.Model):
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  num_h=1,
                  h_activation=tx.elu,
-                 h_init=tx.he_normal_init,
+                 h_init=tx.he_normal_init(),
                  use_dropout=False,
                  embed_dropout=False,
                  keep_prob=0.95,
@@ -61,9 +61,9 @@ class NNLM(tx.Model):
 
         with tf.name_scope("run"):
             # feature lookup
-            feature_lookup = tx.Lookup(inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
-            var_reg.append(feature_lookup.weights)
-            feature_lookup = feature_lookup.as_concat()
+            embeddings = tx.Lookup(inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
+            var_reg.append(embeddings.weights)
+            feature_lookup = embeddings.as_concat()
 
             last_layer = feature_lookup
             h_layers = []
@@ -72,7 +72,7 @@ class NNLM(tx.Model):
                             n_units=h_dim,
                             fn=h_activation,
                             weight_init=h_init,
-                            bias=True,
+                            add_bias=True,
                             name="h_{}".format(i + 1))
                 h_layers.append(h_i)
                 last_layer = h_i
@@ -80,7 +80,7 @@ class NNLM(tx.Model):
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
-                last_layer = tx.Linear(last_layer, embed_dim, f_init, bias=True, name="f_predict")
+                last_layer = tx.Linear(last_layer, embed_dim, f_init, add_bias=True, name="f_predict")
                 var_reg.append(last_layer.weights)
                 f_predict = last_layer
 
@@ -92,7 +92,7 @@ class NNLM(tx.Model):
                                    weight_init=logit_init,
                                    shared_weights=shared_weights,
                                    transpose_weights=transpose_weights,
-                                   bias=logit_bias,
+                                   add_bias=logit_bias,
                                    name="logits")
 
             if not embed_share:
@@ -104,7 +104,6 @@ class NNLM(tx.Model):
         # TRAIN GRAPH
         # ===============================================
         with tf.name_scope("train"):
-            feature_lookup = feature_lookup.reuse_with(inputs)
             if use_dropout and embed_dropout:
                 last_layer = tx.Dropout(feature_lookup, keep_prob=keep_prob, name="dropout_features")
             else:
@@ -125,9 +124,9 @@ class NNLM(tx.Model):
             train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
 
             def categorical_loss(labels, logits):
-                loss = tx.categorical_cross_entropy(
-                    labels=tx.dense_one_hot(column_indices=labels, num_cols=vocab_size),
-                    logits=logits)
+                labels = tx.dense_one_hot(column_indices=labels, num_cols=vocab_size)
+                loss = tx.categorical_cross_entropy(labels=labels, logits=logits)
+                # loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels,logits=logits)
                 return tf.reduce_mean(loss)
 
             def nce_loss(labels, weights, bias, predict):
@@ -143,28 +142,36 @@ class NNLM(tx.Model):
                 return tf.reduce_mean(loss)
 
             if use_nce:
-                nce_bias = tx.Bias(feature_lookup)
-                nce_bias = tx.WrapLayer(nce_bias, n_units=nce_bias.n_units, wrap_fn=lambda x: x.bias)
-                nce_weights = tx.WrapLayer(feature_lookup, n_units=feature_lookup.n_units, wrap_fn=lambda x: x.weights)
-                train_loss = tx.FnLayer(labels, nce_weights, nce_bias, last_layer, tensor_fn=nce_loss, n_units=1,
+                bias = tx.VariableLayer(shape=[vocab_size], name="nce_bias")
+
+                nce_weights = tx.WrapLayer(embeddings,
+                                           n_units=embeddings.n_units,
+                                           wrap_fn=lambda x: x.weights,
+                                           layer_fn=True)
+                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, shape=[],
                                         name="nce_loss")
             else:
-                train_loss = tx.FnLayer(labels, train_logits, tensor_fn=categorical_loss, n_units=1, name="train_loss")
+                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss, shape=[],
+                                        name="train_loss")
 
             if l2_loss:
                 l2_losses = [tf.nn.l2_loss(var) for var in var_reg]
-                train_loss = tx.WrapLayer(train_loss, n_units=1, wrap_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
+                train_loss = tx.WrapLayer(train_loss, shape=[],
+                                          wrap_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
                                           name="train_loss_l2")
 
         # ===============================================
         # EVAL GRAPH
         # ===============================================
         with tf.name_scope("eval"):
-            eval_loss = tx.FnLayer(labels, run_logits, tensor_fn=categorical_loss, n_units=1, name="eval_loss")
+            eval_loss = tx.FnLayer(labels, run_logits, apply_fn=categorical_loss, shape=[], name="eval_loss")
 
         # BUILD MODEL
-        super().__init__(run_in_layers=inputs, run_out_layers=run_output,
-                         train_in_layers=inputs, train_out_layers=train_output,
-                         eval_in_layers=inputs, eval_out_layers=run_output,
-                         train_out_loss=train_loss, train_in_loss=labels,
-                         eval_out_score=eval_loss, eval_in_score=labels)
+        super().__init__(run_outputs=run_output,
+                         run_inputs=inputs,
+                         train_inputs=[inputs, labels],
+                         train_outputs=train_output,
+                         train_loss=train_loss,
+                         eval_inputs=[inputs, labels],
+                         eval_outputs=run_output,
+                         eval_score=eval_loss)

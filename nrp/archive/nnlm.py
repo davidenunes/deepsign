@@ -219,11 +219,11 @@ def run(progress=False, **kwargs):
             clip_fn = clip_grad_global
 
     if args.clip_grads:
-        model_runner.config_optimizer(optimizer, params=lr_param,
+        model_runner.config_optimizer(optimizer, optimizer_params=lr_param,
                                       gradient_op=clip_fn,
                                       global_gradient_op=not args.clip_local)
     else:
-        model_runner.config_optimizer(optimizer, params=lr_param)
+        model_runner.config_optimizer(optimizer, optimizer_params=lr_param)
 
     # ======================================================================================
     # EVALUATION

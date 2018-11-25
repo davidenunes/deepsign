@@ -195,9 +195,9 @@ class LBL_NRP(tx.Model):
             eval_loss = tf.reduce_mean(eval_loss)
 
         # SETUP MODEL CONTAINER ====================================
-        super().__init__(run_in_layers=run_inputs, run_out_layers=run_embed_prob,
-                         train_in_layers=run_inputs, train_out_layers=train_embed_prob,
-                         eval_in_layers=run_inputs, eval_out_layers=run_embed_prob,
+        super().__init__(run_inputs=run_inputs, run_outputs=run_embed_prob,
+                         train_inputs=run_inputs, train_outputs=train_embed_prob,
+                         eval_inputs=run_inputs, eval_outputs=run_embed_prob,
                          train_out_loss=train_loss, train_in_loss=loss_inputs,
                          eval_out_score=eval_loss, eval_in_score=eval_inputs)
 
@@ -386,8 +386,8 @@ class NNLM_NRP(tx.Model):
             eval_loss = tf.reduce_mean(eval_loss)
 
         # BUILD MODEL
-        super().__init__(run_in_layers=run_inputs, run_out_layers=embed_prob,
-                         train_in_layers=run_inputs, train_out_layers=train_embed_prob,
-                         eval_in_layers=run_inputs, eval_out_layers=embed_prob,
+        super().__init__(run_inputs=run_inputs, run_outputs=embed_prob,
+                         train_inputs=run_inputs, train_outputs=train_embed_prob,
+                         eval_inputs=run_inputs, eval_outputs=embed_prob,
                          train_out_loss=train_loss, train_in_loss=loss_inputs,
                          eval_out_score=eval_loss, eval_in_score=eval_inputs)

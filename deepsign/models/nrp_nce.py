@@ -170,12 +170,12 @@ class NRP(tx.Model):
             train_loss_in = label_inputs
 
         # BUILD MODEL
-        super().__init__(run_in_layers=run_inputs, run_out_layers=embed_prob,
-                         train_in_layers=run_inputs, train_out_layers=train_embed_prob,
-                         eval_in_layers=run_inputs, eval_out_layers=embed_prob,
+        super().__init__(run_inputs=run_inputs, run_outputs=embed_prob,
+                         train_inputs=run_inputs, train_outputs=train_embed_prob,
+                         eval_inputs=run_inputs, eval_outputs=embed_prob,
                          train_out_loss=train_loss, train_in_loss=train_loss_in,
                          eval_out_score=eval_loss, eval_in_score=eval_label_input,
-                         update_in_layers=ri_tensor_input)
+                         update_inputs=ri_tensor_input)
 
     def update_state(self):
         # takes the value from the update_in_layers and updates the variable cache

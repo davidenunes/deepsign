@@ -45,8 +45,8 @@ out_prob = tx.Activation(out, fn=tx.sigmoid)
 
 loss = tx.binary_cross_entropy(labels=label_layer.tensor, logits=out.tensor)
 
-model = tx.Model(run_in_layers=in_layer,
-                 run_out_layers=out_prob,
+model = tx.Model(run_inputs=in_layer,
+                 run_outputs=out_prob,
                  train_in_loss=label_layer,
                  train_out_loss=loss)
 

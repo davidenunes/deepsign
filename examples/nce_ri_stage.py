@@ -165,7 +165,7 @@ opt = tx.AMSGrad(learning_rate=lr.tensor)
 # sess.run(tf.variables_initializer(opt.variables()))
 
 model = tx.Model(
-    run_in_layers=input_layer,
+    run_inputs=input_layer,
     train_in_loss=input_labels,
     train_out_loss=sampled_loss,
     eval_out_score=val_loss
@@ -173,7 +173,7 @@ model = tx.Model(
 runner = tx.ModelRunner(model)
 runner.set_session()
 runner.config_optimizer(opt,
-                        params=lr,
+                        optimizer_params=lr,
                         gradient_op=lambda grad: tf.clip_by_norm(grad, 1.0))
 
 avg_nce = []

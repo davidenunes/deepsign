@@ -143,7 +143,7 @@ with tf.name_scope("rnn"):
 # setup optimizer
 optimizer = tx.AMSGrad(learning_rate=0.01)
 
-model = tx.Model(run_in_layers=in_layer, run_out_layers=[rnn1, rnn2, rnn3])
+model = tx.Model(run_inputs=in_layer, run_outputs=[rnn1, rnn2, rnn3])
 runner = tx.ModelRunner(model)
 
 runner.set_session(runtime_stats=True)

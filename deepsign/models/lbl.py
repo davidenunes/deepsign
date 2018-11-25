@@ -158,8 +158,8 @@ class LBL(tx.Model):
             eval_loss = tf.reduce_mean(eval_loss)
 
         # SETUP MODEL CONTAINER ====================================
-        super().__init__(run_in_layers=run_inputs, run_out_layers=y_prob,
-                         train_in_layers=run_inputs, train_out_layers=y_prob,
-                         eval_in_layers=run_inputs, eval_out_layers=y_prob,
+        super().__init__(run_inputs=run_inputs, run_outputs=y_prob,
+                         train_inputs=run_inputs, train_outputs=y_prob,
+                         eval_inputs=run_inputs, eval_outputs=y_prob,
                          train_out_loss=train_loss, train_in_loss=loss_inputs,
                          eval_out_score=eval_loss, eval_in_score=eval_inputs)
