@@ -4,6 +4,8 @@ import tensorflow as tf
 import tensorx as tx
 from tensorx.test_utils import TestCase
 from deepsign.models.nnlm import NNLM
+from deepsign.models.nnlm_lstm import NNLM as NNLM_LSTM
+from deepsign.models.nnlm_gru import NNLM as NNLM_GRU
 from deepsign.models.lbl import LBL
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
 from deepsign.models.nrp_nce import NRP
@@ -28,7 +30,7 @@ class TestModels(TestCase):
 
     def test_nnlm(self):
         vocab_size = 4
-        ctx_size = 4
+        ctx_size = 22
         batch_size = 2
         embed_dim = 512
         h_dim = 128
@@ -62,14 +64,119 @@ class TestModels(TestCase):
         label_data = np.random.randint(0, vocab_size, [batch_size, 1])
 
         with self.cached_session():
+            for _ in tqdm(range(1)):
+                eval1 = model.eval({inputs: input_data, labels: label_data})
+                eval2 = model.eval({inputs: input_data, labels: label_data})
+                result = model.train({inputs: input_data, labels: label_data}, write_summaries=True)
+
+        # print(list(map(str,model.train_graph.output_layers)))
+        self.assertArrayEqual(eval1, eval2)
+        self.assertArrayNotEqual(result, eval2)
+
+    def test_nnlm_lstm(self):
+        vocab_size = 1000
+        ctx_size = 5
+        batch_size = 20
+        embed_dim = 64
+        h_dim = 128
+
+        print('building model')
+        inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
+        labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
+        model = NNLM_LSTM(inputs=inputs,
+                          labels=labels,
+                          batch_size=batch_size,
+                          vocab_size=vocab_size,
+                          embed_dim=embed_dim,
+                          reset_state=False,
+                          embed_share=True,
+                          use_f_predict=True,
+                          h_dim=h_dim,
+                          embed_dropout=True,
+                          w_dropout=True,
+                          u_dropconnect=True,
+                          other_dropout=True,
+                          w_keep_prob=0.9,
+                          u_keep_prob=0.9,
+                          embed_keep_prob=0.9,
+                          other_keep_prob=0.9,
+                          use_nce=False,
+                          nce_samples=2
+                          )
+        # model.run_graph.draw("run.pdf")
+
+        print("done")
+
+        model.set_session(runtime_stats=True)
+        model.set_log_dir("/tmp/")
+        model.log_graph()
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = None
+        model.set_session(runtime_stats=True, run_options=options)
+        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.005),
+                               gradient_op=lambda grad: tf.clip_by_norm(grad, 4.0))
+
+        # model.train_graph.draw("train.pdf")
+
+        input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
+        label_data = np.random.randint(0, vocab_size, [batch_size, 1])
+
+        with self.cached_session():
             for _ in tqdm(range(10)):
                 eval1 = model.eval({inputs: input_data, labels: label_data})
                 eval2 = model.eval({inputs: input_data, labels: label_data})
                 result = model.train({inputs: input_data, labels: label_data})
 
         # print(list(map(str,model.train_graph.output_layers)))
-        self.assertArrayEqual(eval1,eval2)
-        self.assertArrayNotEqual(result,eval2)
+        # self.assertArrayEqual(eval1, eval2)
+        # self.assertArrayNotEqual(result, eval2)
+
+    def test_nnlm_gru(self):
+        vocab_size = 1000
+        ctx_size = 10
+        batch_size = 128
+        embed_dim = 64
+        h_dim = 128
+
+        print('building model')
+        inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
+        labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
+        model = NNLM_GRU(inputs=inputs,
+                         labels=labels,
+                         vocab_size=vocab_size,
+                         embed_dim=embed_dim,
+                         embed_share=True,
+                         use_f_predict=True,
+                         h_dim=h_dim,
+                         use_dropout=True,
+                         keep_prob=0.9,
+                         embed_dropout=True,
+                         use_nce=False,
+                         nce_samples=2
+                         )
+        model.run_graph.draw("run.pdf")
+
+        print("done")
+
+        model.set_session(runtime_stats=True)
+        model.set_log_dir("/tmp/")
+        model.log_graph()
+        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # options = None
+        model.set_session(runtime_stats=True, run_options=options)
+        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.005),
+                               gradient_op=lambda grad: tf.clip_by_norm(grad, 4.0))
+
+        model.train_graph.draw("train.pdf")
+
+        input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
+        label_data = np.random.randint(0, vocab_size, [batch_size, 1])
+
+        with self.cached_session():
+            for _ in tqdm(range(10)):
+                eval1 = model.eval({inputs: input_data, labels: label_data})
+                eval2 = model.eval({inputs: input_data, labels: label_data})
+                result = model.train({inputs: input_data, labels: label_data})
 
     def test_tx_random_choice(self):
         range_max = 100

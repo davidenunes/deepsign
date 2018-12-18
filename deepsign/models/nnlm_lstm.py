@@ -1,6 +1,8 @@
 import tensorx as tx
 import tensorflow as tf
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
+import sys
+from functools import partial
 
 
 class NNLM(tx.Model):
@@ -23,14 +25,21 @@ class NNLM(tx.Model):
                  vocab_size,
                  embed_dim,
                  h_dim,
+                 batch_size,
                  embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  num_h=1,
-                 h_activation=tx.elu,
+                 h_activation=tx.tanh,
                  h_init=tx.he_normal_init(),
-                 use_dropout=False,
+                 reset_state=True,
                  embed_dropout=False,
-                 keep_prob=0.95,
+                 w_dropout=False,
+                 u_dropconnect=False,
+                 other_dropout=False,
+                 w_keep_prob=0.9,
+                 u_keep_prob=0.9,
+                 embed_keep_prob=0.9,
+                 other_keep_prob=0.9,
                  l2_loss=False,
                  l2_weight=1e-5,
                  use_f_predict=False,
@@ -63,20 +72,49 @@ class NNLM(tx.Model):
             # feature lookup
             embeddings = tx.Lookup(inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
             var_reg.append(embeddings.weights)
-            feature_lookup = embeddings.as_concat()
+            feature_lookup = embeddings.as_seq()
 
             last_layer = feature_lookup
-            h_layers = []
-            for i in range(num_h):
-                h_i = tx.FC(layer=last_layer,
-                            n_units=h_dim,
-                            fn=h_activation,
-                            weight_init=h_init,
-                            add_bias=True,
-                            name="h_{}".format(i + 1))
-                h_layers.append(h_i)
+            last_feature_layer = feature_lookup
+            lstm_cells = []
+
+            w_reg = partial(tx.Dropout, keep_prob=w_keep_prob) if w_dropout else None
+            u_reg = partial(tx.DropConnect, keep_prob=u_keep_prob) if u_dropconnect else None
+
+            if reset_state:
+                zero_state = None
+            else:
+                zero_state = tx.VariableLayer(n_units=h_dim, name="zero_state_var")
+
+            # for i in range(num_h):
+            for i in range(ctx_size):
+                if i == 0:
+                    h_i = tx.LSTMCell(layer=last_feature_layer[i],
+                                      previous_state=zero_state,
+                                      candidate_activation=h_activation,
+                                      output_activation=h_activation,
+                                      w_init=h_init,
+                                      u_init=h_init,
+                                      n_units=h_dim,
+                                      w_regularizer=w_reg,
+                                      u_regularizer=u_reg,
+                                      regularized=False,
+                                      name="lstm_cell_{}".format(i))
+                    lstm_cells.append(h_i)
+                else:
+                    h_i = last_layer.reuse_with(input_layer=last_feature_layer[i],
+                                                previous_state=last_layer,
+                                                memory_state=last_layer.memory_state,
+                                                name="lstm_cell_{}".format(i))
+
                 last_layer = h_i
-                var_reg.append(h_i.linear.weights)
+                # save last state, this will be used by state of first cell
+
+                var_reg += [wi.weights for wi in last_layer.w]
+                var_reg += [ui.weights for ui in last_layer.u]
+
+            if not reset_state:
+                last_layer = zero_state.reuse_with(last_layer, name="cache_last_cell")
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
@@ -104,17 +142,40 @@ class NNLM(tx.Model):
         # TRAIN GRAPH
         # ===============================================
         with tf.name_scope("train"):
-            if use_dropout and embed_dropout:
-                last_layer = tx.Dropout(feature_lookup, keep_prob=keep_prob, name="dropout_features")
-            else:
-                last_layer = feature_lookup
+            embeddings = embeddings.reuse_with(inputs)
+            feature_lookup = embeddings.as_seq()
+
+            if other_dropout and embed_dropout:
+                feature_lookup = tx.Dropout(feature_lookup, keep_prob=embed_keep_prob, name="drop_features")
+
+            # last_layer = last_layer.as_seq()
 
             # add dropout between each layer
-            for i, layer in enumerate(h_layers):
-                h = layer.reuse_with(last_layer)
-                if use_dropout:
-                    h = tx.Dropout(h, keep_prob=keep_prob, name="dropout_{}".format(i + 1))
+            # for i, layer in enumerate(h_layers):
+            cell = lstm_cells[0]
+            memory_state = None
+            for i in range(ctx_size):
+                if i == 0:
+                    h = cell.reuse_with(input_layer=feature_lookup[i],
+                                        previous_state=None,
+                                        memory_state=memory_state,
+                                        regularized=w_dropout or u_dropconnect,
+                                        name="lstm_cell_{}".format(i))
+
+                else:
+                    h = cell.reuse_with(input_layer=feature_lookup[i],
+                                        previous_state=last_layer,
+                                        name="lstm_cell_{}".format(i))
+
+                cell = h
+                # if use_dropout:
+                #    h = tx.ZoneOut(h,
+                #                   previous_layer=h.previous_state,
+                #                   keep_prob=keep_prob,
+                #                   name="zoneout_{}".format(i))
                 last_layer = h
+            if not reset_state:
+                last_layer = zero_state.reuse_with(last_layer, name="cache_last_cell")
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
@@ -148,11 +209,9 @@ class NNLM(tx.Model):
                                            n_units=embeddings.n_units,
                                            wrap_fn=lambda x: x.weights,
                                            layer_fn=True)
-                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss,
-                                        name="nce_loss")
+                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, name="nce_loss")
             else:
-                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss,
-                                        name="train_loss")
+                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss, name="train_loss")
 
             if l2_loss:
                 l2_losses = [tf.nn.l2_loss(var) for var in var_reg]
