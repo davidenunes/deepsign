@@ -9,9 +9,10 @@ import tensorflow as tf
 from tqdm import tqdm
 import traceback
 import tensorx as tx
+import tensorx.train
 from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, \
     flatten_it
-from deepsign.models.nnlm_lstm import NNLM
+from deepsign.models.nnlm_lstm import LSTM_NNLM
 from exp.args import ParamDict
 from deepsign.data.corpora.ptb import PTBReader
 from deepsign.data.corpora.wiki103 import WikiText103
@@ -26,25 +27,29 @@ defaults = {
     'id': (int, 0),  # param configuration id
     'run': (int, 1),  # run number within param id
     'corpus': (str, default_corpus),
-    'ngram_size': (int, 10),
-    'mark_eos': (bool, True),
+    'ngram_size': (int, 20),
+    'mark_eos': (bool, False),
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
     # network architecture
-    'embed_dim': (int, 128),
+    'embed_dim': (int, 400),
     'embed_init': (str, 'uniform', ["normal", "uniform"]),
-    'embed_init_val': (float, 0.01),
+    'embed_init_val': (float, 0.05),
     'logit_init': (str, "uniform", ["normal", "uniform"]),
-    'logit_init_val': (float, 0.01),
+    'logit_init_val': (float, 0.05),
+    'h_init': (str, "uniform", ["normal", "uniform", "xavier", "he"]),
+    'h_init_val': (float, 0.05),
     'embed_share': (bool, True),
     'num_h': (int, 1),
-    'h_dim': (int, 128),
-    'h_act': (str, "relu", ['relu', 'tanh', 'elu', 'selu']),
+    'h_dim': (int, 650),
+    # TODO selo return overflow
+    'h_act': (str, "tanh", ['relu', 'tanh', 'elu', 'selu']),
     'epochs': (int, 20),
     'batch_size': (int, 128),
-    'shuffle': (bool, True),
+    'shuffle': (bool, False),
     'shuffle_buffer_size': (int, 128 * 10000),
-    'optimizer': (str, 'sgd', ['sgd', 'adam', 'ams']),
+    # TODO ams produced an error
+    'optimizer': (str, 'adagrad', ['sgd', 'adam', 'ams', 'adagrad']),
     # needed for adam and ams
     'optimizer_beta1': (float, 0.9),
     'optimizer_beta2': (float, 0.999),
@@ -52,7 +57,7 @@ defaults = {
     # training
     'lr': (float, 0.5),
     'lr_decay': (bool, True),
-    'lr_decay_rate': (float, 0.5),
+    'lr_decay_rate': (float, 0.8),
     # annealing
     'lr_decay_threshold': (float, 1e-6),
     # lr decay when last_ppl - current_ppl < eval_threshold
@@ -66,18 +71,26 @@ defaults = {
 
     # regularisation
     'clip_grads': (bool, True),
-    # if true clips by local norm, else clip by norm of all gradients
-    'clip_local': (bool, False),
+    'clip_local': (bool, True),
     'clip_value': (float, 1.0),
 
-    'dropout': (bool, True),
     'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.60),
+    'embed_keep_prob': (float, 0.75),
 
-    'l2_loss': (bool, False),
+    'w_dropout': (bool, True),
+    'w_keep_prob': (float, 0.50),
+
+    'u_dropconnect': (bool, False),
+    'u_keep_prob': (float, 0.60),
+
+    'reset_state': (bool, True),
+
+    'l2_loss': (bool, True),
     'l2_loss_coef': (float, 1e-5),
 
     "eval_test": (bool, False),
+
+    "eval_train": (bool, True),
 
     # eval display progress:
     "eval_progress": (bool, True),
@@ -177,16 +190,23 @@ def run(**kwargs):
     # Configure weight initializers based on activation functions
     if args.h_act == "relu":
         h_act = tx.relu
-        h_init = tx.he_normal_init()
     elif args.h_act == "tanh":
         h_act = tx.tanh
-        h_init = tx.xavier_init()
     elif args.h_act == "elu":
         h_act = tx.elu
-        h_init = tx.he_normal_init()
     elif args.h_act == "selu":
         h_act = tf.nn.selu
+
+    if args.h_init == "normal":
+        h_init = tx.random_normal(mean=0.,
+                                  stddev=args.h_init_val)
+    elif args.h_init == "uniform":
+        h_init = tx.random_uniform(minval=-args.h_init_val,
+                                   maxval=args.h_init_val)
+    elif args.h_init == "xavier":
         h_init = tx.xavier_init()
+    elif args.h_init == "he":
+        h_init = tx.he_normal_init()
 
     # Configure embedding and logit weight initializers
     if args.embed_init == "normal":
@@ -212,34 +232,38 @@ def run(**kwargs):
 
     inputs = tx.Input(args.ngram_size - 1, dtype=tf.int64, name="ctx_inputs")
     labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
-    model = NNLM(inputs=inputs,
-                 labels=labels,
-                 vocab_size=len(vocab),
-                 embed_dim=args.embed_dim,
-                 embed_init=embed_init,
-                 embed_share=args.embed_share,
-                 logit_init=logit_init,
-                 h_dim=args.h_dim,
-                 num_h=args.num_h,
-                 h_activation=h_act,
-                 h_init=h_init,
-                 other_dropout=args.dropout,
-                 keep_prob=args.keep_prob,
-                 embed_dropout=args.embed_dropout,
-                 l2_loss=args.l2_loss,
-                 l2_weight=args.l2_loss_coef,
-                 use_f_predict=args.use_f_predict,
-                 f_init=f_init,
-                 logit_bias=args.logit_bias,
-                 use_nce=False)
+    model = LSTM_NNLM(inputs=inputs,
+                      labels=labels,
+                      vocab_size=len(vocab),
+                      embed_dim=args.embed_dim,
+                      embed_init=embed_init,
+                      embed_share=args.embed_share,
+                      logit_init=logit_init,
+                      h_dim=args.h_dim,
+                      num_h=args.num_h,
+                      h_activation=h_act,
+                      h_init=h_init,
+                      reset_state=args.reset_state,
+                      w_dropout=args.w_dropout,
+                      u_dropconnect=args.u_dropconnect,
+                      w_keep_prob=args.w_keep_prob,
+                      u_keep_prob=args.u_keep_prob,
+                      embed_keep_prob=args.embed_keep_prob,
+                      embed_dropout=args.embed_dropout,
+                      l2_loss=args.l2_loss,
+                      l2_weight=args.l2_loss_coef,
+                      use_f_predict=args.use_f_predict,
+                      f_init=f_init,
+                      logit_bias=args.logit_bias,
+                      use_nce=False)
 
     # Input params can be changed during training by setting their value
     # lr_param = tx.InputParam(init_value=args.lr)
-    lr_param = tx.EvalStepDecayParam(value=args.lr,
-                                     improvement_threshold=args.eval_threshold,
-                                     less_is_better=True,
-                                     decay_rate=args.lr_decay_rate,
-                                     decay_threshold=args.lr_decay_threshold)
+    lr_param = tensorx.train.EvalStepDecayParam(value=args.lr,
+                                                improvement_threshold=args.eval_threshold,
+                                                less_is_better=True,
+                                                decay_rate=args.lr_decay_rate,
+                                                decay_threshold=args.lr_decay_threshold)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":
@@ -252,9 +276,12 @@ def run(**kwargs):
                                beta1=args.optimizer_beta1,
                                beta2=args.optimizer_beta2,
                                epsilon=args.optimizer_epsilon)
+    elif args.optimizer == "adagrad":
+        optimizer = tf.train.AdagradOptimizer(learning_rate=lr_param.tensor,)
 
     def clip_grad_global(grads):
-        grads, _ = tf.clip_by_global_norm(grads, 12)
+        #TODO found hard coded value
+        grads, _ = tf.clip_by_global_norm(grads, args.clip_value)
         return grads
 
     def clip_grad_local(grad):
@@ -316,6 +343,16 @@ def run(**kwargs):
 
             res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
                        "dataset": "test",
+                       "perplexity": ppl_test}
+            ppl_writer.writerow(res_row)
+
+        if args.eval_train:
+            # pb.write("[Eval Test Set]")
+            ppl_test = eval_model(model, corpus_pipeline(corpus.training_set(), epochs=1, shuffle=False), training_len,
+                                  display_progress)
+
+            res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
+                       "dataset": "train",
                        "perplexity": ppl_test}
             ppl_writer.writerow(res_row)
 

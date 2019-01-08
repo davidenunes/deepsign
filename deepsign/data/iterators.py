@@ -156,9 +156,33 @@ def flatten_it(iterable):
     return itertools.chain.from_iterable(iterable)
 
 
-def take_it(n, iterable):
-    """Return first n items of the iterable as a list"""
-    return itertools.islice(iterable, n)
+def take_it(iterable, n):
+    """Takes n items from iterable as a generator"""
+    return itertools.islice(iterable, int(n))
+
+
+def slice_it(iterable, n):
+    """Iterates through iterable by taking n items at a time"""
+    source_iter = iter(iterable)
+    try:
+        while True:
+            batch_iter = take_it(source_iter, n)
+            next_batch = itertools.chain([next(batch_iter)], batch_iter)
+            yield next_batch
+    except StopIteration:
+        return
+
+
+def narrow_it(iterable, n):
+    """Iterates through iterable until n items are returns"""
+    source_iter = iter(iterable)
+    i = 0
+    try:
+        while i < n:
+            yield next(source_iter)
+            i += 1
+    except StopIteration:
+        return
 
 
 def chunk_it(dataset, n_rows=None, chunk_size=1):
@@ -225,20 +249,20 @@ def window_it(iterable, n, as_list=True):
     """ Creates fixed sized sliding windows from iterable
     s -> (s0, ...,s(n-1)), (s1, ...,sn), (s2, ..., s(n+1)), ...
     """
-    iters = itertools.tee(iterable, n)
-    for i, it in enumerate(iters):
+    its = itertools.tee(iterable, n)
+    for i, it in enumerate(its):
         consume_it(it, i)
 
-    return map(list, zip(*iters)) if as_list else zip(*iters)
+    return map(list, zip(*its)) if as_list else zip(*its)
 
 
-def batch_it(data_it, size, padding=False, padding_elem=None):
-    """
+def batch_it(iterable, size, padding=False, padding_elem=None):
+    """ Batches iterable and returns lists of elements with a given size
 
     Args:
         padding_elem: the element to be used to pad the batches
         padding: if True, pads the last batch to be of at least the given size
-        data_it: an iterable over data to be batched
+        iterable: an iterable over data to be batched
         size: size of the batch to be returned
 
     Returns:
@@ -246,10 +270,10 @@ def batch_it(data_it, size, padding=False, padding_elem=None):
 
 
     """
-    source_iter = iter(data_it)
+    source_iter = iter(iterable)
     try:
         while True:
-            batch_iter = take_it(size, source_iter)
+            batch_iter = take_it(source_iter, size)
             next_batch = list(itertools.chain([next(batch_iter)], batch_iter))
             if padding and len(next_batch) < size:
                 padding_size = size - len(next_batch)
@@ -257,6 +281,79 @@ def batch_it(data_it, size, padding=False, padding_elem=None):
             yield next_batch
     except StopIteration:
         return
+
+
+def bptt_it(iterable_data, batch_size, seq_len, min_seq_len=2, seq_prob=0.95, num_batches=None):
+    """ Back Propagation Through Time Iterator
+
+    Args:
+
+        iterable_data: iterable data (like a generator) of data
+        batch_size: number of parallel sequences
+        seq_len: base sequence length
+        min_seq_len: mini
+        num_batches: acts as a buffer, if None consumes the entire data and loads it
+            to load the entire iterable to memory
+
+    Returns:
+        a generator of batches of sequences for back propagation through time
+
+    """
+
+    # average sequence lengths
+    k1 = seq_len
+    k2 = seq_len // 2
+
+    # probability of sequence length distribution
+    p1 = seq_prob
+    p2 = 1 - p1
+
+    def to_batch(flat_data):
+        n = np.shape(flat_data)[0]
+        max_seq_len = n // batch_size
+        # narrow remove items that don't fit into batch
+        flat_data = flat_data[:max_seq_len * batch_size]
+        batched_data = np.reshape(flat_data, [batch_size, max_seq_len])
+        batched_data = np.ascontiguousarray(batched_data)
+        return batched_data
+
+    def splits(max_n):
+        i = 0
+        while i < max_n:
+            r = np.random.rand()
+            if r < seq_prob:
+                current_len = np.random.normal(k1, min_seq_len)
+            else:
+                current_len = np.random.normal(k2, min_seq_len)
+
+            # prevents excessively small or negative sequence sizes
+            # it also prevents excessively small splits at the end of a long sequence
+            offset = max(min_seq_len, int(current_len))
+            if max_n - i + offset < min_seq_len:
+                offset = max_n - i
+            yield i, i + offset
+            i += offset
+
+    data = iter(iterable_data)
+    # load everything onto memory
+    if num_batches is None:
+        data = np.array(list(data))
+        data = to_batch(data)
+        data = iter([data])
+    else:
+        # expected sequence length
+        avg_seq_len = int(k1 * p1 + k2 * p2)
+        # buffer max_seq * batches at a time
+        buffer_size = batch_size * avg_seq_len * num_batches
+        buffers = batch_it(data, buffer_size)
+        data = (to_batch(buffer) for buffer in buffers)
+
+    # TODO not sure if data needs to be contiguous here feeding a view might be just fine
+    # I can return a time-major batch of sequences which is contiguous
+    batches = (data_i[:, ii:fi] for data_i in data
+               for ii, fi in splits(np.shape(data_i)[-1]))
+
+    return batches
 
 
 def shuffle_it(data_it, buffer_size):

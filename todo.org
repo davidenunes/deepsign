@@ -1,0 +1,16 @@
+* DATA 
+** views
+*** TODO BPTT Pipeline
+      | *parameters* | *desc.*                                             |
+      | max seq. len | maximum length from which we will draw batches from |
+      | window len   | maximum window size for the BPTT unrolled network   |
+
+* MODELS
+** TODO dynamic lstm model
+** TODO convolutional model
+** TODO NRP lstm model
+** TODO NRP convolutional model 
+** TODO best model with conditional NCE
+** TODO best NRP model with conditional NCE 
+
+ 

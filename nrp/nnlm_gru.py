@@ -9,6 +9,7 @@ import tensorflow as tf
 from tqdm import tqdm
 import traceback
 import tensorx as tx
+import tensorx.train
 from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, \
     flatten_it
 from deepsign.models.nnlm_gru import NNLM
@@ -237,11 +238,11 @@ def run(**kwargs):
 
     # Input params can be changed during training by setting their value
     # lr_param = tx.InputParam(init_value=args.lr)
-    lr_param = tx.EvalStepDecayParam(value=args.lr,
-                                     improvement_threshold=args.eval_threshold,
-                                     less_is_better=True,
-                                     decay_rate=args.lr_decay_rate,
-                                     decay_threshold=args.lr_decay_threshold)
+    lr_param = tensorx.train.EvalStepDecayParam(value=args.lr,
+                                                improvement_threshold=args.eval_threshold,
+                                                less_is_better=True,
+                                                decay_rate=args.lr_decay_rate,
+                                                decay_threshold=args.lr_decay_threshold)
     if args.optimizer == "sgd":
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr_param.tensor)
     elif args.optimizer == "adam":

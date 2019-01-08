@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorx as tx
 from tensorx.test_utils import TestCase
 from deepsign.models.nnlm import NNLM
-from deepsign.models.nnlm_lstm import NNLM as NNLM_LSTM
+from deepsign.models.nnlm_lstm import LSTM_NNLM as NNLM_LSTM
 from deepsign.models.nnlm_gru import NNLM as NNLM_GRU
 from deepsign.models.lbl import LBL
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
@@ -75,7 +75,7 @@ class TestModels(TestCase):
 
     def test_nnlm_lstm(self):
         vocab_size = 1000
-        ctx_size = 5
+        ctx_size = 2
         batch_size = 20
         embed_dim = 64
         h_dim = 128
@@ -85,13 +85,13 @@ class TestModels(TestCase):
         labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
         model = NNLM_LSTM(inputs=inputs,
                           labels=labels,
-                          batch_size=batch_size,
                           vocab_size=vocab_size,
                           embed_dim=embed_dim,
-                          reset_state=False,
+                          reset_state=True,
                           embed_share=True,
                           use_f_predict=True,
                           h_dim=h_dim,
+                          num_h=1,
                           embed_dropout=True,
                           w_dropout=True,
                           u_dropconnect=True,
@@ -103,7 +103,7 @@ class TestModels(TestCase):
                           use_nce=False,
                           nce_samples=2
                           )
-        # model.run_graph.draw("run.pdf")
+        model.run_graph.draw("run.pdf")
 
         print("done")
 

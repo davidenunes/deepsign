@@ -29,7 +29,7 @@ class LSTM_NNLM(tx.Model):
                  logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
                  num_h=1,
                  h_activation=tx.tanh,
-                 h_init=tx.random_uniform(minval=-0.05, maxval=0.05),
+                 h_init=tx.he_normal_init(),
                  reset_state=True,
                  embed_dropout=False,
                  w_dropout=False,
@@ -77,52 +77,22 @@ class LSTM_NNLM(tx.Model):
             last_feature_layer = feature_lookup
 
 
-            w_reg = partial(tx.Dropout, keep_prob=w_keep_prob) if w_dropout else None
-            u_reg = partial(tx.DropConnect, keep_prob=u_keep_prob) if u_dropconnect else None
-
-            if reset_state:
-                zero_state = None
-            else:
-                zero_state = tx.VariableLayer(n_units=h_dim, name="zero_state_var")
-
-            lstm_layers = []
             for i in range(num_h):
-                lstm_cells = []
+                h_i = tx.QRNN(feature_lookup,
+                              n_units=h_dim,
+                              activation=h_activation,
+                              filter_size=
+                              )
 
 
-                for i in range(ctx_size):
-                    if i == 0:
-                        h_i = tx.LSTMCell(input_layer=last_feature_layer[i],
-                                          previous_cell=zero_state,
-                                          activation=h_activation,
-                                          output_activation=h_activation,
-                                          w_init=h_init,
-                                          u_init=h_init,
-                                          n_units=h_dim,
-                                          w_regularizer=w_reg,
-                                          u_regularizer=u_reg,
-                                          regularized=False,
-                                          name="lstm_cell_{}".format(i))
-                        lstm_cells.append(h_i)
-                    else:
-                        h_i = last_layer.reuse_with(input_layer=last_feature_layer[i],
-                                                    previous_state=last_layer,
-                                                    previous_memory=last_layer.memory_state,
-                                                    name="lstm_cell_{}".format(i))
-                        lstm_cells.append(h_i)
+                last_layer = h_i
+                # save last state, this will be used by state of first cell
 
-                    last_layer = lstm_cells[-1]
-                    # save last state, this will be used by state of first cell
+                var_reg += [wi.weights for wi in last_layer.w]
+                var_reg += [ui.weights for ui in last_layer.u]
 
-                    var_reg += [wi.weights for wi in last_layer.w]
-                    var_reg += [ui.weights for ui in last_layer.u]
-
-                if not reset_state:
-                    last_layer = zero_state.reuse_with(last_layer, name="cache_last_state")
-
-                # add cells to layer
-                lstm_layers.append(lstm_cells)
-                last_feature_layer = lstm_cells
+            if not reset_state:
+                last_layer = zero_state.reuse_with(last_layer, name="cache_last_state")
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
@@ -172,7 +142,7 @@ class LSTM_NNLM(tx.Model):
 
                 else:
                     h = cell.reuse_with(input_layer=feature_lookup[i],
-                                        previous_cell=last_layer,
+                                        previous_state=last_layer,
                                         name="lstm_cell_{}".format(i))
 
                 cell = h

@@ -1,5 +1,6 @@
 from unittest import TestCase
 import numpy as np
+from deepsign.data import iterators as it
 from deepsign.data.iterators import chunk_it, subset_chunk_it
 from deepsign.data.iterators import divide_slices, window_it, batch_it, shuffle_it, flatten_it, repeat_apply, chain_it
 import itertools
@@ -128,6 +129,79 @@ class TestViews(TestCase):
         self.assertEqual(len(unique_data), 4)
         self.assertEqual(len(counts), 1)
         self.assertEqual(counts[0], 4)
+
+    def test_narrow_it(self):
+        n_samples = 10
+        t = 4
+        data = range(n_samples)
+
+        result1 = it.narrow_it(data, t)
+        self.assertEqual(len(list(result1)), t)
+
+        result2 = it.narrow_it(data, n_samples + t)
+        self.assertEqual(len(list(result2)), n_samples)
+
+    def test_take_it(self):
+        n_samples = 10
+        t = 5
+        data = range(n_samples)
+        result = it.take_it(data, t)
+
+        self.assertEqual(len(list(result)), t)
+
+    def test_slice_it(self):
+        n_samples = 9
+        t = 3
+        data = range(n_samples)
+        result = it.slice_it(data, t)
+
+        for s in result:
+            self.assertEqual(len(list(s)), 3)
+
+    def test_bptt_it(self):
+        n = 10000
+        bsz = 5
+        seq = 10
+        data = np.arange(n, dtype=np.int32)
+
+        data_it = it.bptt_it(data,
+                             batch_size=bsz,
+                             seq_prob=1.0,
+                             seq_len=seq)
+
+        data1 = list(data_it)
+        last = data1[-1].flatten()[-1]
+        num_batches = len(data1)
+        self.assertEqual(last, n // bsz * bsz - 1)
+
+        n = 0
+        seq_sizes = 0
+        for batch in data1:
+            # print(batch)
+            seq_sizes += np.shape(batch)[-1]
+            n += 1
+
+        avg_seq_len1 = seq_sizes / n
+
+        data_it2 = it.bptt_it(data,
+                              batch_size=bsz,
+                              seq_prob=1.0,
+                              seq_len=seq,
+                              num_batches=100)
+
+        data2 = list(data_it2)
+        n = 0
+        seq_sizes = 0
+        for batch in data2:
+            # print(batch)
+            seq_sizes += np.shape(batch)[-1]
+            n += 1
+
+        avg_seq_len2 = seq_sizes / n
+
+        self.assertAlmostEqual(avg_seq_len1,avg_seq_len2,delta=1.0)
+
+
 
     def test_repeat_fn_exhaust(self):
         n_samples = 4

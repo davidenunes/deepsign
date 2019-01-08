@@ -2,6 +2,8 @@ from tensorflow.python.ops import array_ops, math_ops, variables, candidate_samp
 from tensorflow.python.framework import dtypes, ops, sparse_tensor
 from tensorflow.python.ops.nn import embedding_lookup_sparse, embedding_lookup, sigmoid_cross_entropy_with_logits
 
+import tensorx.layers
+import tensorx.train
 from deepsign.rp.tf_utils import RandomIndexTensor
 from deepsign.rp.ri import Generator, RandomIndex
 from deepsign.data.transform import ris_to_sp_tensor_value
@@ -156,7 +158,7 @@ sampled_loss = tf.reduce_mean(sampled_loss + tf.nn.l2_loss(lookup.weights) * 1e-
 
 tqdm.write("loss: {}".format(sampled_loss.eval()))
 
-lr = tx.Param(0.0005)
+lr = tensorx.layers.Param(0.0005)
 # opt = tf.train.RMSPropOptimizer(learning_rate=lr.tensor)
 opt = tx.AMSGrad(learning_rate=lr.tensor)
 # opt = tf.train.GradientDescentOptimizer(learning_rate=lr.tensor)

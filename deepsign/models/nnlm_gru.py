@@ -72,7 +72,7 @@ class NNLM(tx.Model):
             # for i in range(num_h):
             for i in range(ctx_size):
                 if i == 0:
-                    h_i = tx.GRUCell(layer=last_feature_layer[i],
+                    h_i = tx.GRUCell(input_layer=last_feature_layer[i],
                                      activation=h_activation,
                                      w_init=h_init,
                                      u_init=h_init,
