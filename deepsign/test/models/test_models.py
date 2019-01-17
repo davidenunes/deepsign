@@ -81,7 +81,7 @@ class TestModels(TestCase):
         h_dim = 128
 
         print('building model')
-        inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
+        inputs = tx.Input(n_units=None, dtype=tf.int64, name="ctx_inputs")
         labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
         model = NNLM_LSTM(inputs=inputs,
                           labels=labels,
@@ -91,7 +91,7 @@ class TestModels(TestCase):
                           embed_share=True,
                           use_f_predict=True,
                           h_dim=h_dim,
-                          num_h=1,
+                          num_h=2,
                           embed_dropout=True,
                           w_dropout=True,
                           u_dropconnect=True,
@@ -122,7 +122,9 @@ class TestModels(TestCase):
         label_data = np.random.randint(0, vocab_size, [batch_size, 1])
 
         with self.cached_session():
-            for _ in tqdm(range(10)):
+            for i in tqdm(range(100)):
+                if i == 50:
+                    model.reset_state()
                 eval1 = model.eval({inputs: input_data, labels: label_data})
                 eval2 = model.eval({inputs: input_data, labels: label_data})
                 result = model.train({inputs: input_data, labels: label_data})

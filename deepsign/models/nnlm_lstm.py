@@ -61,7 +61,6 @@ class LSTM_NNLM(tx.Model):
         if num_h < 0:
             raise ValueError("num hidden should be >= 0")
 
-        ctx_size = inputs.n_units
         # ===============================================
         # RUN GRAPH
         # ===============================================
@@ -69,60 +68,45 @@ class LSTM_NNLM(tx.Model):
 
         with tf.name_scope("run"):
             # feature lookup
-            embeddings = tx.Lookup(inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
+            embeddings = tx.Lookup(inputs,
+                                   seq_size=None,
+                                   lookup_shape=[vocab_size, embed_dim],
+                                   weight_init=embed_init)
             var_reg.append(embeddings.weights)
             feature_lookup = embeddings.as_seq()
 
             last_layer = feature_lookup
-            last_feature_layer = feature_lookup
-
 
             w_reg = partial(tx.Dropout, keep_prob=w_keep_prob) if w_dropout else None
             u_reg = partial(tx.DropConnect, keep_prob=u_keep_prob) if u_dropconnect else None
 
-            if reset_state:
-                zero_state = None
-            else:
-                zero_state = tx.VariableLayer(n_units=h_dim, name="zero_state_var")
+            def cell_proto(x, **kwargs):
+                return tx.LSTMCell(x,
+                                   n_units=h_dim,
+                                   activation=h_activation,
+                                   w_init=h_init,
+                                   u_init=h_init,
+                                   w_regularizer=w_reg,
+                                   u_regularizer=u_reg,
+                                   regularized=False,
+                                   name="lstm_cell",
+                                   **kwargs)
 
             lstm_layers = []
             for i in range(num_h):
-                lstm_cells = []
-
-
-                for i in range(ctx_size):
-                    if i == 0:
-                        h_i = tx.LSTMCell(input_layer=last_feature_layer[i],
-                                          previous_cell=zero_state,
-                                          activation=h_activation,
-                                          output_activation=h_activation,
-                                          w_init=h_init,
-                                          u_init=h_init,
-                                          n_units=h_dim,
-                                          w_regularizer=w_reg,
-                                          u_regularizer=u_reg,
+                lstm_layer = tx.Recurrent(last_layer,
+                                          cell_proto=cell_proto,
                                           regularized=False,
-                                          name="lstm_cell_{}".format(i))
-                        lstm_cells.append(h_i)
-                    else:
-                        h_i = last_layer.reuse_with(input_layer=last_feature_layer[i],
-                                                    previous_state=last_layer,
-                                                    previous_memory=last_layer.memory_state,
-                                                    name="lstm_cell_{}".format(i))
-                        lstm_cells.append(h_i)
+                                          stateful=True,
+                                          name="LSTM_{}".format(i+1))
 
-                    last_layer = lstm_cells[-1]
-                    # save last state, this will be used by state of first cell
+                lstm_layers.append(lstm_layer)
+                var_reg += [wi.weights for wi in lstm_layer.cell.w]
+                var_reg += [ui.weights for ui in lstm_layer.cell.u]
+                last_layer = lstm_layer
 
-                    var_reg += [wi.weights for wi in last_layer.w]
-                    var_reg += [ui.weights for ui in last_layer.u]
-
-                if not reset_state:
-                    last_layer = zero_state.reuse_with(last_layer, name="cache_last_state")
-
-                # add cells to layer
-                lstm_layers.append(lstm_cells)
-                last_feature_layer = lstm_cells
+            # last time step is the state used to make the prediction
+            last_layer = last_layer[-1]
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
@@ -156,34 +140,13 @@ class LSTM_NNLM(tx.Model):
             if other_dropout and embed_dropout:
                 feature_lookup = tx.Dropout(feature_lookup, keep_prob=embed_keep_prob, name="drop_features")
 
-            # last_layer = last_layer.as_seq()
+            last_layer = feature_lookup
 
-            # add dropout between each layer
-            # for i, layer in enumerate(h_layers):
-            cell = lstm_cells[0]
+            for i in range(num_h):
+                lstm_layer = lstm_layers[i].reuse_with(last_layer, regularized=True)
+                last_layer = lstm_layer
 
-            for i in range(ctx_size):
-                if i == 0:
-                    h = cell.reuse_with(input_layer=feature_lookup[i],
-                                        previous_state=None,  # copy from first cell
-                                        previous_memory=None,  # copy from first cell
-                                        regularized=w_dropout or u_dropconnect,
-                                        name="lstm_cell_{}".format(i))
-
-                else:
-                    h = cell.reuse_with(input_layer=feature_lookup[i],
-                                        previous_cell=last_layer,
-                                        name="lstm_cell_{}".format(i))
-
-                cell = h
-                # if use_dropout:
-                #    h = tx.ZoneOut(h,
-                #                   previous_layer=h.previous_state,
-                #                   keep_prob=keep_prob,
-                #                   name="zoneout_{}".format(i))
-                last_layer = h
-            if not reset_state:
-                last_layer = zero_state.reuse_with(last_layer, name="cache_last_cell")
+            last_layer = last_layer[-1]
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
@@ -233,6 +196,7 @@ class LSTM_NNLM(tx.Model):
         with tf.name_scope("eval"):
             eval_loss = tx.FnLayer(labels, run_logits, apply_fn=categorical_loss, name="eval_loss")
 
+        self.stateful_layers = lstm_layers
         # BUILD MODEL
         super().__init__(run_outputs=run_output,
                          run_inputs=inputs,
@@ -242,3 +206,10 @@ class LSTM_NNLM(tx.Model):
                          eval_inputs=[inputs, labels],
                          eval_outputs=run_output,
                          eval_score=eval_loss)
+
+    def reset_state(self):
+        """ returns an op that resets all stateful layers
+
+        """
+        reset_op = tf.group(*[layer.reset() for layer in self.stateful_layers])
+        self.session.run(reset_op)

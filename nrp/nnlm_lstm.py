@@ -10,12 +10,12 @@ from tqdm import tqdm
 import traceback
 import tensorx as tx
 import tensorx.train
-from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, \
-    flatten_it
+from deepsign.data.pipelines import to_parallel_seq
 from deepsign.models.nnlm_lstm import LSTM_NNLM
 from exp.args import ParamDict
 from deepsign.data.corpora.ptb import PTBReader
 from deepsign.data.corpora.wiki103 import WikiText103
+from functools import partial
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -110,44 +110,14 @@ def run(**kwargs):
     corpus_stats = h5py.File(os.path.join(args.corpus, "ptb_stats.hdf5"), mode='r')
     vocab = marisa_trie.Trie(corpus_stats["vocabulary"])
 
-    def corpus_pipeline(corpus_stream,
-                        n_gram_size=args.ngram_size,
-                        epochs=1,
-                        batch_size=args.batch_size,
-                        shuffle=args.shuffle,
-                        flatten=False):
-        """ Corpus Processing Pipeline.
-
-        Transforms the corpus reader -a stream of sentences or words- into a stream of n-gram batches.
-
-        Args:
-            n_gram_size: the size of the n-gram window
-            corpus_stream: the stream of sentences of words
-            epochs: number of epochs we want to iterate over this corpus
-            batch_size: batch size for the n-gram batch
-            shuffle: if true, shuffles the n-grams according to a buffer size
-            flatten: if true sliding windows are applied over a stream of words rather than within each sentence
-            (n-grams can cross sentence boundaries)
-        """
-
-        if flatten:
-            word_it = flatten_it(corpus_stream)
-            n_grams = window_it(word_it, n_gram_size)
-        else:
-            sentence_n_grams = (window_it(sentence, n_gram_size) for sentence in corpus_stream)
-            n_grams = flatten_it(sentence_n_grams)
-
-        # at this point this is an n_gram iterator
-        n_grams = ([vocab[w] for w in ngram] for ngram in n_grams)
-
-        if epochs > 1:
-            n_grams = repeat_it(n_grams, epochs)
-
-        if shuffle:
-            n_grams = shuffle_it(n_grams, args.shuffle_buffer_size)
-
-        n_grams = batch_it(n_grams, size=batch_size, padding=False)
-        return n_grams
+    to_ngrams_batch = partial(to_parallel_seq,
+                              vocab=vocab,
+                              ngram_size=args.ngram_size,
+                              batch_size=args.batch_size,
+                              epochs=1,
+                              shuffle=False,
+                              shuffle_buffer_size=args.shuffle_buffer_size,
+                              enum_epoch=False)
 
     # print("counting dataset samples...")
     training_len = sum(1 for _ in corpus_pipeline(corpus.training_set(), batch_size=1, epochs=1, shuffle=False))

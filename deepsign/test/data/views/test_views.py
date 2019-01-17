@@ -187,7 +187,7 @@ class TestViews(TestCase):
                               batch_size=bsz,
                               seq_prob=1.0,
                               seq_len=seq,
-                              num_batches=100)
+                              num_batches=num_batches)
 
         data2 = list(data_it2)
         n = 0

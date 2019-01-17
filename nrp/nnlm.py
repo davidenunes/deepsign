@@ -1,4 +1,3 @@
-import argparse
 import csv
 import marisa_trie
 import os
@@ -10,17 +9,19 @@ from tqdm import tqdm
 import traceback
 import tensorx as tx
 import tensorx.train
-from deepsign.data.iterators import chunk_it, take_it, batch_it, shuffle_it, repeat_it, repeat_apply, window_it, \
-    flatten_it
 from deepsign.models.nnlm import NNLM
 from exp.args import ParamDict
 from deepsign.data.corpora.ptb import PTBReader
+from deepsign.data.pipelines import to_ngrams
 from deepsign.data.corpora.wiki103 import WikiText103
+
+# TODO make a progress bar showing PPL like I did with LSTM runner?
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 default_corpus = os.path.join(os.getenv("HOME"), "data/datasets/ptb/")
 default_out_dir = os.getcwd()
+from functools import partial
 
 defaults = {
     'pid': (int, 0),
@@ -32,14 +33,14 @@ defaults = {
     'save_model': (bool, False),
     'out_dir': (str, default_out_dir),
     # network architecture
-    'embed_dim': (int, 128),
+    'embed_dim': (int, 256),
     'embed_init': (str, 'uniform', ["normal", "uniform"]),
     'embed_init_val': (float, 0.01),
     'logit_init': (str, "uniform", ["normal", "uniform"]),
     'logit_init_val': (float, 0.01),
     'embed_share': (bool, True),
     'num_h': (int, 1),
-    'h_dim': (int, 128),
+    'h_dim': (int, 512),
     'h_act': (str, "relu", ['relu', 'tanh', 'elu', 'selu']),
     'epochs': (int, 20),
     'batch_size': (int, 128),
@@ -67,8 +68,7 @@ defaults = {
 
     # regularisation
     'clip_grads': (bool, True),
-    # if true clips by local norm, else clip by norm of all gradients
-    'clip_local': (bool, False),
+    'clip_local': (bool, True),
     'clip_value': (float, 1.0),
 
     'dropout': (bool, True),
@@ -98,54 +98,22 @@ def run(**kwargs):
     corpus_stats = h5py.File(os.path.join(args.corpus, "ptb_stats.hdf5"), mode='r')
     vocab = marisa_trie.Trie(corpus_stats["vocabulary"])
 
-    def corpus_pipeline(corpus_stream,
-                        n_gram_size=args.ngram_size,
-                        epochs=1,
-                        batch_size=args.batch_size,
-                        shuffle=args.shuffle,
-                        flatten=False):
-        """ Corpus Processing Pipeline.
+    to_ngrams_batch = partial(to_ngrams,
+                              vocab=vocab,
+                              ngram_size=args.ngram_size,
+                              batch_size=args.batch_size,
+                              epochs=1,
+                              shuffle=False,
+                              shuffle_buffer_size=args.shuffle_buffer_size,
+                              enum_epoch=False)
 
-        Transforms the corpus reader -a stream of sentences or words- into a stream of n-gram batches.
+    training_len = sum(1 for _ in to_ngrams_batch(corpus.training_set, batch_size=1))
 
-        Args:
-            n_gram_size: the size of the n-gram window
-            corpus_stream: the stream of sentences of words
-            epochs: number of epochs we want to iterate over this corpus
-            batch_size: batch size for the n-gram batch
-            shuffle: if true, shuffles the n-grams according to a buffer size
-            flatten: if true sliding windows are applied over a stream of words rather than within each sentence
-            (n-grams can cross sentence boundaries)
-        """
-
-        if flatten:
-            word_it = flatten_it(corpus_stream)
-            n_grams = window_it(word_it, n_gram_size)
-        else:
-            sentence_n_grams = (window_it(sentence, n_gram_size) for sentence in corpus_stream)
-            n_grams = flatten_it(sentence_n_grams)
-
-        # at this point this is an n_gram iterator
-        n_grams = ([vocab[w] for w in ngram] for ngram in n_grams)
-
-        if epochs > 1:
-            n_grams = repeat_it(n_grams, epochs)
-
-        if shuffle:
-            n_grams = shuffle_it(n_grams, args.shuffle_buffer_size)
-
-        n_grams = batch_it(n_grams, size=batch_size, padding=False)
-        return n_grams
-
-    # print("counting dataset samples...")
-    training_len = sum(1 for _ in corpus_pipeline(corpus.training_set(), batch_size=1, epochs=1, shuffle=False))
     validation_len = None
     test_len = None
     if args.eval_progress:
-        validation_len = sum(1 for _ in corpus_pipeline(corpus.validation_set(), batch_size=1, epochs=1, shuffle=False))
-        test_len = sum(1 for _ in corpus_pipeline(corpus.test_set(), batch_size=1, epochs=1, shuffle=False))
-    # print("done")
-    # print("dset len ", training_len)
+        validation_len = sum(1 for _ in to_ngrams_batch(corpus.validation_set, batch_size=1))
+        test_len = sum(1 for _ in to_ngrams_batch(corpus.test_set, batch_size=1))
 
     # ======================================================================================
     # Load Params, Prepare results assets
@@ -166,9 +134,9 @@ def run(**kwargs):
 
     # start perplexity file
     ppl_header = ["id", "run", "epoch", "step", "lr", "dataset", "perplexity"]
-    ppl_fname = os.path.join(args.out_dir, "perplexity_{id}_{run}.csv".format(id=args.id, run=args.run))
+    ppl_filename = os.path.join(args.out_dir, "perplexity_{id}_{run}.csv".format(id=args.id, run=args.run))
 
-    ppl_file = open(ppl_fname, "w")
+    ppl_file = open(ppl_filename, "w")
     ppl_writer = csv.DictWriter(f=ppl_file, fieldnames=ppl_header)
     ppl_writer.writeheader()
 
@@ -302,7 +270,8 @@ def run(**kwargs):
 
     def evaluation(model: tx.Model, progress_bar, cur_epoch, step, display_progress=False):
 
-        ppl_validation = eval_model(model, corpus_pipeline(corpus.validation_set(), epochs=1, shuffle=False),
+        ppl_validation = eval_model(model,
+                                    to_ngrams_batch(corpus.validation_set),
                                     validation_len,
                                     display_progress)
         res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
@@ -312,8 +281,7 @@ def run(**kwargs):
 
         if args.eval_test:
             # pb.write("[Eval Test Set]")
-            ppl_test = eval_model(model, corpus_pipeline(corpus.test_set(), epochs=1, shuffle=False), test_len,
-                                  display_progress)
+            ppl_test = eval_model(model, to_ngrams(corpus.test_set), test_len, display_progress)
 
             res_row = {"id": args.id, "run": args.run, "epoch": cur_epoch, "step": step, "lr": lr_param.value,
                        "dataset": "test",
@@ -348,17 +316,18 @@ def run(**kwargs):
     model.init_vars()
 
     progress = tqdm(total=training_len * args.epochs, position=args.pid + 1, disable=not args.display_progress)
-    training_data = corpus_pipeline(corpus.training_set(),
-                                    batch_size=args.batch_size,
+
+    training_data = to_ngrams_batch(corpus.training_set,
                                     epochs=args.epochs,
-                                    shuffle=args.shuffle)
+                                    shuffle=args.shuffle,
+                                    enum_epoch=True)
 
     evaluations = []
 
     try:
 
-        for ngram_batch in training_data:
-            epoch = progress.n // training_len + 1
+        for i, ngram_batch in training_data:
+            epoch = i + 1
             # Start New Epoch
             if epoch != current_epoch:
                 current_epoch = epoch

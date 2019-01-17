@@ -291,6 +291,7 @@ def bptt_it(iterable_data, batch_size, seq_len, min_seq_len=2, seq_prob=0.95, nu
         iterable_data: iterable data (like a generator) of data
         batch_size: number of parallel sequences
         seq_len: base sequence length
+        seq_prob: probability of base sequence
         min_seq_len: mini
         num_batches: acts as a buffer, if None consumes the entire data and loads it
             to load the entire iterable to memory
@@ -299,6 +300,8 @@ def bptt_it(iterable_data, batch_size, seq_len, min_seq_len=2, seq_prob=0.95, nu
         a generator of batches of sequences for back propagation through time
 
     """
+    if seq_prob > 1:
+        raise ValueError("seq_prob has to be a value 0<x<=1.0")
 
     # average sequence lengths
     k1 = seq_len
@@ -348,7 +351,7 @@ def bptt_it(iterable_data, batch_size, seq_len, min_seq_len=2, seq_prob=0.95, nu
         buffers = batch_it(data, buffer_size)
         data = (to_batch(buffer) for buffer in buffers)
 
-    # TODO not sure if data needs to be contiguous here feeding a view might be just fine
+    # TODO not sure if data needs to be contiguous here, a view might be just fine
     # I can return a time-major batch of sequences which is contiguous
     batches = (data_i[:, ii:fi] for data_i in data
                for ii, fi in splits(np.shape(data_i)[-1]))
