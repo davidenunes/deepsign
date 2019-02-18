@@ -103,14 +103,14 @@ class LBL(tx.Model):
         with tf.name_scope("train"):
             if use_dropout and embed_dropout:
                 feature_lookup = feature_lookup.reuse_with(run_inputs)
-                features = tx.Dropout(feature_lookup, keep_prob=keep_prob)
+                features = tx.Dropout(feature_lookup, probability=keep_prob)
             else:
                 features = feature_lookup
 
             if use_gate or use_hidden:
                 if use_dropout:
                     h = h.reuse_with(features)
-                    h = tx.Dropout(h, keep_prob=keep_prob)
+                    h = tx.Dropout(h, probability=keep_prob)
 
                 if use_gate:
                     gate_w = gate_w.reuse_with(h)
@@ -121,7 +121,7 @@ class LBL(tx.Model):
                 if use_hidden:
                     h_to_f = h_to_f.reuse_with(h)
                     if use_dropout:
-                        h_to_f = tx.Dropout(h_to_f, keep_prob=keep_prob)
+                        h_to_f = tx.Dropout(h_to_f, probability=keep_prob)
                     f_prediction = tx.Add(f_prediction, h_to_f)
             else:
                 f_prediction = f_prediction.reuse_with(features)

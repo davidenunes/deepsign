@@ -19,7 +19,7 @@ class NNLM(tx.Model):
 
     def __init__(self,
                  inputs,
-                 labels,
+                 label_inputs,
                  vocab_size,
                  embed_dim,
                  h_dim,
@@ -30,7 +30,7 @@ class NNLM(tx.Model):
                  h_init=tx.he_normal_init(),
                  use_dropout=False,
                  embed_dropout=False,
-                 keep_prob=0.95,
+                 drop_probability=0.05,
                  l2_loss=False,
                  l2_weight=1e-5,
                  use_f_predict=False,
@@ -43,8 +43,8 @@ class NNLM(tx.Model):
         if not isinstance(inputs, tx.Input):
             raise TypeError("inputs must be an Input layer")
         self.inputs = inputs
-        self.labels = labels
-        if not isinstance(labels, tx.Input):
+        self.labels = label_inputs
+        if not isinstance(label_inputs, tx.Input):
             raise TypeError("labels must be an Input layer")
 
         if inputs.dtype != tf.int32 and inputs.dtype != tf.int64:
@@ -70,7 +70,7 @@ class NNLM(tx.Model):
             for i in range(num_h):
                 h_i = tx.FC(layer=last_layer,
                             n_units=h_dim,
-                            fn=h_activation,
+                            activation=h_activation,
                             weight_init=h_init,
                             add_bias=True,
                             name="h_{}".format(i + 1))
@@ -105,7 +105,7 @@ class NNLM(tx.Model):
         # ===============================================
         with tf.name_scope("train"):
             if use_dropout and embed_dropout:
-                last_layer = tx.Dropout(feature_lookup, keep_prob=keep_prob, name="dropout_features")
+                last_layer = tx.Dropout(feature_lookup, probability=drop_probability, name="dropout_features")
             else:
                 last_layer = feature_lookup
 
@@ -113,7 +113,7 @@ class NNLM(tx.Model):
             for i, layer in enumerate(h_layers):
                 h = layer.reuse_with(last_layer)
                 if use_dropout:
-                    h = tx.Dropout(h, keep_prob=keep_prob, name="dropout_{}".format(i + 1))
+                    h = tx.Dropout(h, probability=drop_probability, name="dropout_{}".format(i + 1))
                 last_layer = h
 
             # feature prediction for Energy-Based Model
@@ -126,7 +126,6 @@ class NNLM(tx.Model):
             def categorical_loss(labels, logits):
                 labels = tx.dense_one_hot(column_indices=labels, num_cols=vocab_size)
                 loss = tx.categorical_cross_entropy(labels=labels, logits=logits)
-                # loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels,logits=logits)
                 return tf.reduce_mean(loss)
 
             def nce_loss(labels, weights, bias, predict):
@@ -148,11 +147,11 @@ class NNLM(tx.Model):
                                            n_units=embeddings.n_units,
                                            wrap_fn=lambda x: x.weights,
                                            layer_fn=True)
-                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss,
-                                        name="nce_loss")
+                train_loss = tx.LambdaLayer(label_inputs, nce_weights, bias, last_layer, apply_fn=nce_loss,
+                                            name="nce_loss")
             else:
-                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss,
-                                        name="train_loss")
+                train_loss = tx.LambdaLayer(label_inputs, train_logits, apply_fn=categorical_loss,
+                                            name="train_loss")
 
             if l2_loss:
                 l2_losses = [tf.nn.l2_loss(var) for var in var_reg]
@@ -164,14 +163,14 @@ class NNLM(tx.Model):
         # EVAL GRAPH
         # ===============================================
         with tf.name_scope("eval"):
-            eval_loss = tx.FnLayer(labels, run_logits, apply_fn=categorical_loss, name="eval_loss")
+            eval_loss = tx.LambdaLayer(label_inputs, run_logits, apply_fn=categorical_loss, name="eval_loss")
 
         # BUILD MODEL
         super().__init__(run_outputs=run_output,
                          run_inputs=inputs,
-                         train_inputs=[inputs, labels],
+                         train_inputs=[inputs, label_inputs],
                          train_outputs=train_output,
                          train_loss=train_loss,
-                         eval_inputs=[inputs, labels],
+                         eval_inputs=[inputs, label_inputs],
                          eval_outputs=run_output,
                          eval_score=eval_loss)

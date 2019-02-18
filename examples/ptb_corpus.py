@@ -3,6 +3,7 @@ from tensorx.data import itertools as itx
 import marisa_trie
 import os
 import h5py
+import numpy as np
 
 home = os.getenv("HOME")
 corpus_path = os.path.join(home, 'data/datasets/ptb')
@@ -55,9 +56,9 @@ train_data = itx.repeat_apply(lambda corpus: pipeline(corpus.training_set(1)),
                               n=epochs,
                               enum=True)
 
-data_it = itx.bptt_it(itx.flatten_it(ptb.training_set(10)), seq_len=7, batch_size=2)
+data_it = itx.bptt_it(itx.flatten_it(ptb.training_set()), seq_len=20,seq_prob=0.95, min_seq_len=5, batch_size=80)
 
-itx.advance_it(data_it, 10)
-print(next(data_it))
-print(next(data_it))
-print(next(data_it))
+for data in data_it:
+    shape = np.shape(data)
+    if shape[-1] <= 5:
+        print(shape)

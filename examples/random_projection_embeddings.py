@@ -46,7 +46,7 @@ embed = tx.Lookup(ri_inputs, seq_size, [k, embed_dim])
 # logits: take the embeddings and get the features for all random indexes
 
 ri_layer = tx.TensorLayer(sp_ri, n_units=k)
-logits = tx.Linear(layer=ri_layer,
+logits = tx.Linear(input_layer=ri_layer,
                    n_units=embed_dim,
                    shared_weights=embed.weights,
                    bias=True)

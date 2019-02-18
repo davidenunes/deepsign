@@ -71,7 +71,7 @@ class LSTM_NNLM(tx.Model):
             # feature lookup
             embeddings = tx.Lookup(inputs, ctx_size, [vocab_size, embed_dim], weight_init=embed_init)
             var_reg.append(embeddings.weights)
-            feature_lookup = embeddings.as_seq()
+            feature_lookup = embeddings.permute_batch_time()
 
             last_layer = feature_lookup
             last_feature_layer = feature_lookup
@@ -124,7 +124,7 @@ class LSTM_NNLM(tx.Model):
             feature_lookup = embeddings.as_seq()
 
             if other_dropout and embed_dropout:
-                feature_lookup = tx.Dropout(feature_lookup, keep_prob=embed_keep_prob, name="drop_features")
+                feature_lookup = tx.Dropout(feature_lookup, probability=embed_keep_prob, name="drop_features")
 
             # last_layer = last_layer.as_seq()
 
@@ -187,21 +187,21 @@ class LSTM_NNLM(tx.Model):
                                            n_units=embeddings.n_units,
                                            wrap_fn=lambda x: x.weights,
                                            layer_fn=True)
-                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, name="nce_loss")
+                train_loss = tx.LambdaLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, name="nce_loss")
             else:
-                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss, name="train_loss")
+                train_loss = tx.LambdaLayer(labels, train_logits, apply_fn=categorical_loss, name="train_loss")
 
             if l2_loss:
                 l2_losses = [tf.nn.l2_loss(var) for var in var_reg]
-                train_loss = tx.FnLayer(train_loss,
-                                        apply_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
-                                        name="train_loss_l2")
+                train_loss = tx.LambdaLayer(train_loss,
+                                            apply_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
+                                            name="train_loss_l2")
 
         # ===============================================
         # EVAL GRAPH
         # ===============================================
         with tf.name_scope("eval"):
-            eval_loss = tx.FnLayer(labels, run_logits, apply_fn=categorical_loss, name="eval_loss")
+            eval_loss = tx.LambdaLayer(labels, run_logits, apply_fn=categorical_loss, name="eval_loss")
 
         # BUILD MODEL
         super().__init__(run_outputs=run_output,

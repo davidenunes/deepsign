@@ -57,7 +57,8 @@ def to_parallel_seq(corpus_fn,
                     batch_size=1,
                     num_batches_buffer=None,
                     enum_seq=False,
-                    enum_epoch=True):
+                    enum_epoch=True,
+                    return_future=True):
     """ Parallel Sequence Pipeline for sequence modelling with RNN networks
 
     Args:
@@ -82,7 +83,8 @@ def to_parallel_seq(corpus_fn,
                                   min_seq_len=min_seq_len,
                                   seq_prob=seq_prob,
                                   num_batches=num_batches_buffer,
-                                  enum=enum_seq
+                                  enum=enum_seq,
+                                  return_targets=return_future
                                   )
 
         return seq_batches

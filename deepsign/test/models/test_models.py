@@ -5,7 +5,6 @@ import tensorx as tx
 from tensorx.test_utils import TestCase
 from deepsign.models.nnlm import NNLM
 from deepsign.models.nnlm_lstm import LSTM_NNLM as NNLM_LSTM
-from deepsign.models.nnlm_gru import NNLM as NNLM_GRU
 from deepsign.models.lbl import LBL
 from deepsign.models.nrp import LBL_NRP, RandomIndexTensor, NNLM_NRP
 from deepsign.models.nrp_nce import NRP
@@ -38,14 +37,14 @@ class TestModels(TestCase):
         inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
         labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
         model = NNLM(inputs=inputs,
-                     labels=labels,
+                     label_inputs=labels,
                      vocab_size=vocab_size,
                      embed_dim=embed_dim,
                      embed_share=True,
                      use_f_predict=True,
                      h_dim=h_dim,
                      use_dropout=False,
-                     keep_prob=0.9,
+                     drop_probability=0.9,
                      embed_dropout=False,
                      use_nce=True,
                      nce_samples=2
@@ -74,32 +73,29 @@ class TestModels(TestCase):
         self.assertArrayNotEqual(result, eval2)
 
     def test_nnlm_lstm(self):
-        vocab_size = 1000
-        ctx_size = 2
+        vocab_size = 10000
+        ctx_size = 5
         batch_size = 20
         embed_dim = 64
         h_dim = 128
 
         print('building model')
         inputs = tx.Input(n_units=None, dtype=tf.int64, name="ctx_inputs")
-        labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
+        labels = tx.Input(n_units=None, dtype=tf.int64, name="labels")
         model = NNLM_LSTM(inputs=inputs,
                           labels=labels,
                           vocab_size=vocab_size,
                           embed_dim=embed_dim,
-                          reset_state=True,
                           embed_share=True,
                           use_f_predict=True,
                           h_dim=h_dim,
                           num_h=2,
-                          embed_dropout=True,
-                          w_dropout=True,
-                          u_dropconnect=True,
-                          other_dropout=True,
-                          w_keep_prob=0.9,
-                          u_keep_prob=0.9,
-                          embed_keep_prob=0.9,
-                          other_keep_prob=0.9,
+                          embed_dropout=0.3,
+                          w_dropconnect=None,
+                          u_dropconnect=None,
+                          y_dropout=0.3,
+                          r_dropout=0.3,
+                          other_dropout=0.3,
                           use_nce=False,
                           nce_samples=2
                           )
@@ -119,66 +115,20 @@ class TestModels(TestCase):
         # model.train_graph.draw("train.pdf")
 
         input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
-        label_data = np.random.randint(0, vocab_size, [batch_size, 1])
+        label_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
+        print(np.shape(label_data))
 
         with self.cached_session():
             for i in tqdm(range(100)):
                 if i == 50:
                     model.reset_state()
-                eval1 = model.eval({inputs: input_data, labels: label_data})
-                eval2 = model.eval({inputs: input_data, labels: label_data})
+                #eval1 = model.eval({inputs: input_data, labels: label_data})
+                #eval2 = model.eval({inputs: input_data, labels: label_data})
                 result = model.train({inputs: input_data, labels: label_data})
 
         # print(list(map(str,model.train_graph.output_layers)))
         # self.assertArrayEqual(eval1, eval2)
         # self.assertArrayNotEqual(result, eval2)
-
-    def test_nnlm_gru(self):
-        vocab_size = 1000
-        ctx_size = 10
-        batch_size = 128
-        embed_dim = 64
-        h_dim = 128
-
-        print('building model')
-        inputs = tx.Input(ctx_size, dtype=tf.int64, name="ctx_inputs")
-        labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
-        model = NNLM_GRU(inputs=inputs,
-                         labels=labels,
-                         vocab_size=vocab_size,
-                         embed_dim=embed_dim,
-                         embed_share=True,
-                         use_f_predict=True,
-                         h_dim=h_dim,
-                         use_dropout=True,
-                         keep_prob=0.9,
-                         embed_dropout=True,
-                         use_nce=False,
-                         nce_samples=2
-                         )
-        model.run_graph.draw("run.pdf")
-
-        print("done")
-
-        model.set_session(runtime_stats=True)
-        model.set_log_dir("/tmp/")
-        model.log_graph()
-        options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        # options = None
-        model.set_session(runtime_stats=True, run_options=options)
-        model.config_optimizer(tf.train.AdamOptimizer(learning_rate=0.005),
-                               gradient_op=lambda grad: tf.clip_by_norm(grad, 4.0))
-
-        model.train_graph.draw("train.pdf")
-
-        input_data = np.random.randint(0, vocab_size, [batch_size, ctx_size])
-        label_data = np.random.randint(0, vocab_size, [batch_size, 1])
-
-        with self.cached_session():
-            for _ in tqdm(range(10)):
-                eval1 = model.eval({inputs: input_data, labels: label_data})
-                eval2 = model.eval({inputs: input_data, labels: label_data})
-                result = model.train({inputs: input_data, labels: label_data})
 
     def test_tx_random_choice(self):
         range_max = 100
@@ -383,7 +333,7 @@ class TestModels(TestCase):
                      h_dim=128,
                      use_f_predict=True,
                      use_dropout=True,
-                     keep_prob=0.75,
+                     drop_probability=0.75,
                      embed_dropout=True,
                      use_nce=False,
                      nce_samples=nce_samples
@@ -490,7 +440,7 @@ class TestModels(TestCase):
                      num_h=2,
                      use_dropout=True,
                      embed_dropout=True,
-                     keep_prob=0.1)
+                     drop_probability=0.1)
 
         print("RUN GRAPH:")
         for layer in tx.layers_to_list(model.run_outputs):

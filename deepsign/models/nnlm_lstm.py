@@ -1,8 +1,6 @@
 import tensorx as tx
 import tensorflow as tf
 from tensorflow.python.ops.candidate_sampling_ops import uniform_candidate_sampler as uniform_sampler
-import sys
-from functools import partial
 
 
 class LSTM_NNLM(tx.Model):
@@ -25,20 +23,17 @@ class LSTM_NNLM(tx.Model):
                  vocab_size,
                  embed_dim,
                  h_dim,
-                 embed_init=tx.random_uniform(minval=-0.01, maxval=0.01),
-                 logit_init=tx.random_uniform(minval=-0.01, maxval=0.01),
+                 embed_init=tx.zeros_init(),
+                 logit_init=tx.glorot_uniform(),
                  num_h=1,
                  h_activation=tx.tanh,
-                 h_init=tx.random_uniform(minval=-0.05, maxval=0.05),
-                 reset_state=True,
-                 embed_dropout=False,
-                 w_dropout=False,
-                 u_dropconnect=False,
-                 other_dropout=False,
-                 w_keep_prob=0.9,
-                 u_keep_prob=0.9,
-                 embed_keep_prob=0.9,
-                 other_keep_prob=0.9,
+                 h_init=tx.glorot_uniform(),
+                 w_dropconnect=None,
+                 u_dropconnect=None,
+                 r_dropout=0.4,
+                 y_dropout=0.4,
+                 embed_dropout=0.3,
+                 other_dropout=0.3,
                  l2_loss=False,
                  l2_weight=1e-5,
                  use_f_predict=False,
@@ -47,6 +42,7 @@ class LSTM_NNLM(tx.Model):
                  logit_bias=False,
                  use_nce=False,
                  nce_samples=10,
+                 skip_connections=False
                  ):
         if not isinstance(inputs, tx.Input):
             raise TypeError("inputs must be an Input layer")
@@ -68,50 +64,77 @@ class LSTM_NNLM(tx.Model):
 
         with tf.name_scope("run"):
             # feature lookup
+
             embeddings = tx.Lookup(inputs,
                                    seq_size=None,
                                    lookup_shape=[vocab_size, embed_dim],
                                    weight_init=embed_init)
             var_reg.append(embeddings.weights)
-            feature_lookup = embeddings.as_seq()
+            feature_lookup = embeddings.permute_batch_time()
 
             last_layer = feature_lookup
 
-            w_reg = partial(tx.Dropout, keep_prob=w_keep_prob) if w_dropout else None
-            u_reg = partial(tx.DropConnect, keep_prob=u_keep_prob) if u_dropconnect else None
-
-            def cell_proto(x, **kwargs):
-                return tx.LSTMCell(x,
-                                   n_units=h_dim,
-                                   activation=h_activation,
-                                   w_init=h_init,
-                                   u_init=h_init,
-                                   w_regularizer=w_reg,
-                                   u_regularizer=u_reg,
-                                   regularized=False,
-                                   name="lstm_cell",
-                                   **kwargs)
+            cell_proto = tx.LSTMCell.proto(
+                n_units=h_dim,
+                activation=h_activation,
+                gate_activation=tx.hard_sigmoid,
+                w_init=h_init,
+                u_init=h_init,
+                w_dropconnect=w_dropconnect,
+                u_dropconnect=u_dropconnect,
+                r_dropout=r_dropout,
+                x_dropout=None,
+                y_dropout=y_dropout,
+                regularized=False,
+                name="cell",
+            )
 
             lstm_layers = []
             for i in range(num_h):
-                lstm_layer = tx.Recurrent(last_layer,
-                                          cell_proto=cell_proto,
-                                          regularized=False,
-                                          stateful=True,
-                                          name="LSTM_{}".format(i+1))
+                lstm_layer = tx.RNN(last_layer,
+                                    cell_proto=cell_proto,
+                                    regularized=False,
+                                    stateful=True,
+                                    name="LSTM_{}".format(i + 1))
 
                 lstm_layers.append(lstm_layer)
+
                 var_reg += [wi.weights for wi in lstm_layer.cell.w]
                 var_reg += [ui.weights for ui in lstm_layer.cell.u]
+
                 last_layer = lstm_layer
 
             # last time step is the state used to make the prediction
-            last_layer = last_layer[-1]
+            # last_layer = tx.Reshape(last_layer, [-1, h_dim])
+
+            # TODO this is not consistent with locked dropout for the last layer
+            # where the same mask should be applied across time steps
+            # to do this I need either y_dropout to be available or some sort of map
+            # operation I can use with layers outputting 3D tensors
+            # something equivalent to https://keras.io/layers/wrappers/ which applies
+            # a layer to every temporal slice of an input. They implement this the same way
+            # they implement an RNN
 
             # feature prediction for Energy-Based Model
             if use_f_predict:
                 last_layer = tx.Linear(last_layer, embed_dim, f_init, add_bias=True, name="f_predict")
-                var_reg.append(last_layer.weights)
+                # proto = tx.GRUCell.proto(n_units=embed_dim,
+                #                          activation=h_activation,
+                #                          gate_activation=tx.hard_sigmoid,
+                #                          w_init=h_init,
+                #                          u_init=h_init,
+                #                          w_dropconnect=w_dropconnect,
+                #                          u_dropconnect=u_dropconnect,
+                #                          r_dropout=r_dropout,
+                #                          x_dropout=None,
+                #                          y_dropout=y_dropout,
+                #                          regularized=False)
+                # last_layer1 = tx.RNN(last_layer, cell_proto=proto, regularized=False, stateful=False)
+                # last_layer2 = last_layer1.reuse_with(last_layer, reverse=True)
+                # last_layer = tx.Add(last_layer1, last_layer2)
+                # last_layer = tx.Module(last_layer, last_layer)
+                var_reg += last_layer.variables
+                # var_reg.append(last_layer.weights)
                 f_predict = last_layer
 
             shared_weights = feature_lookup.weights if embed_share else None
@@ -130,35 +153,42 @@ class LSTM_NNLM(tx.Model):
 
             run_output = tx.Activation(run_logits, tx.softmax, name="run_output")
 
-        # ===============================================
-        # TRAIN GRAPH
-        # ===============================================
-        with tf.name_scope("train"):
-            embeddings = embeddings.reuse_with(inputs)
-            feature_lookup = embeddings.as_seq()
+            # ===============================================
+            # TRAIN GRAPH
+            # ===============================================
+            with tf.name_scope("train"):
+                embeddings = embeddings.reuse_with(inputs)
+                feature_lookup = embeddings.permute_batch_time()
 
-            if other_dropout and embed_dropout:
-                feature_lookup = tx.Dropout(feature_lookup, keep_prob=embed_keep_prob, name="drop_features")
+                if embed_dropout:
+                    feature_lookup = tx.Dropout(feature_lookup, probability=embed_dropout, name="drop_features")
 
-            last_layer = feature_lookup
+                last_layer = feature_lookup
 
-            for i in range(num_h):
-                lstm_layer = lstm_layers[i].reuse_with(last_layer, regularized=True)
-                last_layer = lstm_layer
+                for i in range(num_h):
+                    lstm_layer = lstm_layers[i].reuse_with(last_layer, regularized=True)
+                    last_layer = lstm_layer
 
-            last_layer = last_layer[-1]
+                # last_layer = tx.Reshape(last_layer, [-1, h_dim])
 
-            # feature prediction for Energy-Based Model
-            if use_f_predict:
-                last_layer = f_predict.reuse_with(last_layer)
+                # feature prediction for Energy-Based Model
+                if use_f_predict:
+                    # last_layer = f_predict.reuse_with(last_layer)
+                    last_layer = f_predict.reuse_with(last_layer, regularized=True)
 
-            train_logits = run_logits.reuse_with(last_layer, name="train_logits")
-            train_output = tx.Activation(train_logits, tx.softmax, name="train_output")
+                last_layer = tx.Dropout(last_layer, probability=other_dropout, locked=False)
+
+                train_logits = run_logits.reuse_with(last_layer, name="train_logits")
+
+                train_output = tx.Activation(train_logits, tx.softmax, name="run_output")
 
             def categorical_loss(labels, logits):
-                labels = tx.dense_one_hot(column_indices=labels, num_cols=vocab_size)
+                # labels come as a batch of classes [[1,2],[3,4]] -> [1,3,2,4] time steps are ordered to match logits
+                labels = tx.Transpose(labels)
+                labels = tx.Reshape(labels, [-1])
+                labels = tx.dense_one_hot(labels, num_cols=vocab_size)
                 loss = tx.categorical_cross_entropy(labels=labels, logits=logits)
-                # loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels,logits=logits)
+
                 return tf.reduce_mean(loss)
 
             def nce_loss(labels, weights, bias, predict):
@@ -176,25 +206,28 @@ class LSTM_NNLM(tx.Model):
             if use_nce:
                 bias = tx.VariableLayer(var_shape=[vocab_size], name="nce_bias")
 
+                # wraps a layer to expose the weights as a layer but with the layer as its input
                 nce_weights = tx.WrapLayer(embeddings,
                                            n_units=embeddings.n_units,
                                            wrap_fn=lambda x: x.weights,
                                            layer_fn=True)
-                train_loss = tx.FnLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, name="nce_loss")
+                train_loss = tx.LambdaLayer(labels, nce_weights, bias, last_layer, apply_fn=nce_loss, name="nce_loss")
             else:
-                train_loss = tx.FnLayer(labels, train_logits, apply_fn=categorical_loss, name="train_loss")
+                train_loss = tx.LambdaLayer(labels, train_logits, apply_fn=categorical_loss,
+                                            name="train_loss")
 
             if l2_loss:
                 l2_losses = [tf.nn.l2_loss(var) for var in var_reg]
-                train_loss = tx.FnLayer(train_loss,
-                                        apply_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
-                                        name="train_loss_l2")
+                train_loss = tx.LambdaLayer(train_loss,
+                                            apply_fn=lambda x: x + l2_weight * tf.add_n(l2_losses),
+                                            name="train_loss_l2")
 
         # ===============================================
         # EVAL GRAPH
         # ===============================================
         with tf.name_scope("eval"):
-            eval_loss = tx.FnLayer(labels, run_logits, apply_fn=categorical_loss, name="eval_loss")
+            eval_loss = tx.LambdaLayer(labels, run_logits, apply_fn=categorical_loss,
+                                       name="eval_loss")
 
         self.stateful_layers = lstm_layers
         # BUILD MODEL

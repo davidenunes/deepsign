@@ -10,7 +10,7 @@ batch_size = 2
 
 inputs = TensorLayer(np.random.random([batch_size, seq_size]), n_units=seq_size, dtype=tf.int32)
 lookup = Lookup(inputs, seq_size=seq_size, lookup_shape=[n_features, embed_size])
-seq = lookup.as_seq()
+seq = lookup.permute_batch_time()
 
 # this state is passed to the first cell instance which
 # which transforms it into a list, the recurrent cell gets that state back as list
@@ -21,4 +21,4 @@ zero_state = (tf.zeros([batch_size, hdim]))
 def rnn_proto(x, **kwargs): return RNNCell(x, n_units=hdim, **kwargs)
 
 
-rnn1 = Recurrent(seq, cell_proto=rnn_proto, previous_state=ones_state)
+rnn1 = RNN(seq, cell_proto=rnn_proto, previous_state=ones_state)

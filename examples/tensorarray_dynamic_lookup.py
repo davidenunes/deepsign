@@ -37,7 +37,7 @@ it would be
 
 inputs = tx.Input(n_units=None, dtype=tf.int32)
 lookup = tx.Lookup(inputs, seq_size=None, lookup_shape=[N, M])
-input_seq = lookup.as_seq()
+input_seq = lookup.permute_batch_time()
 
 # this is a time major sequence so we can look at the number of elements
 seq_size = tf.shape(input_seq)[0]

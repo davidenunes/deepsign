@@ -73,7 +73,7 @@ defaults = {
 
     'dropout': (bool, True),
     'embed_dropout': (bool, True),
-    'keep_prob': (float, 0.60),
+    'drop_probability': (float, 0.4),
 
     'l2_loss': (bool, False),
     'l2_loss_coef': (float, 1e-5),
@@ -149,13 +149,13 @@ def run(**kwargs):
         h_init = tx.he_normal_init()
     elif args.h_act == "tanh":
         h_act = tx.tanh
-        h_init = tx.xavier_init()
+        h_init = tx.glorot_uniform()
     elif args.h_act == "elu":
         h_act = tx.elu
         h_init = tx.he_normal_init()
     elif args.h_act == "selu":
         h_act = tf.nn.selu
-        h_init = tx.xavier_init()
+        h_init = tx.glorot_uniform()
 
     # Configure embedding and logit weight initializers
     if args.embed_init == "normal":
@@ -182,7 +182,7 @@ def run(**kwargs):
     inputs = tx.Input(args.ngram_size - 1, dtype=tf.int64, name="ctx_inputs")
     labels = tx.Input(1, dtype=tf.int64, name="ctx_inputs")
     model = NNLM(inputs=inputs,
-                 labels=labels,
+                 label_inputs=labels,
                  vocab_size=len(vocab),
                  embed_dim=args.embed_dim,
                  embed_init=embed_init,
@@ -193,7 +193,7 @@ def run(**kwargs):
                  h_activation=h_act,
                  h_init=h_init,
                  use_dropout=args.dropout,
-                 keep_prob=args.keep_prob,
+                 drop_probability=args.drop_probability,
                  embed_dropout=args.embed_dropout,
                  l2_loss=args.l2_loss,
                  l2_weight=args.l2_loss_coef,
@@ -394,5 +394,5 @@ def run(**kwargs):
 
 if __name__ == "__main__":
     # test with single gpu
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     run(progress=True)

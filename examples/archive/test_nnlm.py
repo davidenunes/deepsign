@@ -158,7 +158,7 @@ elif args.h_act == "elu":
     h_init = tx.he_normal_init()
 elif args.h_act == "tanh":
     h_act = tx.tanh
-    h_init = tx.xavier_init()
+    h_init = tx.glorot_uniform()
 
 # Embedding (Lookup) layer weight init
 if args.embed_init == "normal":
@@ -192,7 +192,7 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_activation=h_act,
              h_init=h_init,
              use_dropout=args.dropout,
-             keep_prob=args.keep_prob,
+             drop_probability=args.keep_prob,
              l2_loss=True,
              l2_weight=1e-5
              )

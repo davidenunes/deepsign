@@ -26,8 +26,8 @@ class RNNCell(Layer):
                  previous_state=None,
                  activation=tx.tanh,
                  use_bias=True,
-                 init=tx.xavier_init(),
-                 recurrent_init=tx.xavier_init(),
+                 init=tx.glorot_uniform(),
+                 recurrent_init=tx.glorot_uniform(),
                  share_state_with=None,
                  name="rnn_cell"):
         self.activation = activation

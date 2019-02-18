@@ -162,7 +162,7 @@ if args.h_act == "relu":
     h_init = tx.he_normal_init()
 elif args.h_act == "tanh":
     h_act = tx.tanh
-    h_init = tx.xavier_init()
+    h_init = tx.glorot_uniform()
 elif args.h_act == "elu":
     h_act = tx.elu
     h_init = tx.he_normal_init()
@@ -200,7 +200,7 @@ model = NNLM(ctx_size=args.ngram_size - 1,
              h_activation=h_act,
              h_init=h_init,
              use_dropout=args.dropout,
-             keep_prob=args.keep_prob,
+             drop_probability=args.keep_prob,
              embed_dropout=args.embed_dropout,
              l2_loss=args.l2_loss,
              l2_weight=args.l2_loss_coef,

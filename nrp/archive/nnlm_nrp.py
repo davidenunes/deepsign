@@ -159,7 +159,7 @@ def run(**kwargs):
         h_init = tx.he_normal_init()
     elif args.h_act == "tanh":
         h_act = tx.tanh
-        h_init = tx.xavier_init()
+        h_init = tx.glorot_uniform()
     elif args.h_act == "elu":
         h_act = tx.elu
         h_init = tx.he_normal_init()

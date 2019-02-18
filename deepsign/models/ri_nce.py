@@ -387,9 +387,9 @@ def _sampled_logits_from_parametric_noise(ri_tensors,
                                          partition_strategy=partition_strategy)
 
         label_layer = tx.TensorLayer(true_w, input_dim)
-        noise_fn = tx.FC(label_layer, 512, fn=tx.relu)
+        noise_fn = tx.FC(label_layer, 512, activation=tx.relu)
         noise_fn_sp = tx.ToSparse(noise_fn)
-        noise_ris = tx.Linear(noise_fn_sp, k_dim, weight_init=tx.xavier_init(), bias=True)
+        noise_ris = tx.Linear(noise_fn_sp, k_dim, weight_init=tx.glorot_uniform(), bias=True)
         noise_ris_sp = tx.ToSparse(noise_ris)
 
         noise_w = embedding_lookup_sparse(params=weights,

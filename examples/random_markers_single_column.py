@@ -36,8 +36,8 @@ data = batch_it(data, batch_size)
 label_layer = tx.Input(1)
 in_layer = tx.Input(M)
 
-f1 = tx.FC(in_layer, 512, fn=tf.nn.tanh)
-f2 = tx.FC(f1, 512, fn=tf.nn.relu)
+f1 = tx.FC(in_layer, 512, activation=tf.nn.tanh)
+f2 = tx.FC(f1, 512, activation=tf.nn.relu)
 fm = tx.Highway(f1, f2, carry_gate=True)
 
 out = tx.Linear(f2, 1)

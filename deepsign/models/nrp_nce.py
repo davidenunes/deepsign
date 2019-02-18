@@ -85,7 +85,7 @@ class NRP(tx.Model):
             for i in range(num_h):
                 hi = tx.FC(last_layer,
                            n_units=h_dim,
-                           fn=h_activation,
+                           activation=h_activation,
                            weight_init=h_init,
                            name="h_{i}".format(i=i))
                 h_layers.append(hi)
@@ -118,7 +118,7 @@ class NRP(tx.Model):
         with tf.name_scope("train"):
             if use_dropout and embed_dropout:
                 feature_lookup = feature_lookup.reuse_with(run_inputs)
-                last_layer = tx.Dropout(feature_lookup, keep_prob=keep_prob)
+                last_layer = tx.Dropout(feature_lookup, probability=keep_prob)
             else:
                 last_layer = feature_lookup
 
@@ -126,7 +126,7 @@ class NRP(tx.Model):
             for layer in h_layers:
                 h = layer.reuse_with(last_layer)
                 if use_dropout:
-                    h = tx.Dropout(h, keep_prob=keep_prob)
+                    h = tx.Dropout(h, probability=keep_prob)
                 last_layer = h
 
             f_prediction = f_prediction.reuse_with(last_layer)
